@@ -1,0 +1,25 @@
+<script lang="ts">
+	type Props = { size?: number; class?: string };
+	let { size = 18, class: klass = '' }: Props = $props();
+</script>
+
+<svg
+	xmlns="http://www.w3.org/2000/svg"
+	viewBox="0 0 32 32"
+	width={size}
+	height={size}
+	fill="none"
+	class={klass}
+	aria-hidden="true"
+>
+	<circle cx="16" cy="7" r="3.5" fill="currentColor" />
+	<circle cx="7" cy="22" r="3.5" fill="currentColor" />
+	<circle cx="25" cy="22" r="3.5" fill="currentColor" />
+	<path
+		d="M 16 7 L 7 22 M 16 7 L 25 22 M 7 22 L 25 22"
+		stroke="currentColor"
+		stroke-width="1.5"
+		stroke-linecap="round"
+		opacity="0.35"
+	/>
+</svg>

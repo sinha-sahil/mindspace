@@ -1,0 +1,159 @@
+info:
+  version: '1.0.0'
+  title: 'mindspace database row types'
+
+types:
+  Visibility:
+    type: string
+    enum:
+      - private
+      - link
+
+  ProjectRow:
+    type: object
+    required:
+      - id
+      - workspace_id
+      - name
+      - visibility
+      - created_at
+      - updated_at
+    properties:
+      id:
+        type: string
+      workspace_id:
+        type: string
+      name:
+        type: string
+      scene:
+        type: unknown
+      visibility:
+        $ref: '#/types/Visibility'
+      position:
+        type: number
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+
+  WorkspaceRow:
+    type: object
+    required:
+      - id
+      - name
+      - owner_id
+      - created_at
+      - updated_at
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+
+  AppMemberRow:
+    type: object
+    required:
+      - email
+      - is_admin
+      - created_at
+    properties:
+      email:
+        type: string
+      is_admin:
+        type: boolean
+      added_by:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+
+  PasskeyRow:
+    type: object
+    required:
+      - credential_id
+      - user_id
+      - public_key
+      - counter
+      - transports
+      - backed_up
+      - created_at
+    properties:
+      credential_id:
+        type: string
+      user_id:
+        type: string
+      public_key:
+        type: string
+      counter:
+        type: number
+      transports:
+        type: array
+        items:
+          type: string
+      device_type:
+        type: string
+      backed_up:
+        type: boolean
+      device_name:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      last_used_at:
+        type: string
+        format: date-time
+
+  AppInviteRow:
+    type: object
+    required:
+      - token
+      - grant_admin
+      - use_count
+      - created_at
+    properties:
+      token:
+        type: string
+      created_by:
+        type: string
+      grant_admin:
+        type: boolean
+      max_uses:
+        type: number
+      use_count:
+        type: number
+      expires_at:
+        type: string
+        format: date-time
+      note:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+
+  PasskeyRegisterFinishBody:
+    type: object
+    required:
+      - response
+    properties:
+      response:
+        type: unknown
+      deviceName:
+        type: string
+
+  PasskeyLoginBody:
+    type: object
+    properties:
+      email:
+        type: string
+      response:
+        type: unknown
