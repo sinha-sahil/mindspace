@@ -3,7 +3,9 @@ import { browser } from '$app/environment';
 const STORAGE_KEY = 'mindspace::sidebar-collapsed';
 
 function readInitial(): boolean {
-	if (!browser) {return false;}
+	if (!browser) {
+		return false;
+	}
 	return localStorage.getItem(STORAGE_KEY) === '1';
 }
 
@@ -12,7 +14,9 @@ function createSidebarStore() {
 
 	function toggle() {
 		state.collapsed = !state.collapsed;
-		if (browser) {localStorage.setItem(STORAGE_KEY, state.collapsed ? '1' : '0');}
+		if (browser) {
+			localStorage.setItem(STORAGE_KEY, state.collapsed ? '1' : '0');
+		}
 	}
 
 	return {

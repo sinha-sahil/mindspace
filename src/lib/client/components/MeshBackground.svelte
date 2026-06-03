@@ -37,7 +37,7 @@
 	.blob-1 {
 		width: 620px;
 		height: 620px;
-		background: radial-gradient(circle, #0070f3, transparent 65%);
+		background: radial-gradient(circle, var(--mesh-1, #7986f2), transparent 65%);
 		top: -180px;
 		left: -120px;
 		animation: drift1 22s ease-in-out infinite;
@@ -45,7 +45,7 @@
 	.blob-2 {
 		width: 540px;
 		height: 540px;
-		background: radial-gradient(circle, #7928ca, transparent 65%);
+		background: radial-gradient(circle, var(--mesh-2, #c083d3), transparent 65%);
 		top: 30%;
 		right: -160px;
 		animation: drift2 26s ease-in-out infinite;
@@ -53,7 +53,7 @@
 	.blob-3 {
 		width: 480px;
 		height: 480px;
-		background: radial-gradient(circle, #50e3c2, transparent 65%);
+		background: radial-gradient(circle, var(--mesh-3, #78c2e6), transparent 65%);
 		bottom: -160px;
 		left: 25%;
 		animation: drift3 30s ease-in-out infinite;
@@ -61,7 +61,7 @@
 	.blob-4 {
 		width: 420px;
 		height: 420px;
-		background: radial-gradient(circle, #f81ce5, transparent 65%);
+		background: radial-gradient(circle, var(--mesh-4, #f3c080), transparent 65%);
 		bottom: 8%;
 		right: 10%;
 		animation: drift4 34s ease-in-out infinite;
@@ -69,20 +69,40 @@
 	}
 
 	@keyframes drift1 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		50% { transform: translate(140px, 80px) scale(1.05); }
+		0%,
+		100% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(140px, 80px) scale(1.05);
+		}
 	}
 	@keyframes drift2 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		50% { transform: translate(-100px, 60px) scale(0.95); }
+		0%,
+		100% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(-100px, 60px) scale(0.95);
+		}
 	}
 	@keyframes drift3 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		50% { transform: translate(120px, -90px) scale(1.08); }
+		0%,
+		100% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(120px, -90px) scale(1.08);
+		}
 	}
 	@keyframes drift4 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		50% { transform: translate(-110px, -50px) scale(0.92); }
+		0%,
+		100% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(-110px, -50px) scale(0.92);
+		}
 	}
 
 	.grain {

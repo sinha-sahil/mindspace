@@ -42,8 +42,9 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	}
 	await assertWorkspaceOwner(params.id, locals.user.id, locals.supabase);
 
-	const body = await request.json().catch(() => null);
-	const role = assertRole((body as Record<string, unknown> | null)?.role);
+	const body: unknown = await request.json().catch(() => null);
+	const rawRole = typeof body === 'object' && body !== null && 'role' in body ? body.role : null;
+	const role = assertRole(rawRole);
 
 	const admin = getSupabaseAdmin();
 	const { error: dbError } = await admin

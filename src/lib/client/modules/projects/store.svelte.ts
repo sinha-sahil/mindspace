@@ -1,19 +1,21 @@
 import { browser } from '$app/environment';
 import type { AppSupabaseClient } from '../../../../app';
-import type { Database } from '$lib/database.types';
+import type { Database, ProjectKind } from '$lib/database.types';
 import { analytics } from '../analytics';
 
 export type Visibility = 'private' | 'link';
+export type { ProjectKind };
 
 export type Project = {
 	id: string;
 	name: string;
+	kind: ProjectKind;
 	scene: string;
 	visibility: Visibility;
 	position: number;
 	createdAt: number;
 	updatedAt: number;
-}
+};
 
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
 
@@ -25,15 +27,16 @@ type StoreState = {
 	loading: boolean;
 	error: string | null;
 	savingCount: number;
-}
+};
 
 const ACTIVE_KEY_PREFIX = 'mindspace::active-project::';
 const SAVE_DEBOUNCE_MS = 500;
 
-function rowToProject(row: ProjectRow): Project {
+export function rowToProject(row: ProjectRow): Project {
 	return {
 		id: row.id,
 		name: row.name,
+		kind: row.kind,
 		scene: row.scene !== null ? JSON.stringify(row.scene) : '',
 		visibility: row.visibility ?? 'private',
 		position: row.position ?? 0,
@@ -64,10 +67,27 @@ function createStore() {
 
 	let client: AppSupabaseClient | null = null;
 	let currentWorkspaceId: string | null = null;
+	let errorListener: ((message: string) => void) | null = null;
+	// One-shot active-project preference seeded from the URL on first load. When
+	// present and valid it wins over the localStorage fallback, so a reload of
+	// `/?p=<id>` reopens that project. Cleared once consumed.
+	let initialProjectId: string | null = null;
 	const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 	function activeKey(workspaceId: string) {
 		return ACTIVE_KEY_PREFIX + workspaceId;
+	}
+
+	// Record an error and notify whoever registered onError. Replaces the
+	// page-level $effect that used to poll `error` — failures now push to the
+	// UI at the point they happen.
+	function fail(message: string) {
+		state.error = message;
+		errorListener?.(message);
+	}
+
+	function onError(cb: (message: string) => void) {
+		errorListener = cb;
 	}
 
 	async function loadFor(supabase: AppSupabaseClient, workspaceId: string) {
@@ -84,20 +104,26 @@ function createStore() {
 
 		const { data, error } = await supabase
 			.from('projects')
-			.select('id, workspace_id, name, scene, visibility, position, created_at, updated_at')
+			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
 			.eq('workspace_id', workspaceId)
 			.order('position', { ascending: true })
 			.order('updated_at', { ascending: false });
 
 		if (error) {
-			state.error = error.message;
+			fail(error.message);
 			state.loading = false;
 			return;
 		}
 
 		state.projects = (data ?? []).map(rowToProject).sort(compareProjects);
 
-		if (browser) {
+		// Restore priority: URL preference > localStorage > first project.
+		const preferred = initialProjectId;
+		initialProjectId = null;
+		if (preferred && state.projects.some((p) => p.id === preferred)) {
+			state.activeId = preferred;
+			persistActiveId();
+		} else if (browser) {
 			const stored = localStorage.getItem(activeKey(workspaceId));
 			state.activeId =
 				stored && state.projects.some((p) => p.id === stored)
@@ -108,6 +134,14 @@ function createStore() {
 		}
 
 		state.loading = false;
+	}
+
+	/**
+	 * Seed the active-project preference from the URL before the first load.
+	 * Consumed (and cleared) by the next loadFor.
+	 */
+	function setInitialProject(id: string | null) {
+		initialProjectId = id;
 	}
 
 	function persistActiveId() {
@@ -121,7 +155,7 @@ function createStore() {
 		}
 	}
 
-	async function add(name?: string): Promise<Project | null> {
+	async function add(name?: string, kind: ProjectKind = 'whiteboard'): Promise<Project | null> {
 		if (!client || !currentWorkspaceId) {
 			return null;
 		}
@@ -135,14 +169,15 @@ function createStore() {
 			.insert({
 				name: finalName,
 				workspace_id: currentWorkspaceId,
+				kind,
 				scene: null,
 				position: newPosition
 			})
-			.select('id, workspace_id, name, scene, visibility, position, created_at, updated_at')
+			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
 			.single();
 
 		if (error || !data) {
-			state.error = error?.message ?? 'Failed to create project';
+			fail(error?.message ?? 'Failed to create project');
 			return null;
 		}
 
@@ -200,15 +235,12 @@ function createStore() {
 			return;
 		}
 
-		const { error } = await client
-			.from('projects')
-			.update({ position: newPosition })
-			.eq('id', id);
+		const { error } = await client.from('projects').update({ position: newPosition }).eq('id', id);
 
 		if (error) {
 			project.position = previousPosition;
 			state.projects = [...state.projects].sort(compareProjects);
-			state.error = error.message;
+			fail(error.message);
 			return;
 		}
 		analytics.track('project_reordered', { project_id: id });
@@ -229,7 +261,7 @@ function createStore() {
 		const { error } = await client.from('projects').delete().eq('id', id);
 		if (error) {
 			state.projects = previous;
-			state.error = error.message;
+			fail(error.message);
 			return;
 		}
 		analytics.track('project_deleted', { project_id: id });
@@ -255,7 +287,7 @@ function createStore() {
 		const { error } = await client.from('projects').update({ name: trimmed }).eq('id', id);
 		if (error) {
 			project.name = previousName;
-			state.error = error.message;
+			fail(error.message);
 			return;
 		}
 		analytics.track('project_renamed', { project_id: id });
@@ -298,7 +330,7 @@ function createStore() {
 			state.projects = previous;
 			state.activeId = previousActive;
 			persistActiveId();
-			state.error = error.message;
+			fail(error.message);
 			return false;
 		}
 		analytics.track('project_moved_to_workspace', {
@@ -321,7 +353,7 @@ function createStore() {
 		const { error } = await client.from('projects').update({ visibility }).eq('id', id);
 		if (error) {
 			project.visibility = previous;
-			state.error = error.message;
+			fail(error.message);
 			return;
 		}
 		analytics.track('project_visibility_changed', { project_id: id, visibility });
@@ -374,7 +406,7 @@ function createStore() {
 				}
 				const { error } = await supabase.from('projects').update({ scene: parsed }).eq('id', id);
 				if (error) {
-					state.error = error.message;
+					fail(error.message);
 				}
 			} finally {
 				state.savingCount = Math.max(0, state.savingCount - 1);
@@ -393,6 +425,44 @@ function createStore() {
 		state.loading = false;
 		state.error = null;
 		state.savingCount = 0;
+	}
+
+	/**
+	 * Re-fetch the project list for the current workspace, bypassing the
+	 * loadFor early-exit. Preserves the selected project when it still
+	 * exists; otherwise falls back to the first project. No-op if nothing
+	 * has been loaded yet.
+	 */
+	async function refresh() {
+		if (!client || !currentWorkspaceId) {
+			return;
+		}
+		const ws = currentWorkspaceId;
+		const previousActive = state.activeId;
+		state.loading = true;
+		state.error = null;
+
+		const { data, error } = await client
+			.from('projects')
+			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
+			.eq('workspace_id', ws)
+			.order('position', { ascending: true })
+			.order('updated_at', { ascending: false });
+
+		if (error) {
+			fail(error.message);
+			state.loading = false;
+			return;
+		}
+
+		state.projects = (data ?? []).map(rowToProject).sort(compareProjects);
+		if (previousActive && state.projects.some((p) => p.id === previousActive)) {
+			state.activeId = previousActive;
+		} else {
+			state.activeId = state.projects[0]?.id ?? null;
+			persistActiveId();
+		}
+		state.loading = false;
 	}
 
 	return {
@@ -415,6 +485,7 @@ function createStore() {
 			return state.savingCount > 0;
 		},
 		loadFor,
+		refresh,
 		reset,
 		add,
 		remove,
@@ -423,7 +494,9 @@ function createStore() {
 		select,
 		saveScene,
 		setVisibility,
-		moveToWorkspace
+		moveToWorkspace,
+		setInitialProject,
+		onError
 	};
 }
 

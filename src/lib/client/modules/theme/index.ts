@@ -1,2 +1,2 @@
-export { theme } from "./store.svelte";
-export type { ThemeMode } from "./store.svelte";
+export { theme, SKINS } from './store.svelte';
+export type { ThemeMode, ThemeSkin } from './store.svelte';

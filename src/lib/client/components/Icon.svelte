@@ -31,44 +31,66 @@
 	import grip from '$lib/assets/icons/grip.svg?raw';
 	import pin from '$lib/assets/icons/pin.svg?raw';
 	import undo from '$lib/assets/icons/undo.svg?raw';
+	import refresh from '$lib/assets/icons/refresh.svg?raw';
 	import alertCircle from '$lib/assets/icons/alert-circle.svg?raw';
 	import infoCircle from '$lib/assets/icons/info-circle.svg?raw';
+	import fileText from '$lib/assets/icons/file-text.svg?raw';
+	import book from '$lib/assets/icons/book.svg?raw';
+	import calendar from '$lib/assets/icons/calendar.svg?raw';
+	import hash from '$lib/assets/icons/hash.svg?raw';
+	import code from '$lib/assets/icons/code.svg?raw';
+	import list from '$lib/assets/icons/list.svg?raw';
+	import table from '$lib/assets/icons/table.svg?raw';
+	import star from '$lib/assets/icons/star.svg?raw';
+	import image from '$lib/assets/icons/image.svg?raw';
+	import layout from '$lib/assets/icons/layout.svg?raw';
 
 	export const ICONS = {
-		'plus': plus,
-		'pencil': pencil,
-		'trash': trash,
+		plus: plus,
+		pencil: pencil,
+		trash: trash,
 		'chevron-left': chevronLeft,
 		'chevron-right': chevronRight,
 		'chevron-down': chevronDown,
-		'check': check,
-		'copy': copy,
-		'lock': lock,
-		'link': link,
-		'logout': logout,
-		'shield': shield,
-		'key': key,
-		'sparkles': sparkles,
-		'sun': sun,
-		'moon': moon,
-		'monitor': monitor,
-		'sidebar': sidebar,
+		check: check,
+		copy: copy,
+		lock: lock,
+		link: link,
+		logout: logout,
+		shield: shield,
+		key: key,
+		sparkles: sparkles,
+		sun: sun,
+		moon: moon,
+		monitor: monitor,
+		sidebar: sidebar,
 		'arrow-up-right': arrowUpRight,
-		'circle': circle,
+		circle: circle,
 		'circle-dot': circleDot,
-		'folder': folder,
-		'globe': globe,
-		'mail': mail,
-		'x': xIcon,
-		'search': search,
-		'fingerprint': fingerprint,
-		'command': command,
-		'settings': settings,
-		'grip': grip,
-		'pin': pin,
-		'undo': undo,
+		folder: folder,
+		globe: globe,
+		mail: mail,
+		x: xIcon,
+		search: search,
+		fingerprint: fingerprint,
+		command: command,
+		settings: settings,
+		grip: grip,
+		pin: pin,
+		undo: undo,
+		refresh: refresh,
 		'alert-circle': alertCircle,
-		'info-circle': infoCircle
+		'info-circle': infoCircle,
+		'file-text': fileText,
+		book: book,
+		calendar: calendar,
+		hash: hash,
+		code: code,
+		list: list,
+		table: table,
+		star: star,
+		image: image,
+		layout: layout
 	};
 
 	export type IconName = keyof typeof ICONS;

@@ -7,21 +7,21 @@ export type Workspace = {
 	name: string;
 	ownerId: string;
 	createdAt: number;
-}
+};
 
 type WorkspaceRow = {
 	id: string;
 	name: string;
 	owner_id: string;
 	created_at: string;
-}
+};
 
 type StoreState = {
 	items: Workspace[];
 	activeId: string | null;
 	loading: boolean;
 	error: string | null;
-}
+};
 
 const ACTIVE_KEY_PREFIX = 'mindspace::active-workspace::';
 
@@ -44,15 +44,28 @@ function createStore() {
 
 	let client: AppSupabaseClient | null = null;
 	let currentUserId: string | null = null;
-	let activeChangeListener:
-		| ((supabase: AppSupabaseClient, workspaceId: string) => void)
-		| null = null;
+	let activeChangeListener: ((supabase: AppSupabaseClient, workspaceId: string) => void) | null =
+		null;
+	let errorListener: ((message: string) => void) | null = null;
 
 	function fireActiveChange() {
 		if (!activeChangeListener || !client || !state.activeId) {
 			return;
 		}
 		activeChangeListener(client, state.activeId);
+	}
+
+	// Record an error and notify whoever registered onError. Replaces the
+	// page-level $effect that used to poll `error` — failures now push to the
+	// UI at the point they happen. Errors a caller already surfaces itself
+	// (add, rename) set `state.error` directly and skip this.
+	function fail(message: string) {
+		state.error = message;
+		errorListener?.(message);
+	}
+
+	function onError(cb: (message: string) => void) {
+		errorListener = cb;
 	}
 
 	async function init(supabase: AppSupabaseClient, userId: string) {
@@ -71,7 +84,7 @@ function createStore() {
 			.order('created_at', { ascending: true });
 
 		if (error) {
-			state.error = error.message;
+			fail(error.message);
 			state.loading = false;
 			return;
 		}
@@ -86,9 +99,7 @@ function createStore() {
 		if (browser) {
 			const stored = localStorage.getItem(ACTIVE_KEY_PREFIX + userId);
 			state.activeId =
-				stored && items.some((w) => w.id === stored)
-					? stored
-					: (items[0]?.id ?? null);
+				stored && items.some((w) => w.id === stored) ? stored : (items[0]?.id ?? null);
 		} else {
 			state.activeId = items[0]?.id ?? null;
 		}
@@ -134,7 +145,7 @@ function createStore() {
 			if (!res.ok) {
 				throw new Error((await res.text()) || `Request failed (${res.status})`);
 			}
-			const row = (await res.json()) as WorkspaceRow;
+			const row: WorkspaceRow = await res.json();
 			ws = rowToWorkspace(row);
 		} catch (e) {
 			state.error = e instanceof Error ? e.message : 'Failed to create workspace';
@@ -149,9 +160,7 @@ function createStore() {
 		return ws;
 	}
 
-	function onActiveChange(
-		cb: (supabase: AppSupabaseClient, workspaceId: string) => void
-	) {
+	function onActiveChange(cb: (supabase: AppSupabaseClient, workspaceId: string) => void) {
 		activeChangeListener = cb;
 		fireActiveChange();
 	}
@@ -184,7 +193,7 @@ function createStore() {
 			return;
 		}
 		if (state.items.length <= 1) {
-			state.error = 'Cannot delete your only workspace.';
+			fail('Cannot delete your only workspace.');
 			return;
 		}
 		const previous = state.items;
@@ -196,7 +205,7 @@ function createStore() {
 		const { error } = await client.from('workspaces').delete().eq('id', id);
 		if (error) {
 			state.items = previous;
-			state.error = error.message;
+			fail(error.message);
 			return;
 		}
 		analytics.track('workspace_deleted', { workspace_id: id });
@@ -233,7 +242,8 @@ function createStore() {
 		add,
 		rename,
 		remove,
-		onActiveChange
+		onActiveChange,
+		onError
 	};
 }
 

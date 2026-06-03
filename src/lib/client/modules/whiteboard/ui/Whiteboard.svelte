@@ -1,14 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
+	import { MediaQuery } from 'svelte/reactivity';
+	import type { Attachment } from 'svelte/attachments';
 	import '@excalidraw/excalidraw/index.css';
-	import type {
-		ExcalidrawProps,
-		ExcalidrawImperativeAPI
-	} from '@excalidraw/excalidraw/types';
+	import type { ExcalidrawProps, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 	import { theme } from '$lib/client/modules/theme';
 	import type { AppSupabaseClient } from '../../../../../app';
-	import { collab, reconcileElements, type Peer } from '../collab.svelte';
+	import { collab, reconcileElements, type Peer, type SceneElement } from '../collab.svelte';
 
 	type Props = {
 		scene?: string;
@@ -20,6 +17,9 @@
 		projectId?: string | null;
 		userId?: string | null;
 		userEmail?: string | null;
+		// In split view only the focused pane is "live" — non-live panes still
+		// render + autosave but don't hold the shared realtime channel.
+		live?: boolean;
 	};
 
 	let {
@@ -29,69 +29,54 @@
 		supabase = null,
 		projectId = null,
 		userId = null,
-		userEmail = null
+		userEmail = null,
+		live = true
 	}: Props = $props();
 
-	let containerEl: HTMLDivElement | null = $state(null);
+	let excalAPI: ExcalidrawImperativeAPI | null = $state(null);
 
-	// Resolve 'system' against the OS preference and follow it live.
-	let systemPrefersDark = $state(false);
+	const prefersDark = new MediaQuery('(prefers-color-scheme: dark)');
 	const resolvedTheme = $derived<'light' | 'dark'>(
-		theme.mode === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme.mode
+		theme.mode === 'system' ? (prefersDark.current ? 'dark' : 'light') : theme.mode
 	);
 
-	let excalAPI: ExcalidrawImperativeAPI | null = null;
 	const collabEnabled = $derived(
-		!readOnly && !!supabase && !!projectId && !!userId && !!userEmail
+		!readOnly && live && !!supabase && !!projectId && !!userId && !!userEmail
 	);
 
-	function applyRemoteScene(remoteElements: Parameters<typeof reconcileElements>[0]) {
+	function applyRemoteScene(remote: readonly SceneElement[]) {
 		if (!excalAPI) {
 			return;
 		}
-		const local = excalAPI.getSceneElementsIncludingDeleted() as unknown as Parameters<
-			typeof reconcileElements
-		>[0];
-		const reconciled = reconcileElements(local, remoteElements);
-		// Excalidraw's updateScene expects its full element type; cast since
-		// reconcileElements only inspects id/version/versionNonce.
-		excalAPI.updateScene({
-			elements: reconciled as unknown as Parameters<
-				ExcalidrawImperativeAPI['updateScene']
-			>[0]['elements']
-		});
+		const reconciled = reconcileElements(excalAPI.getSceneElementsIncludingDeleted(), remote);
+		excalAPI.updateScene({ elements: reconciled });
 	}
 
 	function buildCollaboratorsMap(peers: Peer[]) {
-		const m = new Map();
+		const map = new Map<string, Record<string, unknown>>();
 		for (const p of peers) {
-			m.set(p.id, {
+			const collaborator: Record<string, unknown> = {
+				id: p.id,
 				username: p.name,
-				avatarUrl: undefined,
-				color: { background: p.color.from, stroke: p.color.to },
-				pointer: p.pointer,
-				button: p.button,
-				selectedElementIds: p.selectedElementIds
-			});
+				color: { background: p.color.from, stroke: p.color.to }
+			};
+			if (p.pointer) {
+				collaborator.pointer = p.pointer;
+			}
+			if (p.button) {
+				collaborator.button = p.button;
+			}
+			map.set(p.id, collaborator);
 		}
-		return m;
+		return map;
 	}
 
-	onMount(() => {
+	// Mount Excalidraw (a React component) into the host element. An attachment
+	// hands us the element directly and runs once for it — the reactive reads in
+	// the async body aren't tracked, so this never re-mounts the React tree.
+	const mountExcalidraw: Attachment<HTMLElement> = (node) => {
 		let cleanup: (() => void) | null = null;
 		let cancelled = false;
-
-		// Track system color scheme so 'system' mode reflects OS changes too.
-		let mq: MediaQueryList | null = null;
-		let onMqChange: ((e: MediaQueryListEvent) => void) | null = null;
-		if (browser && typeof window.matchMedia === 'function') {
-			mq = window.matchMedia('(prefers-color-scheme: dark)');
-			systemPrefersDark = mq.matches;
-			onMqChange = (e) => {
-				systemPrefersDark = e.matches;
-			};
-			mq.addEventListener('change', onMqChange);
-		}
 
 		(async () => {
 			const [React, { createRoot }, exc] = await Promise.all([
@@ -100,21 +85,20 @@
 				import('@excalidraw/excalidraw')
 			]);
 
-			if (cancelled || !containerEl) {
+			if (cancelled) {
 				return;
 			}
 
 			let initialData: ExcalidrawProps['initialData'] = null;
 			if (scene) {
 				try {
-					const parsed: ExcalidrawProps['initialData'] = JSON.parse(scene);
-					initialData = parsed;
+					initialData = JSON.parse(scene);
 				} catch {
 					initialData = null;
 				}
 			}
 
-			const root = createRoot(containerEl);
+			const root = createRoot(node);
 
 			let last = scene;
 			const handleChange: NonNullable<ExcalidrawProps['onChange']> = (
@@ -123,9 +107,7 @@
 				files
 			) => {
 				if (collabEnabled) {
-					collab.broadcastScene(
-						elements as unknown as Parameters<typeof reconcileElements>[0]
-					);
+					collab.broadcastScene(elements);
 				}
 				const json = exc.serializeAsJSON(elements, appState, files, 'local');
 				if (json === last) {
@@ -135,19 +117,11 @@
 				onChange?.(json);
 			};
 
-			const handlePointerUpdate: NonNullable<ExcalidrawProps['onPointerUpdate']> = (
-				payload
-			) => {
+			const handlePointerUpdate: NonNullable<ExcalidrawProps['onPointerUpdate']> = (payload) => {
 				if (!collabEnabled) {
 					return;
 				}
-				collab.broadcastPointer(
-					payload.pointer,
-					payload.button as 'down' | 'up',
-					payload.pointersMap
-						? undefined
-						: undefined /* selection broadcast handled in onChange */
-				);
+				collab.broadcastPointer(payload.pointer, payload.button);
 			};
 
 			const baseProps: ExcalidrawProps = {
@@ -172,52 +146,68 @@
 			cleanup = () => {
 				excalAPI = null;
 				root.unmount();
-				collab.disconnect();
+				// Only tear down the channel if it's still ours — another pane
+				// may have taken it over.
+				if (projectId) {
+					collab.leaveProject(projectId);
+				}
 			};
 		})();
 
 		return () => {
 			cancelled = true;
-			if (mq && onMqChange) {
-				mq.removeEventListener('change', onMqChange);
-			}
 			cleanup?.();
 		};
-	});
+	};
 
-	// Push theme changes into Excalidraw's appState via its imperative API.
-	// This avoids re-rendering the React tree (which would lose UI state) and
-	// only updates the theme.
-	$effect(() => {
-		const next = resolvedTheme;
-		if (excalAPI) {
-			excalAPI.updateScene({ appState: { theme: next } });
+	// Attachments: element-bound reactive sync into Excalidraw's imperative API.
+	// They re-run whenever the reactive state they read changes — the Svelte 5
+	// idiom for wiring an element to a third-party library.
+
+	// Mirror the app theme into Excalidraw without re-rendering the React tree.
+	const syncTheme: Attachment = () => {
+		const api = excalAPI;
+		if (api) {
+			api.updateScene({ appState: { theme: resolvedTheme } });
 		}
-	});
+	};
 
-	// Connect / reconnect to the collaboration channel when the project or
-	// user identity changes. Disconnect handled in onMount cleanup.
-	$effect(() => {
-		if (!collabEnabled || !supabase || !projectId || !userId || !userEmail) {
-			collab.disconnect();
-			return;
+	// Hold the realtime channel while this pane is live. collab.connect()
+	// internally swaps channels, so focus moving between split panes hands the
+	// channel over cleanly. Teardown happens in the mount cleanup.
+	const syncCollab: Attachment = () => {
+		if (collabEnabled && supabase && projectId && userId && userEmail) {
+			collab.connect(
+				supabase,
+				projectId,
+				{ id: userId, email: userEmail },
+				{
+					onRemoteScene: applyRemoteScene
+				}
+			);
 		}
-		collab.connect(supabase, projectId, { id: userId, email: userEmail }, {
-			onRemoteScene: applyRemoteScene
-		});
-	});
+	};
 
-	// Push the remote-collaborator pointer state into Excalidraw so it draws
-	// each peer's cursor. Excalidraw consumes a Map<id, Collaborator>.
-	$effect(() => {
+	// Draw peers' cursors. A non-live pane clears them — its peers belong to the
+	// other pane's project.
+	const syncPeers: Attachment = () => {
 		const peers = collab.peers;
-		if (excalAPI) {
-			excalAPI.updateScene({ collaborators: buildCollaboratorsMap(peers) });
+		const api = excalAPI;
+		if (api) {
+			api.updateScene({
+				collaborators: collabEnabled ? buildCollaboratorsMap(peers) : new Map()
+			});
 		}
-	});
+	};
 </script>
 
-<div bind:this={containerEl} class="excal-host"></div>
+<div
+	class="excal-host"
+	{@attach mountExcalidraw}
+	{@attach syncTheme}
+	{@attach syncCollab}
+	{@attach syncPeers}
+></div>
 
 <style>
 	.excal-host {

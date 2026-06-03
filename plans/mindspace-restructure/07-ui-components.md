@@ -6,13 +6,13 @@ Move feature-owned `.svelte` files into `module/ui/`. Cross-feature primitives g
 
 ## Tasks
 
-| Component | Destination |
-|---|---|
-| `Sidebar.svelte` | `client/modules/sidebar/ui/Sidebar.svelte` |
-| `Whiteboard.svelte` | `client/modules/whiteboard/ui/Whiteboard.svelte` |
-| `Icon.svelte` | `client/components/Icon.svelte` (shared) |
-| `Logo.svelte` | `client/components/Logo.svelte` (shared) |
-| `Modal.svelte` | `client/components/Modal.svelte` (shared) |
+| Component               | Destination                                        |
+| ----------------------- | -------------------------------------------------- |
+| `Sidebar.svelte`        | `client/modules/sidebar/ui/Sidebar.svelte`         |
+| `Whiteboard.svelte`     | `client/modules/whiteboard/ui/Whiteboard.svelte`   |
+| `Icon.svelte`           | `client/components/Icon.svelte` (shared)           |
+| `Logo.svelte`           | `client/components/Logo.svelte` (shared)           |
+| `Modal.svelte`          | `client/components/Modal.svelte` (shared)          |
 | `MeshBackground.svelte` | `client/components/MeshBackground.svelte` (shared) |
 
 - [ ] Move each file

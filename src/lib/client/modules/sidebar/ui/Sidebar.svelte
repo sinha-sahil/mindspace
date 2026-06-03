@@ -1,14 +1,16 @@
 <script lang="ts">
-	import { ContextMenu } from '@juspay/svelte-ui-components';
-	import Logo from "$lib/client/components/Logo.svelte";
-	import Icon from "$lib/client/components/Icon.svelte";
-	import Modal from "$lib/client/components/Modal.svelte";
+	import { ContextMenu, Modal, Button, Tooltip } from '@juspay/svelte-ui-components';
+	import Logo from '$lib/client/components/Logo.svelte';
+	import Icon from '$lib/client/components/Icon.svelte';
 	import WorkspaceSettingsModal from './WorkspaceSettingsModal.svelte';
-	import { projects, type Project } from '$lib/client/modules/projects';
+	import McpInstallModal from '$lib/client/modules/mcp/ui/McpInstallModal.svelte';
+	import { projects, type Project, type ProjectKind } from '$lib/client/modules/projects';
 	import { workspaces, type Workspace } from '$lib/client/modules/workspaces';
-	import { theme, type ThemeMode } from '$lib/client/modules/theme';
+	import { theme, type ThemeMode, type ThemeSkin, SKINS } from '$lib/client/modules/theme';
 	import { sidebar } from '$lib/client/modules/sidebar';
+	import { splitView } from '$lib/client/modules/split-view';
 	import { commandPalette } from '$lib/client/modules/command-palette';
+	import { whatsNew } from '$lib/client/modules/whats-new';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { analytics } from '$lib/client/modules/analytics';
 	import { colorForKey, initialFor } from '$lib/client/utils/color';
@@ -26,6 +28,25 @@
 
 	let wsMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
+	let newProjectMenuOpen = $state(false);
+	let mcpInstallOpen = $state(false);
+	let refreshingProjects = $state(false);
+
+	async function refreshProjects() {
+		if (refreshingProjects) {
+			return;
+		}
+		refreshingProjects = true;
+		try {
+			await projects.refresh();
+		} catch (e) {
+			toasts.error('Could not refresh projects', {
+				description: e instanceof Error ? e.message : 'Unknown error'
+			});
+		} finally {
+			refreshingProjects = false;
+		}
+	}
 
 	let createWsOpen = $state(false);
 	let newWsName = $state('');
@@ -134,8 +155,8 @@
 
 	// Body-portaled hover tooltip for rail items inside .list — escapes the
 	// list's overflow clip that the CSS-only [data-tip]::after can't.
-	function railTip(node: HTMLElement, label: string | null | undefined) {
-		let text = label ?? null;
+	function railTip(node: HTMLElement, label: string | null) {
+		let text = label;
 		let el: HTMLDivElement | null = null;
 
 		function show() {
@@ -167,8 +188,8 @@
 		node.addEventListener('mousedown', hide);
 
 		return {
-			update(next: string | null | undefined) {
-				text = next ?? null;
+			update(next: string | null) {
+				text = next;
 				if (el && text) {
 					el.textContent = text;
 				} else if (!text) {
@@ -190,7 +211,7 @@
 		queueMicrotask(() => renameInputEl?.select());
 	}
 
-	function beginDrag(e: PointerEvent, projectId: string, sourceEl: HTMLElement) {
+	function beginDrag(e: PointerEvent, projectId: string, rowEl: HTMLElement) {
 		// Only respond to primary button. Secondary/middle leave the row alone
 		// so the ContextMenu and other handlers behave normally.
 		if (e.button !== 0) {
@@ -200,6 +221,11 @@
 		if (editingId === projectId) {
 			return;
 		}
+		const closestItem = rowEl.closest('.item');
+		if (!(closestItem instanceof HTMLElement)) {
+			return;
+		}
+		const sourceEl: HTMLElement = closestItem;
 
 		const startX = e.clientX;
 		const startY = e.clientY;
@@ -212,9 +238,7 @@
 			if (!listEl) {
 				return 0;
 			}
-			const items = Array.from(
-				listEl.querySelectorAll<HTMLElement>('.item:not(.dragging)')
-			);
+			const items = Array.from(listEl.querySelectorAll<HTMLElement>('.item:not(.dragging)'));
 			for (let i = 0; i < items.length; i++) {
 				const r = items[i].getBoundingClientRect();
 				const mid = r.top + r.height / 2;
@@ -234,7 +258,11 @@
 			ghostOffsetY = clientY - r.top;
 
 			// Clone the source row as a floating ghost positioned at the cursor.
-			ghost = sourceEl.cloneNode(true) as HTMLElement;
+			const clone = sourceEl.cloneNode(true);
+			if (!(clone instanceof HTMLElement)) {
+				return;
+			}
+			ghost = clone;
 			ghost.classList.add('drag-ghost');
 			ghost.style.position = 'fixed';
 			ghost.style.left = `${clientX - ghostOffsetX}px`;
@@ -312,21 +340,32 @@
 		return false;
 	}
 	function commitRename() {
-		if (editingId) {projects.rename(editingId, draftName);}
+		if (editingId) {
+			projects.rename(editingId, draftName);
+		}
 		editingId = null;
 	}
 	function handleRenameKey(e: KeyboardEvent) {
-		if (e.key === 'Enter') {commitRename();}
-		else if (e.key === 'Escape') {(editingId = null);}
+		if (e.key === 'Enter') {
+			commitRename();
+		} else if (e.key === 'Escape') {
+			editingId = null;
+		}
 	}
 
 	function relativeTime(ts: number): string {
 		const diff = Date.now() - ts;
 		const m = Math.floor(diff / 60000);
-		if (m < 1) {return 'just now';}
-		if (m < 60) {return `${m}m ago`;}
+		if (m < 1) {
+			return 'just now';
+		}
+		if (m < 60) {
+			return `${m}m ago`;
+		}
 		const h = Math.floor(m / 60);
-		if (h < 24) {return `${h}h ago`;}
+		if (h < 24) {
+			return `${h}h ago`;
+		}
 		const d = Math.floor(h / 24);
 		return `${d}d ago`;
 	}
@@ -349,10 +388,26 @@
 		}
 	}
 
+	function closeCreateWs() {
+		createWsOpen = false;
+		newWsName = '';
+		newWsError = '';
+	}
+
 	async function handleNewProject() {
 		const created = await projects.add();
 		if (created) {
 			toasts.success('Project created', { description: created.name });
+		}
+	}
+
+	async function createProjectOfKind(kind: ProjectKind) {
+		newProjectMenuOpen = false;
+		const created = await projects.add('', kind);
+		if (created) {
+			toasts.success(kind === 'doc' ? 'Doc project created' : 'Project created', {
+				description: created.name
+			});
 		}
 	}
 
@@ -361,19 +416,35 @@
 		toasts.info('Project deleted', { description: name });
 	}
 
+	/**
+	 * Route a project click. When split view is on and the right pane is
+	 * focused, the click fills the right pane; otherwise it selects normally
+	 * (and clicking the already-active project in expanded mode renames it).
+	 */
+	function handleProjectClick(project: Project) {
+		if (splitView.enabled && splitView.focused === 'right') {
+			splitView.setRight(project.id);
+			return;
+		}
+		if (!collapsed && project.id === projects.activeId) {
+			startRename(project.id, project.name);
+			return;
+		}
+		projects.select(project.id);
+	}
+
 	function projectMenuItems(project: Project) {
 		const isPublic = project.visibility === 'link';
 		// Only offer "Move to" entries for workspaces other than the active one
 		// (since the project already lives there).
-		const otherWorkspaces = workspaces.items.filter(
-			(ws) => ws.id !== workspaces.activeId
-		);
+		const otherWorkspaces = workspaces.items.filter((ws) => ws.id !== workspaces.activeId);
 		const moveItems = otherWorkspaces.map((ws) => ({
 			label: `Move to ${ws.name}`,
 			value: `move:${ws.id}`
 		}));
 		return [
 			{ label: 'Rename', value: 'rename' },
+			{ label: 'Open in split view', value: 'split' },
 			{
 				label: isPublic ? 'Make private' : 'Share with link',
 				value: 'visibility'
@@ -394,6 +465,8 @@
 				sidebar.toggle();
 			}
 			queueMicrotask(() => startRename(project.id, project.name));
+		} else if (value === 'split') {
+			splitView.openInSplit(project.id);
 		} else if (value === 'visibility') {
 			const next = project.visibility === 'link' ? 'private' : 'link';
 			await projects.setVisibility(project.id, next);
@@ -428,6 +501,10 @@
 		theme.set(mode);
 	}
 
+	function setSkin(skin: ThemeSkin) {
+		theme.setSkin(skin);
+	}
+
 	const userInitial = $derived((userEmail || '?')[0].toUpperCase());
 	const collapsed = $derived(sidebar.collapsed);
 	const wsColor = $derived.by(() => {
@@ -446,6 +523,9 @@
 		}
 		if (!target.closest('.user-trigger') && !target.closest('.user-menu')) {
 			userMenuOpen = false;
+		}
+		if (!target.closest('.new-project-trigger') && !target.closest('.new-project-menu')) {
+			newProjectMenuOpen = false;
 		}
 	}
 </script>
@@ -585,6 +665,20 @@
 			>
 				<Icon name="plus" size={16} />
 			</button>
+			<Tooltip text="Refresh projects" position="right">
+				<Button
+					classes="btn-icon-rail"
+					ariaLabel="Refresh projects"
+					disabled={refreshingProjects}
+					showLoader={refreshingProjects}
+					loaderType="Circular"
+					onclick={refreshProjects}
+				>
+					{#snippet icon()}
+						{#if !refreshingProjects}<Icon name="refresh" size={15} />{/if}
+					{/snippet}
+				</Button>
+			</Tooltip>
 			<button
 				class="rail-icon-btn"
 				data-tip="Search · ⌘K"
@@ -594,10 +688,59 @@
 				<Icon name="search" size={15} />
 			</button>
 		{:else}
-			<button class="action-btn" title="New project" onclick={handleNewProject}>
-				<Icon name="plus" size={14} />
-				<span>New project</span>
-			</button>
+			<Tooltip text="Refresh projects" position="bottom">
+				<Button
+					classes="btn-icon"
+					ariaLabel="Refresh projects"
+					disabled={refreshingProjects}
+					showLoader={refreshingProjects}
+					loaderType="Circular"
+					onclick={refreshProjects}
+				>
+					{#snippet icon()}
+						{#if !refreshingProjects}<Icon name="refresh" size={13} />{/if}
+					{/snippet}
+				</Button>
+			</Tooltip>
+			<div class="new-project-wrap">
+				<button
+					class="action-btn new-project-trigger"
+					title="New project"
+					aria-haspopup="menu"
+					aria-expanded={newProjectMenuOpen}
+					onclick={() => (newProjectMenuOpen = !newProjectMenuOpen)}
+				>
+					<Icon name="plus" size={14} />
+					<span>New project</span>
+					<Icon name="chevron-down" size={11} class="new-caret" />
+				</button>
+				{#if newProjectMenuOpen}
+					<div class="popover new-project-menu" role="menu">
+						<button
+							type="button"
+							class="popover-item kind-item"
+							onclick={() => createProjectOfKind('whiteboard')}
+						>
+							<span class="popover-icon"><Icon name="folder" size={14} /></span>
+							<span class="kind-text">
+								<span class="popover-item-text">Whiteboard</span>
+								<span class="kind-hint">Infinite canvas for sketches</span>
+							</span>
+						</button>
+						<button
+							type="button"
+							class="popover-item kind-item"
+							onclick={() => createProjectOfKind('doc')}
+						>
+							<span class="popover-icon"><Icon name="pencil" size={14} /></span>
+							<span class="kind-text">
+								<span class="popover-item-text">Document</span>
+								<span class="kind-hint">Markdown notes with comment threads</span>
+							</span>
+						</button>
+					</div>
+				{/if}
+			</div>
 			<button
 				class="cmdk-hint"
 				title="Open command palette"
@@ -651,22 +794,14 @@
 							class="row"
 							class:rail-tile={collapsed}
 							use:railTip={collapsed ? project.name : null}
-							aria-label={collapsed ? project.name : undefined}
+							aria-label={collapsed ? project.name : null}
 							title={!collapsed && !active ? project.name : null}
-							onpointerdown={(e) => beginDrag(e, project.id, e.currentTarget.closest('.item') as HTMLElement)}
+							onpointerdown={(e) => beginDrag(e, project.id, e.currentTarget)}
 							onclick={() => {
 								if (consumeClickIfDragged()) {
 									return;
 								}
-								if (collapsed) {
-									projects.select(project.id);
-									return;
-								}
-								if (active) {
-									startRename(project.id, project.name);
-								} else {
-									projects.select(project.id);
-								}
+								handleProjectClick(project);
 							}}
 						>
 							{#if collapsed}
@@ -679,7 +814,13 @@
 									</span>
 								{/if}
 							{:else}
-								<span class="dot" aria-hidden="true"></span>
+								{#if project.kind === 'doc'}
+									<span class="kind-icon" aria-hidden="true">
+										<Icon name="pencil" size={11} />
+									</span>
+								{:else}
+									<span class="dot" aria-hidden="true"></span>
+								{/if}
 								<span class="meta">
 									{#if isEditing}
 										<input
@@ -734,6 +875,19 @@
 	</nav>
 
 	<footer class="foot">
+		<button
+			class="mcp-trigger"
+			class:rail-icon-btn={collapsed}
+			data-tip={collapsed ? 'Use with Claude Code' : null}
+			title={!collapsed ? 'Connect to Claude Code or Claude Desktop' : null}
+			aria-label="Connect to Claude Code"
+			onclick={() => (mcpInstallOpen = true)}
+		>
+			<Icon name="command" size={collapsed ? 16 : 13} />
+			{#if !collapsed}
+				<span class="mcp-label">Use with Claude</span>
+			{/if}
+		</button>
 		<button
 			class="user-trigger"
 			class:rail-tile={collapsed}
@@ -790,13 +944,40 @@
 					</button>
 				</div>
 
+				<div class="popover-section-label">Skin</div>
+				<div class="skin-list" role="group" aria-label="Skin">
+					{#each SKINS as s (s.id)}
+						<button
+							class="skin-row"
+							class:active={theme.skin === s.id}
+							onclick={() => setSkin(s.id)}
+							title={s.blurb}
+						>
+							<span class="skin-swatch" data-skin-preview={s.id} aria-hidden="true"></span>
+							<span class="skin-meta">
+								<span class="skin-name">{s.label}</span>
+								<span class="skin-blurb">{s.blurb}</span>
+							</span>
+							{#if theme.skin === s.id}
+								<Icon name="check" size={13} class="skin-check" />
+							{/if}
+						</button>
+					{/each}
+				</div>
+
 				<div class="popover-divider"></div>
 
-				<a
+				<button
 					class="popover-item"
-					href="/settings/passkeys"
-					onclick={() => (userMenuOpen = false)}
+					onclick={() => {
+						userMenuOpen = false;
+						whatsNew.show();
+					}}
 				>
+					<span class="popover-icon"><Icon name="sparkles" size={14} /></span>
+					<span class="popover-item-text">What's new</span>
+				</button>
+				<a class="popover-item" href="/settings/passkeys" onclick={() => (userMenuOpen = false)}>
 					<span class="popover-icon"><Icon name="key" size={14} /></span>
 					<span class="popover-item-text">Passkeys</span>
 				</a>
@@ -820,61 +1001,49 @@
 	</footer>
 </aside>
 
-<Modal
-	open={createWsOpen}
-	title="Create a workspace"
-	description="Workspaces help you keep separate sets of projects."
-	onClose={() => {
-		createWsOpen = false;
-		newWsName = '';
-		newWsError = '';
-	}}
->
-	{#snippet children()}
-		<form onsubmit={submitNewWorkspace} class="modal-form">
-			<label class="modal-field">
-				<span>Workspace name</span>
-				<input
-					use:focusOnTrigger={createWsOpen}
-					bind:value={newWsName}
-					type="text"
-					placeholder="e.g. Personal · Acme · Side projects"
-					maxlength="80"
-				/>
-			</label>
-			{#if newWsError}
-				<p class="modal-error">{newWsError}</p>
-			{/if}
-		</form>
-	{/snippet}
-	{#snippet footer()}
-		<button
-			type="button"
-			class="modal-btn ghost"
-			onclick={() => {
-				createWsOpen = false;
-				newWsName = '';
-			}}
-			disabled={newWsBusy}
-		>
-			Cancel
-		</button>
-		<button
-			type="button"
-			class="modal-btn primary"
-			disabled={!newWsName.trim() || newWsBusy}
-			onclick={() => submitNewWorkspace()}
-		>
-			{newWsBusy ? 'Creating…' : 'Create workspace'}
-		</button>
-	{/snippet}
-</Modal>
+{#if createWsOpen}
+	<Modal
+		classes="ms-modal"
+		size="fit-content"
+		header={{ text: 'Create a workspace' }}
+		onoverlayClick={closeCreateWs}
+	>
+		{#snippet content()}
+			<form onsubmit={submitNewWorkspace} class="modal-form">
+				<p class="modal-intro">Workspaces help you keep separate sets of projects.</p>
+				<label class="modal-field">
+					<span>Workspace name</span>
+					<input
+						use:focusOnTrigger={createWsOpen}
+						bind:value={newWsName}
+						type="text"
+						placeholder="e.g. Personal · Acme · Side projects"
+						maxlength="80"
+					/>
+				</label>
+				{#if newWsError}
+					<p class="modal-error">{newWsError}</p>
+				{/if}
+			</form>
+		{/snippet}
+		{#snippet footerSnippet()}
+			<Button text="Cancel" classes="btn-secondary" disabled={newWsBusy} onclick={closeCreateWs} />
+			<Button
+				text={newWsBusy ? 'Creating…' : 'Create workspace'}
+				disabled={!newWsName.trim() || newWsBusy}
+				onclick={() => submitNewWorkspace()}
+			/>
+		{/snippet}
+	</Modal>
+{/if}
 
 <WorkspaceSettingsModal
 	workspace={settingsWorkspace}
 	isOwner={settingsWorkspace?.ownerId === userId}
 	onClose={() => (settingsWorkspace = null)}
 />
+
+<McpInstallModal bind:open={mcpInstallOpen} />
 
 <style>
 	.sidebar {
@@ -1434,7 +1603,10 @@
 		border-radius: var(--radius-sm);
 		cursor: pointer;
 		opacity: 0;
-		transition: opacity 120ms, color 120ms, background 120ms;
+		transition:
+			opacity 120ms,
+			color 120ms,
+			background 120ms;
 	}
 	.ws-popover-row:hover .ws-settings-btn,
 	.ws-settings-btn:focus-visible {
@@ -1462,6 +1634,17 @@
 	.actions {
 		padding: 10px;
 		border-bottom: 1px solid var(--border);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: stretch;
+		gap: 6px;
+	}
+	/* In the collapsed rail, stack the icons vertically — the row is too
+	   narrow to host them side by side. */
+	.actions.rail {
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
 	}
 	.action-btn {
 		width: 100%;
@@ -1479,13 +1662,46 @@
 		border: 1px solid var(--geist-foreground);
 		border-radius: var(--radius-md);
 		cursor: pointer;
-		transition: opacity 120ms;
+		transition:
+			opacity 120ms,
+			border-color 120ms,
+			background 120ms,
+			color 120ms;
 	}
 	.action-btn:hover {
 		opacity: 0.9;
 	}
 	.sidebar.collapsed .action-btn {
 		padding: 0;
+	}
+
+	/* The refresh trigger uses the library Button (.btn-icon variant) — its
+	   built-in Circular loader handles the spinning state, no custom CSS. */
+
+	.new-project-wrap {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+	}
+	:global(.new-caret) {
+		margin-left: auto;
+		opacity: 0.7;
+	}
+	.kind-item {
+		gap: 10px;
+	}
+	.kind-text {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+	.kind-hint {
+		font-size: 11px;
+		color: var(--accents-5);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.cmdk-hint {
@@ -1717,6 +1933,18 @@
 		background: var(--geist-success);
 		box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.18);
 	}
+	.kind-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
+		color: var(--accents-5);
+		flex-shrink: 0;
+	}
+	.item.active .kind-icon {
+		color: var(--geist-foreground);
+	}
 	.meta {
 		min-width: 0;
 		flex: 1;
@@ -1836,7 +2064,47 @@
 		position: relative;
 		padding: 10px;
 		border-top: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
 	}
+	.mcp-trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 6px 10px;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--accents-6);
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition:
+			color 120ms,
+			border-color 120ms,
+			background 120ms;
+	}
+	.mcp-trigger:hover {
+		color: var(--geist-foreground);
+		border-color: var(--accents-3);
+		background: var(--accents-1);
+	}
+	.mcp-label {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.sidebar.collapsed .mcp-trigger {
+		width: auto;
+		justify-content: center;
+		padding: 0;
+		align-self: center;
+	}
+
 	.user-trigger {
 		width: 100%;
 		display: inline-flex;
@@ -1939,6 +2207,78 @@
 		box-shadow: var(--shadow-smallest);
 	}
 
+	.skin-list {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 0 4px 4px;
+	}
+	.skin-row {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		width: 100%;
+		padding: 6px 8px;
+		font: inherit;
+		text-align: left;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		transition: background 100ms;
+	}
+	.skin-row:hover {
+		background: var(--accents-1);
+	}
+	.skin-row.active {
+		background: var(--accent-soft);
+		border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+	}
+	.skin-swatch {
+		flex-shrink: 0;
+		width: 22px;
+		height: 22px;
+		border-radius: 7px;
+		border: 1px solid var(--border-strong);
+		box-shadow: var(--shadow-smallest);
+	}
+	.skin-swatch[data-skin-preview='editorial-luxe'] {
+		background: linear-gradient(135deg, #4d53c1 0%, #c77fb0 55%, #e2b878 100%);
+	}
+	.skin-swatch[data-skin-preview='lumen'] {
+		background: linear-gradient(135deg, #5b48f0 0%, #b06fd6 50%, #5fb6e8 100%);
+	}
+	.skin-swatch[data-skin-preview='voltaic'] {
+		background: linear-gradient(135deg, #2f6df0 0%, #41c0e0 50%, #6a4bd6 100%);
+	}
+	.skin-swatch[data-skin-preview='terracotta'] {
+		background: linear-gradient(135deg, #3f7d4e 0%, #c5703f 55%, #d9a23f 100%);
+	}
+	.skin-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+		flex: 1;
+	}
+	.skin-name {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--geist-foreground);
+		letter-spacing: -0.005em;
+	}
+	.skin-blurb {
+		font-size: 10.5px;
+		color: var(--accents-5);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.skin-row :global(.skin-check) {
+		flex-shrink: 0;
+		color: var(--accent);
+	}
+
 	.muted {
 		padding: 12px;
 		font-size: 12px;
@@ -1954,6 +2294,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+		width: min(420px, 92vw);
+		padding: 18px 20px 20px;
+	}
+	.modal-intro {
+		margin: 0;
+		font-size: 13px;
+		color: var(--accents-5);
 	}
 	.modal-field {
 		display: flex;
@@ -1986,39 +2333,6 @@
 		font-size: 12px;
 		color: var(--geist-error);
 	}
-	.modal-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		height: 32px;
-		padding: 0 14px;
-		font: inherit;
-		font-size: 13px;
-		font-weight: 500;
-		border: 1px solid;
-		border-radius: var(--radius-md);
-		cursor: pointer;
-	}
-	.modal-btn.ghost {
-		color: var(--accents-6);
-		background: transparent;
-		border-color: var(--border);
-	}
-	.modal-btn.ghost:hover:not(:disabled) {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
-	}
-	.modal-btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
-	}
-	.modal-btn.primary:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-	.modal-btn.primary:hover:not(:disabled) {
-		opacity: 0.9;
-	}
+
+	/* MCP install modal moved to its own component: McpInstallModal.svelte */
 </style>

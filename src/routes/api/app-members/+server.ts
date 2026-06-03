@@ -37,8 +37,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		throw error(500, dbError.message);
 	}
 
-	const emails = (data ?? [])
-		.map((r) => r.email)
-		.filter((e) => e.toLowerCase() !== meEmail);
+	const emails = (data ?? []).map((r) => r.email).filter((e) => e.toLowerCase() !== meEmail);
 	return json({ emails });
 };

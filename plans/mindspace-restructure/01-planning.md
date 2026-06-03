@@ -6,25 +6,25 @@ Map existing `src/lib` files to skulls module layout. Confirm utilities the temp
 
 ## Utility detection
 
-| Tool | Expected by skulls | Status in mindspace |
-|---|---|---|
-| `type-crafter` | required for type generation | ✅ in `package.json`, generates to `src/lib/generated/` |
-| `type-decoder` | runtime for generated decoders | ✅ added |
-| `typesafe-api-call` | recommended | ❌ not used. Direct Supabase client + per-route `+server.ts`. Skipping. |
-| Logger | `appLogger`/custom | ❌ none. Native `console` is the fallback. Out of scope. |
+| Tool                | Expected by skulls             | Status in mindspace                                                     |
+| ------------------- | ------------------------------ | ----------------------------------------------------------------------- |
+| `type-crafter`      | required for type generation   | ✅ in `package.json`, generates to `src/lib/generated/`                 |
+| `type-decoder`      | runtime for generated decoders | ✅ added                                                                |
+| `typesafe-api-call` | recommended                    | ❌ not used. Direct Supabase client + per-route `+server.ts`. Skipping. |
+| Logger              | `appLogger`/custom             | ❌ none. Native `console` is the fallback. Out of scope.                |
 
 ## Module inventory
 
-| Module | Existing files | Target location |
-|---|---|---|
-| `workspaces` | `lib/stores/workspaces.svelte.ts` | `lib/client/modules/workspaces/store.ts` |
-| `projects` | `lib/stores/projects.svelte.ts` | `lib/client/modules/projects/store.ts` |
-| `passkeys` | `lib/passkey.ts`, `lib/server/passkey.ts` | client → `lib/client/modules/passkeys/remote.ts`; server stays in `lib/server/passkey.ts` |
-| `theme` | `lib/stores/theme.svelte.ts` | `lib/client/modules/theme/store.ts` |
-| `sidebar` | `lib/stores/sidebar.svelte.ts`, `lib/components/Sidebar.svelte` | `lib/client/modules/sidebar/{store.ts, ui/Sidebar.svelte}` |
-| `auth` | login form lives in `routes/auth/login`, no client store today | UI helpers only — `lib/client/modules/auth/ui/Login.svelte` (extracted from route) |
-| `whiteboard` | `lib/components/Whiteboard.svelte` | `lib/client/modules/whiteboard/ui/Whiteboard.svelte` |
-| Shared primitives (Icon, Logo, Modal, MeshBackground) | `lib/components/*.svelte` | `lib/client/components/` (cross-module shared, not feature-specific) |
+| Module                                                | Existing files                                                  | Target location                                                                           |
+| ----------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `workspaces`                                          | `lib/stores/workspaces.svelte.ts`                               | `lib/client/modules/workspaces/store.ts`                                                  |
+| `projects`                                            | `lib/stores/projects.svelte.ts`                                 | `lib/client/modules/projects/store.ts`                                                    |
+| `passkeys`                                            | `lib/passkey.ts`, `lib/server/passkey.ts`                       | client → `lib/client/modules/passkeys/remote.ts`; server stays in `lib/server/passkey.ts` |
+| `theme`                                               | `lib/stores/theme.svelte.ts`                                    | `lib/client/modules/theme/store.ts`                                                       |
+| `sidebar`                                             | `lib/stores/sidebar.svelte.ts`, `lib/components/Sidebar.svelte` | `lib/client/modules/sidebar/{store.ts, ui/Sidebar.svelte}`                                |
+| `auth`                                                | login form lives in `routes/auth/login`, no client store today  | UI helpers only — `lib/client/modules/auth/ui/Login.svelte` (extracted from route)        |
+| `whiteboard`                                          | `lib/components/Whiteboard.svelte`                              | `lib/client/modules/whiteboard/ui/Whiteboard.svelte`                                      |
+| Shared primitives (Icon, Logo, Modal, MeshBackground) | `lib/components/*.svelte`                                       | `lib/client/components/` (cross-module shared, not feature-specific)                      |
 
 ## Tasks
 

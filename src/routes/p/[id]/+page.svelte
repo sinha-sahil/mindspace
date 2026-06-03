@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Logo from '$lib/client/components/Logo.svelte';
-	import { Whiteboard } from "$lib/client/modules/whiteboard";
+	import { Whiteboard } from '$lib/client/modules/whiteboard';
 	import { formatDate as fmtDate } from '$lib/client/utils/format';
 
 	let { data } = $props();

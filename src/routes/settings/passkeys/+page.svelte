@@ -268,11 +268,11 @@
 		color: var(--geist-foreground);
 		background: linear-gradient(
 			135deg,
-			color-mix(in srgb, #0070f3 20%, var(--surface)),
-			color-mix(in srgb, #7928ca 15%, var(--surface))
+			color-mix(in srgb, var(--accent) 20%, var(--surface)),
+			color-mix(in srgb, var(--rose) 15%, var(--surface))
 		);
 		border: 1px solid var(--border);
-		border-radius: 12px;
+		border-radius: var(--radius-md);
 	}
 	h1 {
 		margin: 0 0 4px;

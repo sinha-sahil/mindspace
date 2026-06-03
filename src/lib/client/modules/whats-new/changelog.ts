@@ -1,0 +1,150 @@
+/**
+ * Release changelog shown by the "What's new" announcer.
+ *
+ * Keep entries newest-first. `id` must be stable and unique — it's the key
+ * stored in localStorage to remember what a user has already seen, so never
+ * reuse or reorder ids. ISO dates work well.
+ *
+ * When you ship a feature, add a new entry at the TOP.
+ */
+
+import type { IconName } from '$lib/client/components/Icon.svelte';
+
+export type ChangelogFeature = {
+	/** Icon name from $lib/client/components/Icon (optional). */
+	icon?: IconName;
+	title: string;
+	description: string;
+};
+
+export type Release = {
+	/** Stable unique id + sort key. Newer = earlier in the array. */
+	id: string;
+	/** Human-friendly date label, e.g. "May 2026". */
+	date: string;
+	/** Short headline for the release. */
+	title: string;
+	features: ChangelogFeature[];
+};
+
+export const CHANGELOG: Release[] = [
+	{
+		id: '2026-05-26-mcp-update',
+		date: 'May 2026',
+		title: 'Push fresh source into mindspace',
+		features: [
+			{
+				icon: 'undo',
+				title: 'In-place document updates',
+				description:
+					'New MCP tool replaces a document\'s content (and optionally its name) without orphaning comments. Threads stay attached and the renderer\'s prefix+quote+suffix fallback keeps highlights pointing at the right text wherever it still appears in the updated document. Closes the loop for "edit source → sync into mindspace → reviewer sees the update next to their resolved comments".'
+			}
+		]
+	},
+	{
+		id: '2026-05-26-mcp-comments',
+		date: 'May 2026',
+		title: 'LLM-driven comment triage',
+		features: [
+			{
+				icon: 'mail',
+				title: 'Project-wide comment fetch',
+				description:
+					'New MCP tool pulls every comment thread across every document in a project in one call — filterable by open / resolved — so an LLM can triage a whole doc set without paging file-by-file.'
+			},
+			{
+				icon: 'check',
+				title: 'Reply & resolve from Claude',
+				description:
+					'Two new MCP actions: post a chat-style reply on any thread, and mark threads resolved (or reopen them). Resolution is collaborative — any workspace member can toggle it.'
+			}
+		]
+	},
+	{
+		id: '2026-05-26-mcp-http',
+		date: 'May 2026',
+		title: 'Drive mindspace from Claude Code',
+		features: [
+			{
+				icon: 'command',
+				title: 'Hosted MCP server — no install',
+				description:
+					'One command in Claude Code points at mindspace.casa/mcp and the LLM can list your workspaces, create whiteboards from Excalidraw scenes, upload markdown, and pull comment threads. Nothing to build or run locally. Click the ⌘ icon at the bottom of the sidebar for the snippet.'
+			},
+			{
+				icon: 'key',
+				title: 'API tokens in settings',
+				description:
+					'Generate long-lived bearer tokens at Settings → API tokens. Each acts as your user, only its sha256 hash is stored, and you can revoke at any time.'
+			}
+		]
+	},
+	{
+		id: '2026-05-26-docs-and-chats',
+		date: 'May 2026',
+		title: 'Markdown docs with chat threads',
+		features: [
+			{
+				icon: 'pencil',
+				title: 'Doc projects',
+				description:
+					'A new kind of project that holds a set of markdown documents. Click "+ New project" in the sidebar and pick "Document" — or upload a .md file straight into the project.'
+			},
+			{
+				icon: 'mail',
+				title: 'Chats anchored to any text',
+				description:
+					'Select any text in a document and start a thread. Replies are chat-style with author + timestamp. Click an existing highlight to focus its thread in the side panel.'
+			}
+		]
+	},
+	{
+		id: '2026-05-22-split-screen',
+		date: 'May 2026',
+		title: 'Split-screen editing',
+		features: [
+			{
+				icon: 'sidebar',
+				title: 'Two projects, side by side',
+				description:
+					'Open a second project in a split pane and work across both at once. Hit “Split view” in the toolbar, or right-click any project in the sidebar.'
+			},
+			{
+				icon: 'grip',
+				title: 'Resizable panes',
+				description:
+					'Drag the divider to give either project more room — your split ratio is remembered.'
+			}
+		]
+	},
+	{
+		id: '2026-05-11-multiplayer',
+		date: 'May 2026',
+		title: 'Real-time multiplayer',
+		features: [
+			{
+				icon: 'sparkles',
+				title: 'Live cursors & editing',
+				description:
+					'See collaborators’ cursors and watch their edits stream onto the canvas as they happen.'
+			}
+		]
+	},
+	{
+		id: '2026-05-10-shared-workspaces',
+		date: 'May 2026',
+		title: 'Shared workspaces',
+		features: [
+			{
+				icon: 'shield',
+				title: 'Share with editor & viewer roles',
+				description:
+					'Invite teammates to a workspace from its settings — as full editors or read-only viewers.'
+			}
+		]
+	}
+];
+
+export function latestReleaseId(): string {
+	return CHANGELOG[0]?.id ?? '';
+}

@@ -80,8 +80,8 @@
 				</h1>
 				<p class="lede">
 					An infinite canvas, designed for the small group of people who actually have to make
-					things together. Sketch, diagram, dump ideas — pick up exactly where you left off, on
-					any device.
+					things together. Sketch, diagram, dump ideas — pick up exactly where you left off, on any
+					device.
 				</p>
 
 				<ul class="features">
@@ -253,8 +253,7 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 9px;
-		background:
-			linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+		background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
 		border: 1px solid var(--border);
 		box-shadow: var(--shadow-sm);
 		color: var(--fg);
@@ -360,23 +359,58 @@
 	}
 
 	.card {
+		position: relative;
+		isolation: isolate;
+		overflow: hidden;
 		width: 100%;
 		max-width: 420px;
 		padding: 32px 30px 26px;
-		background:
-			linear-gradient(
-				180deg,
-				color-mix(in srgb, var(--surface) 92%, transparent) 0%,
-				color-mix(in srgb, var(--surface) 78%, transparent) 100%
-			);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface) 82%, transparent) 0%,
+			color-mix(in srgb, var(--surface) 70%, transparent) 100%
+		);
 		border: 1px solid var(--border);
-		border-radius: 18px;
-		backdrop-filter: blur(28px) saturate(140%);
-		-webkit-backdrop-filter: blur(28px) saturate(140%);
-		box-shadow: var(--shadow-lg);
+		border-radius: var(--radius-lg);
+		backdrop-filter: blur(28px) saturate(135%);
+		-webkit-backdrop-filter: blur(28px) saturate(135%);
+		box-shadow:
+			0 1px 0 rgba(255, 255, 255, 0.5) inset,
+			var(--shadow-lg);
 		display: flex;
 		flex-direction: column;
 		gap: 18px;
+	}
+	/* Foil-edge signature — a faint highlight that sweeps along the card's top
+	   rule like light catching a foil-stamped line on premium stationery. */
+	.card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 1px;
+		background: linear-gradient(90deg, transparent 0%, var(--accent-glow) 50%, transparent 100%);
+		background-size: 220% 100%;
+		background-position: 200% 0;
+		animation: foil-sweep 7s var(--ease-out) infinite;
+		pointer-events: none;
+		z-index: 1;
+	}
+	@keyframes foil-sweep {
+		0% {
+			background-position: 200% 0;
+		}
+		45%,
+		100% {
+			background-position: -120% 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.card::before {
+			animation: none;
+			background: linear-gradient(90deg, transparent, var(--accent-soft), transparent);
+		}
 	}
 
 	.card-head h2 {
