@@ -14,7 +14,7 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	{
-		ignores: ['src/lib/generated/**']
+		ignores: ['src/lib/generated/**', 'mcp/**']
 	},
 	js.configs.recommended,
 	ts.configs.recommended,
@@ -44,10 +44,7 @@ export default defineConfig(
 			curly: ['error', 'all'],
 
 			// Disallow the 'as' operator (type assertions)
-			'@typescript-eslint/consistent-type-assertions': [
-				'error',
-				{ assertionStyle: 'never' }
-			],
+			'@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
 
 			// Disallow TypeScript type predicates (value is SomeType) and undefined
 			'no-restricted-syntax': [
@@ -59,8 +56,7 @@ export default defineConfig(
 				},
 				{
 					selector: 'Identifier[name="undefined"]',
-					message:
-						'undefined is not allowed. Use null or proper type checking instead.'
+					message: 'undefined is not allowed. Use null or proper type checking instead.'
 				},
 				{
 					selector: 'TSUndefinedKeyword',

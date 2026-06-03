@@ -1,8 +1,11 @@
 <script lang="ts">
 	import '@fontsource-variable/geist/index.css';
 	import '@fontsource-variable/geist-mono/index.css';
-	import '@fontsource-variable/fraunces/wght.css';
-	import '@fontsource-variable/fraunces/wght-italic.css';
+	import '@fontsource-variable/fraunces/opsz.css';
+	import '@fontsource-variable/fraunces/opsz-italic.css';
+	// Fonts for the alternate skins (Lumen → Bricolage, Terracotta → Hanken).
+	import '@fontsource-variable/bricolage-grotesque/index.css';
+	import '@fontsource-variable/hanken-grotesk/index.css';
 	import '$lib/styles/theme.css';
 	import { onMount } from 'svelte';
 	import { invalidate } from '$app/navigation';
@@ -15,16 +18,17 @@
 
 	onMount(() => {
 		theme.set(theme.mode);
+		theme.setSkin(theme.skin);
 		analytics.init();
 		if (user) {
-			analytics.identify(user.id, { email: user.email ?? undefined, isAdmin });
+			analytics.identify(user.id, { email: user.email, isAdmin });
 		}
 		const {
 			data: { subscription }
 		} = supabase.auth.onAuthStateChange((event, newSession) => {
 			if (event === 'SIGNED_IN' && newSession?.user) {
 				analytics.identify(newSession.user.id, {
-					email: newSession.user.email ?? undefined,
+					email: newSession.user.email,
 					isAdmin
 				});
 				analytics.track('user_signed_in', { method: 'magic_link' });

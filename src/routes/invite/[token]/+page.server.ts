@@ -11,9 +11,7 @@ type Invite = {
 	note: string | null;
 };
 
-type InviteResult =
-	| { ok: true; invite: Invite }
-	| { ok: false; reason: string };
+type InviteResult = { ok: true; invite: Invite } | { ok: false; reason: string };
 
 function validateInvite(invite: Invite | null): InviteResult {
 	if (!invite) {
@@ -36,7 +34,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		.eq('token', params.token)
 		.maybeSingle();
 
-	if (dbError) {throw error(500, dbError.message);}
+	if (dbError) {
+		throw error(500, dbError.message);
+	}
 
 	const result = validateInvite(data);
 	return {
@@ -64,10 +64,14 @@ export const actions: Actions = {
 			.select('token, grant_admin, max_uses, use_count, expires_at, note')
 			.eq('token', params.token)
 			.maybeSingle();
-		if (inviteError) {return fail(500, { message: inviteError.message });}
+		if (inviteError) {
+			return fail(500, { message: inviteError.message });
+		}
 
 		const result = validateInvite(inviteRow);
-		if (!result.ok) {return fail(400, { message: result.reason });}
+		if (!result.ok) {
+			return fail(400, { message: result.reason });
+		}
 
 		// Add to allowlist (upsert: existing emails stay, role can be elevated).
 		const { data: existing } = await admin
@@ -81,14 +85,18 @@ export const actions: Actions = {
 		const { error: upsertError } = await admin
 			.from('app_members')
 			.upsert({ email, is_admin: willBeAdmin }, { onConflict: 'email' });
-		if (upsertError) {return fail(500, { message: upsertError.message });}
+		if (upsertError) {
+			return fail(500, { message: upsertError.message });
+		}
 
 		// Increment use_count.
 		const { error: updateError } = await admin
 			.from('app_invites')
 			.update({ use_count: result.invite.use_count + 1 })
 			.eq('token', params.token);
-		if (updateError) {return fail(500, { message: updateError.message });}
+		if (updateError) {
+			return fail(500, { message: updateError.message });
+		}
 
 		throw redirect(303, `/auth/login?email=${encodeURIComponent(email)}`);
 	}

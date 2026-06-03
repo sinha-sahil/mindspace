@@ -63,7 +63,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			return {
 				userId: m.user_id,
 				email: u.user?.email ?? '',
-				role: m.role as WorkspaceRole,
+				role: assertRole(m.role),
 				addedAt: m.added_at
 			};
 		})
@@ -87,14 +87,15 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const workspaceId = params.id;
 	await assertWorkspaceOwner(workspaceId, locals.user.id, locals.supabase);
 
-	const body = await request.json().catch(() => null);
+	const body: unknown = await request.json().catch(() => null);
 	if (!body || typeof body !== 'object') {
 		throw error(400, 'Invalid JSON body');
 	}
-	const email = String((body as Record<string, unknown>).email ?? '')
+	const rawEmail = 'email' in body ? body.email : '';
+	const email = String(rawEmail ?? '')
 		.trim()
 		.toLowerCase();
-	const role = assertRole((body as Record<string, unknown>).role);
+	const role = assertRole('role' in body ? body.role : null);
 
 	if (!email || !email.includes('@')) {
 		throw error(400, 'Valid email required');

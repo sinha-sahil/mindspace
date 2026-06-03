@@ -22,7 +22,9 @@
 			await navigator.clipboard.writeText(inviteUrl(token));
 			copiedToken = token;
 			setTimeout(() => {
-				if (copiedToken === token) {copiedToken = null;}
+				if (copiedToken === token) {
+					copiedToken = null;
+				}
 			}, 1500);
 		} catch {
 			/* clipboard rejected */
@@ -34,8 +36,12 @@
 		use_count: number;
 		expires_at: string | null;
 	}) {
-		if (invite.expires_at && new Date(invite.expires_at) < new Date()) {return 'Expired';}
-		if (invite.max_uses !== null && invite.use_count >= invite.max_uses) {return 'Used up';}
+		if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+			return 'Expired';
+		}
+		if (invite.max_uses !== null && invite.use_count >= invite.max_uses) {
+			return 'Used up';
+		}
 		return 'Active';
 	}
 </script>
@@ -64,8 +70,8 @@
 			<div>
 				<h1>App access</h1>
 				<p>
-					Mindspace is invite-only. Manage who can sign in and generate one-link invites that
-					do the work for you.
+					Mindspace is invite-only. Manage who can sign in and generate one-link invites that do the
+					work for you.
 				</p>
 			</div>
 		</section>
@@ -245,12 +251,7 @@
 									<Icon name={copiedToken === inv.token ? 'check' : 'copy'} size={12} />
 									<span>{copiedToken === inv.token ? 'Copied' : 'Copy link'}</span>
 								</button>
-								<form
-									method="POST"
-									action="?/revokeInvite"
-									use:enhance
-									class="inline-form"
-								>
+								<form method="POST" action="?/revokeInvite" use:enhance class="inline-form">
 									<input type="hidden" name="token" value={inv.token} />
 									<button type="submit" class="btn ghost danger">
 										<Icon name="trash" size={12} />
@@ -341,11 +342,11 @@
 		color: var(--geist-foreground);
 		background: linear-gradient(
 			135deg,
-			color-mix(in srgb, #0070f3 18%, var(--surface)),
-			color-mix(in srgb, #7928ca 12%, var(--surface))
+			color-mix(in srgb, var(--accent) 20%, var(--surface)),
+			color-mix(in srgb, var(--rose) 12%, var(--surface))
 		);
 		border: 1px solid var(--border);
-		border-radius: 12px;
+		border-radius: var(--radius-md);
 	}
 	h1 {
 		margin: 0 0 4px;

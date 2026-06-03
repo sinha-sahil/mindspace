@@ -7,7 +7,9 @@ export const GET: RequestHandler = async ({ url, locals: { supabase } }) => {
 
 	if (code) {
 		const { error } = await supabase.auth.exchangeCodeForSession(code);
-		if (!error) {throw redirect(303, next);}
+		if (!error) {
+			throw redirect(303, next);
+		}
 	}
 
 	throw redirect(303, '/auth/login?error=invalid_code');

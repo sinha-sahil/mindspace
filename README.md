@@ -4,19 +4,21 @@
 
 A quiet, invite-only thinking space for small teams who'd rather sketch than slide-deck. Built for people who think in shapes and arrows, work across time zones, and want something that feels like a notebook — not enterprise software.
 
-→ **Live at [www.mindspace.casa](https://www.mindspace.casa)** *(invite-only)*
+→ **Live at [www.mindspace.casa](https://www.mindspace.casa)** _(invite-only)_
 
 ---
 
 ## What it does
 
 ### Sketch together, in real time
+
 - **Live multiplayer canvas.** See every collaborator's cursor, watch their edits stream in, no refresh needed.
 - **Hand-drawn aesthetic.** Excalidraw under the hood — smart shape recognition, rich text, freehand drawing, the lot.
 - **Conflict-free editing.** Element-version reconciliation means concurrent edits never overwrite each other.
 - **Presence indicators.** A coloured avatar stack at the top of every project shows who's viewing right now.
 
 ### Organise without ceremony
+
 - **Workspaces.** Separate spheres of work — Personal, a side project, a client. One owner, many members.
 - **Drag to reorder.** Smooth floating-ghost interaction in the sidebar; order syncs across your devices.
 - **Right-click context menu.** Rename, make public / private, copy link, move to another workspace, delete.
@@ -24,16 +26,19 @@ A quiet, invite-only thinking space for small teams who'd rather sketch than sli
 - **Quick switcher.** ⌘K opens a command palette for searching and switching projects.
 
 ### Share when you mean to
+
 - **Workspace sharing with roles.** Editor (full access) or Viewer (read-only). Share by email — the picker types-ahead through anyone already on the platform.
 - **Public links.** Flip any single project to "Anyone with the link" for a clean read-only viewer. Perfect for dropping a proposal in Slack without handing over the whole workspace.
 - **Invite-only platform.** Only emails on the allowlist can sign in. Admins issue invite links with optional expiry and use limits.
 
 ### Login that stays out of the way
+
 - **Passkey-first.** Touch ID, Face ID, security keys. No passwords to remember.
 - **Magic-link fallback** for first-time sign-in or new devices.
 - **One-tap from invite to in-app** — accept the invite, get the link, click, you're in.
 
 ### Built for keepers
+
 - **Autosave.** Every edit persists within 500 ms. No "save" buttons.
 - **Light, dark, or system theme.** The canvas follows your OS, your mood, or whatever you set.
 - **Mobile-friendly.** Collapsible icon rail and touch-aware canvas.
@@ -45,7 +50,7 @@ A quiet, invite-only thinking space for small teams who'd rather sketch than sli
 - **Not Notion.** No databases, docs, or AI writer.
 - **Not Slack.** No chat, channels, or DMs.
 
-It's a space to *think*. The shapes you draw belong to you and the people you trust enough to invite.
+It's a space to _think_. The shapes you draw belong to you and the people you trust enough to invite.
 
 ## Designed for
 

@@ -3,7 +3,9 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	if (!locals.user) {throw error(401, 'Sign in first');}
+	if (!locals.user) {
+		throw error(401, 'Sign in first');
+	}
 
 	const { data, error: dbError } = await locals.supabase
 		.from('passkeys')
@@ -11,7 +13,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.eq('user_id', locals.user.id)
 		.order('created_at', { ascending: false });
 
-	if (dbError) {throw error(500, dbError.message);}
+	if (dbError) {
+		throw error(500, dbError.message);
+	}
 
 	return {
 		passkeys: data ?? [],
@@ -21,10 +25,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 export const actions: Actions = {
 	remove: async ({ request, locals }) => {
-		if (!locals.user) {return fail(401, { message: 'Sign in first' });}
+		if (!locals.user) {
+			return fail(401, { message: 'Sign in first' });
+		}
 		const form = await request.formData();
 		const credentialId = String(form.get('credential_id') ?? '');
-		if (!credentialId) {return fail(400, { message: 'Missing credential id' });}
+		if (!credentialId) {
+			return fail(400, { message: 'Missing credential id' });
+		}
 
 		const { count } = await locals.supabase
 			.from('passkeys')
@@ -32,8 +40,7 @@ export const actions: Actions = {
 			.eq('user_id', locals.user.id);
 		if ((count ?? 0) <= 1) {
 			return fail(400, {
-				message:
-					"Can't remove your last passkey. Register another one first, then remove this one."
+				message: "Can't remove your last passkey. Register another one first, then remove this one."
 			});
 		}
 
@@ -42,7 +49,9 @@ export const actions: Actions = {
 			.delete()
 			.eq('credential_id', credentialId)
 			.eq('user_id', locals.user.id);
-		if (dbError) {return fail(500, { message: dbError.message });}
+		if (dbError) {
+			return fail(500, { message: dbError.message });
+		}
 		return { success: true };
 	}
 };

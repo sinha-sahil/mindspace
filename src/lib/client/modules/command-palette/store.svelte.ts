@@ -17,6 +17,11 @@ function createStore() {
 		get open() {
 			return state.open;
 		},
+		// Settable so the library CommandMenu can two-way `bind:open` to it —
+		// its built-in Cmd+K toggle writes straight through this setter.
+		set open(value: boolean) {
+			state.open = value;
+		},
 		setOpen,
 		toggle
 	};

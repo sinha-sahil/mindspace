@@ -1,4 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { ExcalidrawProps } from '@excalidraw/excalidraw/types';
 import type { AppSupabaseClient } from '../../../../app';
 import { colorForKey } from '$lib/client/utils/color';
 import { analytics } from '../analytics';
@@ -24,17 +25,16 @@ export type Peer = {
 	email: string;
 	name: string;
 	color: { from: string; to: string; name: string };
-	pointer?: Pointer;
+	pointer?: Pointer | null;
 	button?: PointerButton;
-	selectedElementIds?: Record<string, true>;
 };
 
-type ElementWithVersion = {
-	id: string;
-	version?: number;
-	versionNonce?: number;
-	[key: string]: unknown;
-};
+/**
+ * A scene element as far as collaboration cares — the real Excalidraw element
+ * type, derived from the onChange signature so no import path is pinned. Only
+ * id / version / versionNonce are read during reconcile.
+ */
+export type SceneElement = Parameters<NonNullable<ExcalidrawProps['onChange']>>[0][number];
 
 type PresenceMeta = {
 	id: string; // tab session id (unique per browser tab)
@@ -47,12 +47,15 @@ type PointerMessage = {
 	id: string; // sender tab session id
 	pointer: Pointer | null;
 	button?: PointerButton;
-	selectedElementIds?: Record<string, true>;
 };
 
 type SceneMessage = {
 	id: string; // sender tab session id
-	elements: ElementWithVersion[];
+	elements: readonly SceneElement[];
+};
+
+type Listeners = {
+	onRemoteScene?: (elements: readonly SceneElement[]) => void;
 };
 
 function newSessionId(): string {
@@ -61,10 +64,6 @@ function newSessionId(): string {
 	}
 	return `s_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
 }
-
-type Listeners = {
-	onRemoteScene?: (elements: ElementWithVersion[]) => void;
-};
 
 const POINTER_THROTTLE_MS = 50;
 const SCENE_THROTTLE_MS = 120;
@@ -88,8 +87,7 @@ function makeThrottle<Args extends unknown[]>(
 	}
 
 	return (...args: Args) => {
-		const now = Date.now();
-		const elapsed = now - lastSent;
+		const elapsed = Date.now() - lastSent;
 		pending = { args };
 		if (elapsed >= ms) {
 			if (timer) {
@@ -106,6 +104,33 @@ function makeThrottle<Args extends unknown[]>(
 	};
 }
 
+/** Validate an incoming pointer broadcast — never trust the wire shape. */
+function readPointerMessage(raw: unknown): PointerMessage | null {
+	if (typeof raw !== 'object' || raw === null || !('id' in raw)) {
+		return null;
+	}
+	if (typeof raw.id !== 'string') {
+		return null;
+	}
+	let pointer: Pointer | null = null;
+	if (
+		'pointer' in raw &&
+		typeof raw.pointer === 'object' &&
+		raw.pointer !== null &&
+		'x' in raw.pointer &&
+		'y' in raw.pointer &&
+		typeof raw.pointer.x === 'number' &&
+		typeof raw.pointer.y === 'number'
+	) {
+		pointer = { x: raw.pointer.x, y: raw.pointer.y };
+	}
+	const message: PointerMessage = { id: raw.id, pointer };
+	if ('button' in raw && (raw.button === 'down' || raw.button === 'up')) {
+		message.button = raw.button;
+	}
+	return message;
+}
+
 function createCollab() {
 	const state = $state<{ peers: Peer[]; connected: boolean }>({
 		peers: [],
@@ -113,7 +138,7 @@ function createCollab() {
 	});
 
 	let channel: RealtimeChannel | null = null;
-	let mySessionId: string | null = null; // unique per tab/connection
+	let mySessionId: string | null = null;
 	let myUserId = '';
 	let myEmail = '';
 	let myName = '';
@@ -145,7 +170,8 @@ function createCollab() {
 		}
 		disconnect();
 
-		mySessionId = newSessionId();
+		const sessionId = newSessionId();
+		mySessionId = sessionId;
 		myUserId = user.id;
 		myEmail = user.email;
 		myName = user.email.split('@')[0] || user.email;
@@ -156,7 +182,7 @@ function createCollab() {
 		// open in two tabs (or on phone + laptop) sees themselves as a peer too.
 		const ch = supabase.channel(`project:${projectId}`, {
 			config: {
-				presence: { key: mySessionId },
+				presence: { key: sessionId },
 				broadcast: { self: false, ack: false }
 			}
 		});
@@ -166,22 +192,31 @@ function createCollab() {
 		});
 
 		ch.on('broadcast', { event: 'pointer' }, ({ payload }) => {
-			applyPointer(payload as PointerMessage);
+			const msg = readPointerMessage(payload);
+			if (msg) {
+				applyPointer(msg);
+			}
 		});
 
 		ch.on('broadcast', { event: 'scene' }, ({ payload }) => {
-			const msg = payload as SceneMessage;
-			if (!msg || msg.id === mySessionId) {
+			if (typeof payload !== 'object' || payload === null) {
 				return;
 			}
-			listeners.onRemoteScene?.(msg.elements ?? []);
+			if (!('id' in payload) || payload.id === mySessionId) {
+				return;
+			}
+			// Array.isArray narrows elements to a usable array; the items are
+			// full Excalidraw elements serialised by the sender.
+			if ('elements' in payload && Array.isArray(payload.elements)) {
+				listeners.onRemoteScene?.(payload.elements);
+			}
 		});
 
 		ch.subscribe((status) => {
 			if (status === 'SUBSCRIBED') {
 				state.connected = true;
 				const meta: PresenceMeta = {
-					id: mySessionId!,
+					id: sessionId,
 					userId: myUserId,
 					email: myEmail,
 					name: myName
@@ -198,11 +233,11 @@ function createCollab() {
 	}
 
 	function rebuildPeers(ch: RealtimeChannel) {
-		const presenceState = ch.presenceState() as Record<string, PresenceMeta[]>;
+		const presenceState = ch.presenceState<PresenceMeta>();
 		const next: Peer[] = [];
 		for (const key in presenceState) {
 			if (key === mySessionId) {
-				continue; // skip our own tab
+				continue;
 			}
 			const metas = presenceState[key];
 			const meta = metas[metas.length - 1];
@@ -217,64 +252,66 @@ function createCollab() {
 				name: meta.name,
 				color: colorForKey(meta.email),
 				pointer: existing?.pointer,
-				button: existing?.button,
-				selectedElementIds: existing?.selectedElementIds
+				button: existing?.button
 			});
 		}
 		state.peers = next;
 	}
 
 	function applyPointer(msg: PointerMessage) {
-		if (!msg || msg.id === mySessionId) {
+		if (msg.id === mySessionId) {
 			return;
 		}
 		const idx = state.peers.findIndex((p) => p.id === msg.id);
 		if (idx === -1) {
 			return;
 		}
-		const peer = state.peers[idx];
 		state.peers[idx] = {
-			...peer,
-			pointer: msg.pointer ?? undefined,
-			button: msg.button,
-			selectedElementIds: msg.selectedElementIds
+			...state.peers[idx],
+			pointer: msg.pointer,
+			button: msg.button
 		};
 	}
 
-	const _sendPointer = (payload: PointerMessage) => {
-		// Only send via the live WebSocket: skip if the channel hasn't fully
-		// subscribed yet. Otherwise supabase-js falls back to REST (which is
-		// slower, doesn't deliver to peers, and is being deprecated).
+	function send(event: 'pointer' | 'scene', payload: PointerMessage | SceneMessage) {
+		// Only send over the live WebSocket: skip until the channel has fully
+		// subscribed, otherwise supabase-js falls back to a (deprecated) REST
+		// path that doesn't reach peers.
 		if (!channel || !state.connected) {
 			return;
 		}
-		channel.send({ type: 'broadcast', event: 'pointer', payload });
-	};
-	const _sendScene = (payload: SceneMessage) => {
-		if (!channel || !state.connected) {
-			return;
-		}
-		channel.send({ type: 'broadcast', event: 'scene', payload });
-	};
-	const sendPointerThrottled = makeThrottle(_sendPointer, POINTER_THROTTLE_MS);
-	const sendSceneThrottled = makeThrottle(_sendScene, SCENE_THROTTLE_MS);
-
-	function broadcastPointer(
-		pointer: Pointer | null,
-		button: PointerButton | undefined,
-		selectedElementIds: Record<string, true> | undefined
-	) {
-		if (!channel || !mySessionId || !state.connected) {
-			return;
-		}
-		sendPointerThrottled({ id: mySessionId, pointer, button, selectedElementIds });
+		channel.send({ type: 'broadcast', event, payload });
 	}
 
-	function broadcastScene(elements: ReadonlyArray<ElementWithVersion>) {
+	const sendPointerThrottled = makeThrottle(
+		(p: PointerMessage) => send('pointer', p),
+		POINTER_THROTTLE_MS
+	);
+	const sendSceneThrottled = makeThrottle((s: SceneMessage) => send('scene', s), SCENE_THROTTLE_MS);
+
+	function broadcastPointer(pointer: Pointer | null, button?: PointerButton) {
 		if (!channel || !mySessionId || !state.connected) {
 			return;
 		}
-		sendSceneThrottled({ id: mySessionId, elements: elements as ElementWithVersion[] });
+		sendPointerThrottled({ id: mySessionId, pointer, button });
+	}
+
+	function broadcastScene(elements: readonly SceneElement[]) {
+		if (!channel || !mySessionId || !state.connected) {
+			return;
+		}
+		sendSceneThrottled({ id: mySessionId, elements });
+	}
+
+	/**
+	 * Disconnect only if currently connected to `projectId`. Used by panes on
+	 * unmount so a closing pane doesn't tear down a channel another pane took
+	 * over.
+	 */
+	function leaveProject(projectId: string) {
+		if (currentProjectId === projectId) {
+			disconnect();
+		}
 	}
 
 	return {
@@ -286,6 +323,7 @@ function createCollab() {
 		},
 		connect,
 		disconnect,
+		leaveProject,
 		broadcastPointer,
 		broadcastScene
 	};
@@ -294,50 +332,42 @@ function createCollab() {
 export const collab = createCollab();
 
 /**
- * Reconcile a remote element snapshot with the local current scene by
- * element id + version. Elements with a higher version (or higher
- * versionNonce on tie) win; missing elements on either side are kept.
- *
- * Order of the returned array preserves the LOCAL ordering for elements
- * present locally, then appends remote-only elements at the end.
+ * Reconcile a remote element snapshot with the local current scene by element
+ * id + version. Elements with a higher version (or higher versionNonce on a
+ * tie) win; elements present on only one side are kept. Local ordering is
+ * preserved, with remote-only elements appended.
  */
-export function reconcileElements(
-	local: ReadonlyArray<ElementWithVersion>,
-	remote: ReadonlyArray<ElementWithVersion>
-): ElementWithVersion[] {
-	const remoteById = new Map<string, ElementWithVersion>();
+export function reconcileElements<
+	T extends { id: string; version?: number; versionNonce?: number }
+>(local: readonly T[], remote: readonly T[]): T[] {
+	const remoteById = new Map<string, T>();
 	for (const el of remote) {
 		remoteById.set(el.id, el);
 	}
-	const result: ElementWithVersion[] = [];
+	const result: T[] = [];
 	const seen = new Set<string>();
 
 	for (const localEl of local) {
 		const remoteEl = remoteById.get(localEl.id);
-		if (remoteEl && isNewer(remoteEl, localEl)) {
-			result.push(remoteEl);
-		} else {
-			result.push(localEl);
-		}
+		result.push(remoteEl && isNewer(remoteEl, localEl) ? remoteEl : localEl);
 		seen.add(localEl.id);
 	}
-
 	for (const remoteEl of remote) {
 		if (!seen.has(remoteEl.id)) {
 			result.push(remoteEl);
 		}
 	}
-
 	return result;
 }
 
-function isNewer(a: ElementWithVersion, b: ElementWithVersion): boolean {
+function isNewer(
+	a: { version?: number; versionNonce?: number },
+	b: { version?: number; versionNonce?: number }
+): boolean {
 	const va = a.version ?? 0;
 	const vb = b.version ?? 0;
 	if (va !== vb) {
 		return va > vb;
 	}
-	const na = a.versionNonce ?? 0;
-	const nb = b.versionNonce ?? 0;
-	return na > nb;
+	return (a.versionNonce ?? 0) > (b.versionNonce ?? 0);
 }

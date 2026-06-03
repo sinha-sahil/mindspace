@@ -7,6 +7,7 @@ Realign `src/lib` to the skulls `client-module` template — feature-scoped modu
 ## Scope
 
 In scope:
+
 - New module layout under `src/lib/client/modules/{module}/` for: `workspaces`, `projects`, `passkeys`, `theme`, `sidebar`, `admin`, `auth`
 - Each module containing `index.ts`, `store.ts`, `types.ts`, `remote.ts` (where API calls exist), `ui/*.svelte`
 - Convert `interface` → `type` everywhere (skulls rule #1)
@@ -14,6 +15,7 @@ In scope:
 - Keep server-only code under `src/lib/server/` (skulls template targets client modules; server lib stays)
 
 Out of scope (this pass):
+
 - `typesafe-api-call` migration — the project uses Supabase + per-route `+server.ts` endpoints; the SDK abstraction would add a layer with diminishing return. Documented as a future option, not adopted.
 - Splitting +page.svelte routes per module — SvelteKit's file-system router enforces the route layout; modules are imported into routes
 - Re-namespacing CSS / theme tokens

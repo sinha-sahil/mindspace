@@ -15,8 +15,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		throw error(401, 'Not authenticated');
 	}
 
-	const body = await request.json().catch(() => null);
-	const name = String((body as Record<string, unknown> | null)?.name ?? '').trim();
+	const body: unknown = await request.json().catch(() => null);
+	const rawName = typeof body === 'object' && body !== null && 'name' in body ? body.name : '';
+	const name = String(rawName ?? '').trim();
 	if (!name) {
 		throw error(400, 'Workspace name is required');
 	}

@@ -6,7 +6,9 @@ import { getSupabaseAdmin } from '$lib/server/supabase-admin';
 const CHALLENGE_COOKIE = 'mindspace_pk_reg_challenge';
 
 export const POST: RequestHandler = async ({ url, locals, cookies }) => {
-	if (!locals.user) {throw error(401, 'Sign in first');}
+	if (!locals.user) {
+		throw error(401, 'Sign in first');
+	}
 
 	const admin = getSupabaseAdmin();
 	const { data: existing } = await admin

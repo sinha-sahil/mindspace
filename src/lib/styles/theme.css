@@ -1,6 +1,9 @@
 /* ==========================================================================
-   mindspace · design tokens
-   warm-ink palette · violet→coral→amber spectrum · Fraunces editorial display
+   mindspace · design tokens — "Editorial Luxe"
+   quiet-luxury cool-ivory paper · ink-indigo accent · Fraunces (opsz Didone)
+   display vs crisp Geist body · type-contrast is the signal, color is punctuation
+   Authored from two OKLCH source hues (paper H~265-274, accent H~276); primary
+   tokens pinned to verified-AA hex, gradient + P3 escalation in OKLCH.
    ========================================================================== */
 
 /* ---------- Light theme ---------- */
@@ -8,38 +11,36 @@
 :root[data-theme='light'] {
 	color-scheme: light;
 
-	--bg: #fbf8f4;
-	--bg-2: #f4efe7;
-	--surface: #ffffff;
-	--surface-2: #faf6f0;
-	--border: rgba(15, 12, 10, 0.08);
-	--border-strong: rgba(15, 12, 10, 0.16);
+	--bg: #f9fafd;
+	--bg-2: #f2f3f7;
+	--surface: #fefeff;
+	--surface-2: #f5f6f9;
+	--border: rgba(23, 24, 30, 0.13);
+	--border-strong: rgba(23, 24, 30, 0.24);
 
-	--fg: #14110d;
-	--fg-2: #2a241c;
-	--muted: #6a635a;
-	--muted-2: #8c8478;
-	--soft: #b9b1a2;
+	--fg: #17181e;
+	--fg-2: #3a3c46;
+	--muted: #61636a;
+	--muted-2: #8b8d96;
+	--soft: #bdbec4;
 
-	--accent: #5b3df5;
-	--accent-soft: rgba(91, 61, 245, 0.12);
-	--accent-glow: rgba(91, 61, 245, 0.4);
+	--accent: #4d53c1;
+	--accent-soft: rgba(77, 83, 193, 0.1);
+	--accent-glow: rgba(111, 99, 220, 0.34);
 
-	--rose: #e0376a;
-	--saffron: #f5a524;
-	--sage: #14a085;
+	--rose: #cc2443;
+	--saffron: #c38323;
+	--sage: #2b7a52;
 
-	--shadow-sm: 0 1px 2px rgba(15, 12, 10, 0.04), 0 2px 6px -2px rgba(15, 12, 10, 0.06);
+	--shadow-sm: 0 1px 2px rgba(20, 21, 28, 0.05), 0 2px 8px -3px rgba(20, 21, 28, 0.07);
 	--shadow-md:
-		0 1px 0 rgba(255, 255, 255, 0.6) inset,
-		0 1px 2px rgba(15, 12, 10, 0.05),
-		0 12px 32px -16px rgba(15, 12, 10, 0.18);
+		0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 1px 3px rgba(20, 21, 28, 0.06),
+		0 14px 36px -18px rgba(20, 21, 28, 0.18);
 	--shadow-lg:
-		0 1px 0 rgba(255, 255, 255, 0.7) inset,
-		0 8px 16px -8px rgba(15, 12, 10, 0.12),
-		0 24px 64px -24px rgba(15, 12, 10, 0.2);
+		0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 20px -10px rgba(20, 21, 28, 0.12),
+		0 30px 70px -28px rgba(20, 21, 28, 0.22);
 
-	--noise-opacity: 0.04;
+	--noise-opacity: 0.035;
 
 	/* legacy aliases — gradually migrate consumers */
 	--geist-background: var(--bg);
@@ -66,38 +67,50 @@
 :root[data-theme='dark'] {
 	color-scheme: dark;
 
-	--bg: #0a090e;
-	--bg-2: #100f15;
-	--surface: #15131c;
-	--surface-2: #1c1a25;
-	--border: rgba(255, 250, 245, 0.08);
-	--border-strong: rgba(255, 250, 245, 0.16);
+	--bg: #0d0e14;
+	--bg-2: #13151b;
+	--surface: #1a1b22;
+	--surface-2: #23252d;
+	--border: rgba(237, 238, 243, 0.12);
+	--border-strong: rgba(237, 238, 243, 0.22);
 
-	--fg: #f5f1eb;
-	--fg-2: #c9c2b6;
-	--muted: #8a8175;
-	--muted-2: #6a6359;
-	--soft: #4a443c;
+	--fg: #edeef3;
+	--fg-2: #ced0d7;
+	--muted: #909298;
+	--muted-2: #6f717a;
+	--soft: #4f515b;
 
-	--accent: #a78bfa;
-	--accent-soft: rgba(167, 139, 250, 0.16);
-	--accent-glow: rgba(167, 139, 250, 0.5);
+	--accent: #92a1ff;
+	--accent-soft: rgba(146, 161, 255, 0.16);
+	--accent-glow: rgba(146, 161, 255, 0.45);
 
-	--rose: #f472b6;
-	--saffron: #fbbf24;
-	--sage: #34d399;
+	--rose: #f87582;
+	--saffron: #e8b35e;
+	--sage: #5dc291;
 
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px -3px rgba(0, 0, 0, 0.55);
 	--shadow-md:
-		0 1px 0 rgba(255, 250, 245, 0.04) inset,
-		0 4px 12px -4px rgba(0, 0, 0, 0.4),
-		0 18px 48px -18px rgba(0, 0, 0, 0.65);
+		0 1px 0 rgba(237, 238, 243, 0.05) inset, 0 4px 14px -5px rgba(0, 0, 0, 0.45),
+		0 20px 52px -20px rgba(0, 0, 0, 0.7);
 	--shadow-lg:
-		0 1px 0 rgba(255, 250, 245, 0.06) inset,
-		0 8px 16px -8px rgba(0, 0, 0, 0.5),
-		0 32px 80px -28px rgba(0, 0, 0, 0.85);
+		0 1px 0 rgba(237, 238, 243, 0.07) inset, 0 10px 22px -10px rgba(0, 0, 0, 0.55),
+		0 36px 88px -30px rgba(0, 0, 0, 0.88);
 
-	--noise-opacity: 0.06;
+	--noise-opacity: 0.055;
+
+	/* lifted-L gradient so the spectrum stays vivid on dark surfaces */
+	--accent-gradient: linear-gradient(
+		118deg,
+		oklch(0.7 0.17 276) 0%,
+		oklch(0.72 0.15 320) 46%,
+		oklch(0.82 0.12 72) 100%
+	);
+	--accent-gradient-soft: linear-gradient(
+		118deg,
+		oklch(0.7 0.17 276 / 0.2) 0%,
+		oklch(0.72 0.15 320 / 0.16) 46%,
+		oklch(0.82 0.12 72 / 0.16) 100%
+	);
 
 	--geist-background: var(--bg);
 	--geist-foreground: var(--fg);
@@ -121,38 +134,49 @@
 	:root:not([data-theme]) {
 		color-scheme: dark;
 
-		--bg: #0a090e;
-		--bg-2: #100f15;
-		--surface: #15131c;
-		--surface-2: #1c1a25;
-		--border: rgba(255, 250, 245, 0.08);
-		--border-strong: rgba(255, 250, 245, 0.16);
+		--bg: #0d0e14;
+		--bg-2: #13151b;
+		--surface: #1a1b22;
+		--surface-2: #23252d;
+		--border: rgba(237, 238, 243, 0.12);
+		--border-strong: rgba(237, 238, 243, 0.22);
 
-		--fg: #f5f1eb;
-		--fg-2: #c9c2b6;
-		--muted: #8a8175;
-		--muted-2: #6a6359;
-		--soft: #4a443c;
+		--fg: #edeef3;
+		--fg-2: #ced0d7;
+		--muted: #909298;
+		--muted-2: #6f717a;
+		--soft: #4f515b;
 
-		--accent: #a78bfa;
-		--accent-soft: rgba(167, 139, 250, 0.16);
-		--accent-glow: rgba(167, 139, 250, 0.5);
+		--accent: #92a1ff;
+		--accent-soft: rgba(146, 161, 255, 0.16);
+		--accent-glow: rgba(146, 161, 255, 0.45);
 
-		--rose: #f472b6;
-		--saffron: #fbbf24;
-		--sage: #34d399;
+		--rose: #f87582;
+		--saffron: #e8b35e;
+		--sage: #5dc291;
 
-		--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+		--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px -3px rgba(0, 0, 0, 0.55);
 		--shadow-md:
-			0 1px 0 rgba(255, 250, 245, 0.04) inset,
-			0 4px 12px -4px rgba(0, 0, 0, 0.4),
-			0 18px 48px -18px rgba(0, 0, 0, 0.65);
+			0 1px 0 rgba(237, 238, 243, 0.05) inset, 0 4px 14px -5px rgba(0, 0, 0, 0.45),
+			0 20px 52px -20px rgba(0, 0, 0, 0.7);
 		--shadow-lg:
-			0 1px 0 rgba(255, 250, 245, 0.06) inset,
-			0 8px 16px -8px rgba(0, 0, 0, 0.5),
-			0 32px 80px -28px rgba(0, 0, 0, 0.85);
+			0 1px 0 rgba(237, 238, 243, 0.07) inset, 0 10px 22px -10px rgba(0, 0, 0, 0.55),
+			0 36px 88px -30px rgba(0, 0, 0, 0.88);
 
-		--noise-opacity: 0.06;
+		--noise-opacity: 0.055;
+
+		--accent-gradient: linear-gradient(
+			118deg,
+			oklch(0.7 0.17 276) 0%,
+			oklch(0.72 0.15 320) 46%,
+			oklch(0.82 0.12 72) 100%
+		);
+		--accent-gradient-soft: linear-gradient(
+			118deg,
+			oklch(0.7 0.17 276 / 0.2) 0%,
+			oklch(0.72 0.15 320 / 0.16) 46%,
+			oklch(0.82 0.12 72 / 0.16) 100%
+		);
 
 		--geist-background: var(--bg);
 		--geist-foreground: var(--fg);
@@ -173,35 +197,510 @@
 
 /* ---------- Shared tokens ---------- */
 :root {
-	--font-sans:
-		'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	--font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	--font-display:
 		'Fraunces Variable', 'Iowan Old Style', 'Apple Garamond', 'Palatino Linotype', Georgia, serif;
 	--font-mono:
 		'Geist Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-	--radius-xs: 6px;
-	--radius-sm: 8px;
-	--radius: 10px;
-	--radius-md: 12px;
-	--radius-lg: 16px;
-	--radius-xl: 22px;
+	/* Restrained, architectural radii — crisp page-edge corners, never pillowy. */
+	--radius-xs: 5px;
+	--radius-sm: 7px;
+	--radius: 9px;
+	--radius-md: 11px;
+	--radius-lg: 14px;
+	--radius-xl: 20px;
 	--radius-pill: 9999px;
 
 	--ease-out: cubic-bezier(0.4, 0, 0.2, 1);
-	--ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+	/* Softer, less-bouncy spring — a deliberate accent, not the house style. */
+	--ease-spring: cubic-bezier(0.32, 1.12, 0.5, 1);
 	--duration-fast: 120ms;
 	--duration: 200ms;
 	--duration-slow: 360ms;
+	--duration-slowest: 640ms; /* foil-edge sweep, CTA sheen */
 
-	/* Signature gradient — used on hero, primary CTA, glow accents. */
-	--accent-gradient: linear-gradient(120deg, #a78bfa 0%, #f472b6 50%, #fbbf24 100%);
+	/* Signature gradient — indigo → orchid → honey, "light through frosted
+	   vellum" (Soft Gradients 2.0). Used ONLY on the hero accent word, primary
+	   CTA, and glow accents. White text must sit over the indigo (left) end —
+	   the honey stop is ~1.9:1 vs white, so gradient-clip is display-size only. */
+	--accent-gradient: linear-gradient(
+		118deg,
+		oklch(0.62 0.19 276) 0%,
+		oklch(0.66 0.15 318) 46%,
+		oklch(0.8 0.12 70) 100%
+	);
+	--accent-gradient-soft: linear-gradient(
+		118deg,
+		oklch(0.62 0.19 276 / 0.18) 0%,
+		oklch(0.66 0.15 318 / 0.16) 46%,
+		oklch(0.8 0.12 70 / 0.16) 100%
+	);
+}
+
+/* ---------- Wide-gamut P3 escalation (grafted from "Lumen") ----------
+   On P3/OLED displays (most of this audience's hardware) bump only the accent
+   chroma — lightness is unchanged, so every WCAG AA ratio holds identically on
+   sRGB and P3. A real, cheap premium tell. */
+@media (color-gamut: p3) {
+	:root,
+	:root[data-theme='light'] {
+		--accent: oklch(0.5 0.21 276);
+		--accent-glow: oklch(0.62 0.24 276 / 0.34);
+	}
+	:root[data-theme='dark'] {
+		--accent: oklch(0.74 0.19 276);
+		--accent-glow: oklch(0.74 0.21 276 / 0.45);
+	}
+}
+/* System-dark P3 bump — gated so light system mode keeps the light accent. */
+@media (color-gamut: p3) and (prefers-color-scheme: dark) {
+	:root:not([data-theme]) {
+		--accent: oklch(0.74 0.19 276);
+		--accent-glow: oklch(0.74 0.21 276 / 0.45);
+	}
+}
+
+/* ==========================================================================
+   Switchable skins
+   The bare :root blocks above ARE the default "Editorial Luxe" skin. Selecting
+   another skin sets data-skin on <html>; the higher-specificity blocks below
+   override the base tokens. Legacy aliases (--geist-*, --accents-*) are var()
+   references to the base tokens, so they re-resolve per skin automatically —
+   only base tokens, fonts, radii, gradient, shadows, mesh need overriding.
+   ========================================================================== */
+
+/* Default skin's animated-mesh colors (vellum aurora). */
+:root {
+	--mesh-1: #7986f2;
+	--mesh-2: #c083d3;
+	--mesh-3: #78c2e6;
+	--mesh-4: #f3c080;
+}
+
+/* ---------------------------------------------------------------------------
+   LUMEN — luminous spatial liquid-glass · Bricolage Grotesque · electric indigo
+   --------------------------------------------------------------------------- */
+:root[data-skin='lumen'],
+:root[data-skin='lumen'][data-theme='light'] {
+	color-scheme: light;
+	--bg: oklch(0.985 0.004 258);
+	--bg-2: oklch(0.965 0.008 258);
+	--surface: oklch(1 0 0);
+	--surface-2: oklch(0.975 0.006 258);
+	--border: oklch(0.92 0.01 258 / 0.7);
+	--border-strong: oklch(0.86 0.014 258);
+	--fg: oklch(0.22 0.02 264);
+	--fg-2: oklch(0.36 0.02 264);
+	--muted: oklch(0.52 0.018 262);
+	--muted-2: oklch(0.64 0.016 260);
+	--soft: oklch(0.8 0.012 258);
+	--accent: oklch(0.56 0.21 268);
+	--accent-soft: oklch(0.56 0.21 268 / 0.12);
+	--accent-glow: oklch(0.62 0.2 268 / 0.42);
+	--rose: oklch(0.58 0.2 18);
+	--saffron: oklch(0.72 0.15 72);
+	--sage: oklch(0.62 0.13 162);
+	--shadow-sm: 0 1px 2px oklch(0.4 0.04 264 / 0.05), 0 2px 8px -3px oklch(0.4 0.04 264 / 0.08);
+	--shadow-md:
+		0 1px 0 oklch(1 0 0 / 0.7) inset, 0 2px 4px oklch(0.4 0.04 264 / 0.05),
+		0 14px 36px -16px oklch(0.4 0.06 268 / 0.22);
+	--shadow-lg:
+		0 1px 0 oklch(1 0 0 / 0.8) inset, 0 10px 20px -10px oklch(0.4 0.06 268 / 0.16),
+		0 30px 70px -26px oklch(0.4 0.08 268 / 0.26);
+	--noise-opacity: 0.035;
+	--accent-gradient: linear-gradient(
+		118deg,
+		oklch(0.62 0.2 272) 0%,
+		oklch(0.66 0.18 312) 42%,
+		oklch(0.74 0.14 210) 100%
+	);
+	--accent-gradient-soft: linear-gradient(
+		118deg,
+		oklch(0.62 0.2 272 / 0.16) 0%,
+		oklch(0.66 0.18 312 / 0.14) 42%,
+		oklch(0.74 0.14 210 / 0.14) 100%
+	);
+	--font-display: 'Bricolage Grotesque Variable', 'Geist Variable', -apple-system, sans-serif;
+	--radius-xs: 7px;
+	--radius-sm: 9px;
+	--radius: 11px;
+	--radius-md: 13px;
+	--radius-lg: 18px;
+	--radius-xl: 26px;
+	--mesh-1: oklch(0.66 0.2 270);
+	--mesh-2: oklch(0.7 0.16 312);
+	--mesh-3: oklch(0.74 0.13 208);
+	--mesh-4: oklch(0.78 0.12 168);
+}
+:root[data-skin='lumen'] .display {
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-variation-settings: 'wght' 600;
+	letter-spacing: -0.025em;
+}
+:root[data-skin='lumen'] .display-italic {
+	font-family: var(--font-display);
+	font-style: italic;
+	font-weight: 500;
+	font-variation-settings: 'wght' 500;
+	letter-spacing: -0.02em;
+}
+:root[data-skin='lumen'][data-theme='dark'] {
+	color-scheme: dark;
+	--bg: oklch(0.17 0.018 264);
+	--bg-2: oklch(0.2 0.02 264);
+	--surface: oklch(0.235 0.022 264);
+	--surface-2: oklch(0.275 0.024 264);
+	--border: oklch(0.99 0.01 264 / 0.09);
+	--border-strong: oklch(0.99 0.01 264 / 0.18);
+	--fg: oklch(0.96 0.008 258);
+	--fg-2: oklch(0.82 0.012 258);
+	--muted: oklch(0.64 0.016 260);
+	--muted-2: oklch(0.5 0.018 262);
+	--soft: oklch(0.38 0.018 264);
+	--accent: oklch(0.72 0.17 270);
+	--accent-soft: oklch(0.72 0.17 270 / 0.18);
+	--accent-glow: oklch(0.72 0.17 270 / 0.5);
+	--rose: oklch(0.7 0.16 16);
+	--saffron: oklch(0.82 0.13 75);
+	--sage: oklch(0.76 0.13 162);
+	--shadow-sm: 0 1px 2px oklch(0 0 0 / 0.5), 0 2px 8px -3px oklch(0 0 0 / 0.55);
+	--shadow-md:
+		0 1px 0 oklch(0.99 0.01 264 / 0.05) inset, 0 4px 14px -5px oklch(0 0 0 / 0.5),
+		0 20px 50px -20px oklch(0 0 0 / 0.7);
+	--shadow-lg:
+		0 1px 0 oklch(0.99 0.01 264 / 0.07) inset, 0 10px 22px -10px oklch(0 0 0 / 0.55),
+		0 36px 88px -30px oklch(0 0 0 / 0.85);
+	--noise-opacity: 0.055;
+	--accent-gradient: linear-gradient(
+		118deg,
+		oklch(0.72 0.17 272) 0%,
+		oklch(0.74 0.15 318) 42%,
+		oklch(0.8 0.12 212) 100%
+	);
+	--accent-gradient-soft: linear-gradient(
+		118deg,
+		oklch(0.72 0.17 272 / 0.2) 0%,
+		oklch(0.74 0.15 318 / 0.16) 42%,
+		oklch(0.8 0.12 212 / 0.16) 100%
+	);
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-skin='lumen']:not([data-theme]) {
+		color-scheme: dark;
+		--bg: oklch(0.17 0.018 264);
+		--bg-2: oklch(0.2 0.02 264);
+		--surface: oklch(0.235 0.022 264);
+		--surface-2: oklch(0.275 0.024 264);
+		--border: oklch(0.99 0.01 264 / 0.09);
+		--border-strong: oklch(0.99 0.01 264 / 0.18);
+		--fg: oklch(0.96 0.008 258);
+		--fg-2: oklch(0.82 0.012 258);
+		--muted: oklch(0.64 0.016 260);
+		--muted-2: oklch(0.5 0.018 262);
+		--soft: oklch(0.38 0.018 264);
+		--accent: oklch(0.72 0.17 270);
+		--accent-soft: oklch(0.72 0.17 270 / 0.18);
+		--accent-glow: oklch(0.72 0.17 270 / 0.5);
+		--rose: oklch(0.7 0.16 16);
+		--saffron: oklch(0.82 0.13 75);
+		--sage: oklch(0.76 0.13 162);
+		--shadow-sm: 0 1px 2px oklch(0 0 0 / 0.5), 0 2px 8px -3px oklch(0 0 0 / 0.55);
+		--shadow-md:
+			0 1px 0 oklch(0.99 0.01 264 / 0.05) inset, 0 4px 14px -5px oklch(0 0 0 / 0.5),
+			0 20px 50px -20px oklch(0 0 0 / 0.7);
+		--shadow-lg:
+			0 1px 0 oklch(0.99 0.01 264 / 0.07) inset, 0 10px 22px -10px oklch(0 0 0 / 0.55),
+			0 36px 88px -30px oklch(0 0 0 / 0.85);
+		--noise-opacity: 0.055;
+		--accent-gradient: linear-gradient(
+			118deg,
+			oklch(0.72 0.17 272) 0%,
+			oklch(0.74 0.15 318) 42%,
+			oklch(0.8 0.12 212) 100%
+		);
+		--accent-gradient-soft: linear-gradient(
+			118deg,
+			oklch(0.72 0.17 272 / 0.2) 0%,
+			oklch(0.74 0.15 318 / 0.16) 42%,
+			oklch(0.8 0.12 212 / 0.16) 100%
+		);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   VOLTAIC — electric precision · near-monochrome graphite · Geist · azure
+   --------------------------------------------------------------------------- */
+:root[data-skin='voltaic'],
+:root[data-skin='voltaic'][data-theme='light'] {
+	color-scheme: light;
+	--bg: oklch(0.985 0.003 250);
+	--bg-2: oklch(0.965 0.005 250);
+	--surface: oklch(1 0 0);
+	--surface-2: oklch(0.975 0.004 250);
+	--border: oklch(0.6 0.01 250 / 0.16);
+	--border-strong: oklch(0.5 0.012 250 / 0.28);
+	--fg: oklch(0.22 0.018 255);
+	--fg-2: oklch(0.36 0.015 255);
+	--muted: oklch(0.52 0.012 252);
+	--muted-2: oklch(0.64 0.01 252);
+	--soft: oklch(0.78 0.008 252);
+	--accent: oklch(0.55 0.19 245);
+	--accent-soft: oklch(0.55 0.19 245 / 0.12);
+	--accent-glow: oklch(0.6 0.2 245 / 0.32);
+	--rose: oklch(0.56 0.2 18);
+	--saffron: oklch(0.7 0.13 75);
+	--sage: oklch(0.58 0.11 165);
+	--noise-opacity: 0.03;
+	--accent-gradient: linear-gradient(
+		120deg,
+		oklch(0.62 0.2 245) 0%,
+		oklch(0.7 0.16 215) 48%,
+		oklch(0.5 0.21 270) 100%
+	);
 	--accent-gradient-soft: linear-gradient(
 		120deg,
-		rgba(167, 139, 250, 0.2) 0%,
-		rgba(244, 114, 182, 0.18) 50%,
-		rgba(251, 191, 36, 0.18) 100%
+		oklch(0.62 0.2 245 / 0.16) 0%,
+		oklch(0.7 0.16 215 / 0.14) 48%,
+		oklch(0.5 0.21 270 / 0.14) 100%
 	);
+	--font-display: 'Geist Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+	--radius-xs: 5px;
+	--radius-sm: 7px;
+	--radius: 9px;
+	--radius-md: 10px;
+	--radius-lg: 13px;
+	--radius-xl: 18px;
+	--mesh-1: oklch(0.6 0.2 245);
+	--mesh-2: oklch(0.68 0.16 205);
+	--mesh-3: oklch(0.52 0.21 272);
+	--mesh-4: oklch(0.46 0.14 255);
+}
+:root[data-skin='voltaic'] .display {
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-variation-settings: 'wght' 700;
+	letter-spacing: -0.04em;
+}
+:root[data-skin='voltaic'] .display-italic {
+	font-family: var(--font-display);
+	font-style: normal;
+	font-weight: 700;
+	font-variation-settings: 'wght' 700;
+	letter-spacing: -0.04em;
+}
+:root[data-skin='voltaic'][data-theme='dark'] {
+	color-scheme: dark;
+	--bg: oklch(0.17 0.012 255);
+	--bg-2: oklch(0.2 0.013 255);
+	--surface: oklch(0.23 0.014 255);
+	--surface-2: oklch(0.27 0.015 255);
+	--border: oklch(0.85 0.02 250 / 0.1);
+	--border-strong: oklch(0.85 0.025 250 / 0.2);
+	--fg: oklch(0.96 0.006 250);
+	--fg-2: oklch(0.82 0.01 250);
+	--muted: oklch(0.66 0.012 252);
+	--muted-2: oklch(0.52 0.012 252);
+	--soft: oklch(0.4 0.012 252);
+	--accent: oklch(0.72 0.16 245);
+	--accent-soft: oklch(0.72 0.16 245 / 0.16);
+	--accent-glow: oklch(0.72 0.18 245 / 0.45);
+	--rose: oklch(0.68 0.17 18);
+	--saffron: oklch(0.8 0.12 78);
+	--sage: oklch(0.74 0.13 165);
+	--noise-opacity: 0.045;
+	--accent-gradient: linear-gradient(
+		120deg,
+		oklch(0.74 0.18 245) 0%,
+		oklch(0.82 0.14 205) 48%,
+		oklch(0.64 0.2 272) 100%
+	);
+	--accent-gradient-soft: linear-gradient(
+		120deg,
+		oklch(0.74 0.18 245 / 0.2) 0%,
+		oklch(0.82 0.14 205 / 0.16) 48%,
+		oklch(0.64 0.2 272 / 0.16) 100%
+	);
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-skin='voltaic']:not([data-theme]) {
+		color-scheme: dark;
+		--bg: oklch(0.17 0.012 255);
+		--bg-2: oklch(0.2 0.013 255);
+		--surface: oklch(0.23 0.014 255);
+		--surface-2: oklch(0.27 0.015 255);
+		--border: oklch(0.85 0.02 250 / 0.1);
+		--border-strong: oklch(0.85 0.025 250 / 0.2);
+		--fg: oklch(0.96 0.006 250);
+		--fg-2: oklch(0.82 0.01 250);
+		--muted: oklch(0.66 0.012 252);
+		--muted-2: oklch(0.52 0.012 252);
+		--soft: oklch(0.4 0.012 252);
+		--accent: oklch(0.72 0.16 245);
+		--accent-soft: oklch(0.72 0.16 245 / 0.16);
+		--accent-glow: oklch(0.72 0.18 245 / 0.45);
+		--rose: oklch(0.68 0.17 18);
+		--saffron: oklch(0.8 0.12 78);
+		--sage: oklch(0.74 0.13 165);
+		--noise-opacity: 0.045;
+		--accent-gradient: linear-gradient(
+			120deg,
+			oklch(0.74 0.18 245) 0%,
+			oklch(0.82 0.14 205) 48%,
+			oklch(0.64 0.2 272) 100%
+		);
+		--accent-gradient-soft: linear-gradient(
+			120deg,
+			oklch(0.74 0.18 245 / 0.2) 0%,
+			oklch(0.82 0.14 205 / 0.16) 48%,
+			oklch(0.64 0.2 272 / 0.16) 100%
+		);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   TERRACOTTA — earthy tactile handmade · Fraunces (soft) + Hanken · moss green
+   --------------------------------------------------------------------------- */
+:root[data-skin='terracotta'],
+:root[data-skin='terracotta'][data-theme='light'] {
+	color-scheme: light;
+	--bg: #f3ede1;
+	--bg-2: #eae2d2;
+	--surface: #fbf7ef;
+	--surface-2: #f5eee1;
+	--border: rgba(58, 46, 28, 0.1);
+	--border-strong: rgba(58, 46, 28, 0.2);
+	--fg: #211c12;
+	--fg-2: #39301f;
+	--muted: #6f6450;
+	--muted-2: #928771;
+	--soft: #bcb09a;
+	--accent: #3f7d4e;
+	--accent-soft: rgba(63, 125, 78, 0.13);
+	--accent-glow: rgba(63, 125, 78, 0.34);
+	--rose: #c0432f;
+	--saffron: #c98a1e;
+	--sage: #3f7d4e;
+	--shadow-sm: 0 1px 2px rgba(58, 46, 28, 0.05), 0 2px 6px -2px rgba(58, 46, 28, 0.07);
+	--shadow-md:
+		0 1px 0 rgba(255, 252, 246, 0.7) inset, 0 1px 2px rgba(58, 46, 28, 0.06),
+		0 14px 34px -16px rgba(58, 46, 28, 0.2);
+	--shadow-lg:
+		0 1px 0 rgba(255, 252, 246, 0.8) inset, 0 10px 18px -8px rgba(58, 46, 28, 0.14),
+		0 28px 70px -24px rgba(58, 46, 28, 0.24);
+	--noise-opacity: 0.05;
+	--accent-gradient: linear-gradient(122deg, #3f7d4e 0%, #c5703f 52%, #d9a23f 100%);
+	--accent-gradient-soft: linear-gradient(
+		122deg,
+		rgba(63, 125, 78, 0.16) 0%,
+		rgba(197, 112, 63, 0.14) 52%,
+		rgba(217, 162, 63, 0.14) 100%
+	);
+	--font-sans: 'Hanken Grotesk Variable', 'Geist Variable', -apple-system, sans-serif;
+	--radius-xs: 8px;
+	--radius-sm: 10px;
+	--radius: 13px;
+	--radius-md: 16px;
+	--radius-lg: 20px;
+	--radius-xl: 28px;
+	--mesh-1: #3f7d4e;
+	--mesh-2: #c5703f;
+	--mesh-3: #d9a23f;
+	--mesh-4: #7a9c5a;
+}
+:root[data-skin='terracotta'] .display {
+	font-family: var(--font-display);
+	font-weight: 460;
+	font-variation-settings:
+		'opsz' 144,
+		'wght' 460,
+		'SOFT' 60,
+		'WONK' 0;
+	letter-spacing: -0.018em;
+}
+:root[data-skin='terracotta'] .display-italic {
+	font-family: var(--font-display);
+	font-style: italic;
+	font-weight: 420;
+	font-variation-settings:
+		'opsz' 144,
+		'wght' 420,
+		'SOFT' 60,
+		'WONK' 0;
+	letter-spacing: -0.014em;
+}
+:root[data-skin='terracotta'][data-theme='dark'] {
+	color-scheme: dark;
+	--bg: #161208;
+	--bg-2: #1d180d;
+	--surface: #241e11;
+	--surface-2: #2e2717;
+	--border: rgba(245, 236, 214, 0.09);
+	--border-strong: rgba(245, 236, 214, 0.18);
+	--fg: #f4ecda;
+	--fg-2: #d8ccb2;
+	--muted: #9b8f76;
+	--muted-2: #766c57;
+	--soft: #4d4534;
+	--accent: #7fc08a;
+	--accent-soft: rgba(127, 192, 138, 0.16);
+	--accent-glow: rgba(127, 192, 138, 0.42);
+	--rose: #e0795f;
+	--saffron: #e6b454;
+	--sage: #7fc08a;
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px -2px rgba(0, 0, 0, 0.55);
+	--shadow-md:
+		0 1px 0 rgba(245, 236, 214, 0.05) inset, 0 4px 12px -4px rgba(0, 0, 0, 0.45),
+		0 18px 48px -18px rgba(0, 0, 0, 0.68);
+	--shadow-lg:
+		0 1px 0 rgba(245, 236, 214, 0.07) inset, 0 8px 16px -8px rgba(0, 0, 0, 0.55),
+		0 32px 80px -28px rgba(0, 0, 0, 0.88);
+	--noise-opacity: 0.07;
+	--accent-gradient: linear-gradient(122deg, #7fc08a 0%, #d98a5c 52%, #e6b454 100%);
+	--accent-gradient-soft: linear-gradient(
+		122deg,
+		rgba(127, 192, 138, 0.18) 0%,
+		rgba(217, 138, 92, 0.16) 52%,
+		rgba(230, 180, 84, 0.16) 100%
+	);
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-skin='terracotta']:not([data-theme]) {
+		color-scheme: dark;
+		--bg: #161208;
+		--bg-2: #1d180d;
+		--surface: #241e11;
+		--surface-2: #2e2717;
+		--border: rgba(245, 236, 214, 0.09);
+		--border-strong: rgba(245, 236, 214, 0.18);
+		--fg: #f4ecda;
+		--fg-2: #d8ccb2;
+		--muted: #9b8f76;
+		--muted-2: #766c57;
+		--soft: #4d4534;
+		--accent: #7fc08a;
+		--accent-soft: rgba(127, 192, 138, 0.16);
+		--accent-glow: rgba(127, 192, 138, 0.42);
+		--rose: #e0795f;
+		--saffron: #e6b454;
+		--sage: #7fc08a;
+		--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px -2px rgba(0, 0, 0, 0.55);
+		--shadow-md:
+			0 1px 0 rgba(245, 236, 214, 0.05) inset, 0 4px 12px -4px rgba(0, 0, 0, 0.45),
+			0 18px 48px -18px rgba(0, 0, 0, 0.68);
+		--shadow-lg:
+			0 1px 0 rgba(245, 236, 214, 0.07) inset, 0 8px 16px -8px rgba(0, 0, 0, 0.55),
+			0 32px 80px -28px rgba(0, 0, 0, 0.88);
+		--noise-opacity: 0.07;
+		--accent-gradient: linear-gradient(122deg, #7fc08a 0%, #d98a5c 52%, #e6b454 100%);
+		--accent-gradient-soft: linear-gradient(
+			122deg,
+			rgba(127, 192, 138, 0.18) 0%,
+			rgba(217, 138, 92, 0.16) 52%,
+			rgba(230, 180, 84, 0.16) 100%
+		);
+	}
 }
 
 /* ==========================================================================
@@ -251,17 +750,30 @@ samp {
 	color: var(--bg);
 }
 
-/* Display headings get the serif when you opt in via class */
+/* Display headings get the serif when you opt in via class.
+   Fraunces is pushed to its high-contrast Didone-adjacent end: opsz at max for
+   dramatic thick/thin stroke contrast, SOFT/WONK at 0 to strip the cozy warmth.
+   This is the "quiet luxury" re-voice — type contrast carries the identity. */
 .display {
 	font-family: var(--font-display);
-	font-weight: 500;
-	letter-spacing: -0.02em;
+	font-weight: 420;
+	font-variation-settings:
+		'opsz' 144,
+		'wght' 420,
+		'SOFT' 0,
+		'WONK' 0;
+	letter-spacing: -0.022em;
 }
 .display-italic {
 	font-family: var(--font-display);
 	font-style: italic;
 	font-weight: 400;
-	letter-spacing: -0.015em;
+	font-variation-settings:
+		'opsz' 144,
+		'wght' 400,
+		'SOFT' 0,
+		'WONK' 0;
+	letter-spacing: -0.018em;
 }
 
 /* Gradient text utility */
@@ -351,6 +863,40 @@ samp {
 	--button-border: 1px solid var(--rose);
 }
 
+/* Square icon-only variant for the lib's Button — used for quiet utility
+   actions (refresh, dismiss, copy) where a label would feel heavy-handed.
+   Pair with a Tooltip so the hover hint still surfaces. */
+.btn-icon {
+	--button-color: transparent;
+	--button-text-color: var(--muted);
+	--button-border: 1px solid var(--border);
+	--button-hover-color: var(--bg-2);
+	--button-hover-text-color: var(--fg);
+	--button-hover-border: 1px solid var(--border-strong);
+	--button-padding: 0;
+	--button-content-gap: 0;
+	--button-width: 32px;
+	--button-height: 32px;
+	--button-border-radius: var(--radius-sm);
+}
+
+/* Same idea but sized for the sidebar's collapsed rail (slightly larger
+   with surface bg) so it sits visually consistent with the rest of the
+   rail's icon stack. */
+.btn-icon-rail {
+	--button-color: var(--surface);
+	--button-text-color: var(--fg-2);
+	--button-border: 1px solid var(--border);
+	--button-hover-color: var(--surface-2);
+	--button-hover-text-color: var(--fg);
+	--button-hover-border: 1px solid var(--border-strong);
+	--button-padding: 0;
+	--button-content-gap: 0;
+	--button-width: 36px;
+	--button-height: 36px;
+	--button-border-radius: 10px;
+}
+
 /* Pill variants */
 .pill-success {
 	--pill-background: var(--accent-soft);
@@ -366,6 +912,94 @@ samp {
 	--pill-background: rgba(245, 165, 36, 0.14);
 	--pill-color: var(--saffron);
 	--pill-border: 1px solid rgba(245, 165, 36, 0.3);
+}
+
+/* ==========================================================================
+   Modal / CommandMenu / Toast — palette overrides for the library overlays.
+   Scoped via each component's `classes` prop so generic var names (notably
+   --background-color) never leak past the component's own subtree.
+   ========================================================================== */
+
+.ms-modal {
+	--modal-z-index: 200;
+	--background-color: color-mix(in srgb, var(--geist-foreground) 24%, transparent);
+	--modal-content-background-color: var(--surface);
+	--modal-border-radius: var(--radius-lg);
+	--modal-content-overflow: hidden;
+	--modal-fit-content-max-height: 84vh;
+
+	--modal-header-background-color: var(--surface);
+	--modal-header-padding: 16px 20px;
+	--modal-header-border-bottom: 1px solid var(--border);
+	--header-text-size: 15px;
+	--modal-header-text-weight: 600;
+	--modal-header-text-letter-spacing: -0.01em;
+
+	--modal-footer-background-color: var(--accents-1);
+	--modal-footer-padding: 12px 20px;
+	--modal-footer-border-top: 1px solid var(--border);
+	--modal-footer-justify-content: flex-end;
+	--modal-footer-gap: 8px;
+}
+
+.ms-command-menu {
+	--command-menu-z-index: 250;
+	--command-menu-overlay-background: color-mix(in srgb, var(--geist-foreground) 18%, transparent);
+	--command-menu-overlay-padding-top: 11vh;
+	--command-menu-background: var(--surface);
+	--command-menu-border: 1px solid var(--border);
+	--command-menu-border-radius: var(--radius-lg);
+	--command-menu-box-shadow:
+		0 60px 120px -30px rgba(0, 0, 0, 0.55), 0 18px 40px -16px rgba(0, 0, 0, 0.35),
+		0 0 0 1px var(--accent-soft), 0 8px 40px -12px var(--accent-glow);
+	--command-menu-width: 580px;
+	--command-menu-max-height: 64vh;
+
+	--command-menu-separator-color: var(--border);
+	--command-menu-search-icon-color: var(--accents-4);
+	--command-menu-input-color: var(--geist-foreground);
+	--command-menu-input-caret-color: var(--accent, var(--geist-foreground));
+	--command-menu-input-placeholder-color: var(--accents-4);
+	--command-menu-input-font-family: var(--font-sans);
+	--command-menu-input-font-size: 14px;
+
+	--command-menu-empty-color: var(--accents-5);
+	--command-menu-group-heading-color: var(--accents-5);
+	--command-menu-item-color: var(--geist-foreground);
+	--command-menu-item-active-background: var(--accents-1);
+	--command-menu-item-active-color: var(--geist-foreground);
+
+	--command-menu-kbd-background: var(--accents-1);
+	--command-menu-kbd-border: 1px solid var(--border);
+	--command-menu-kbd-color: var(--accents-6);
+	--command-menu-kbd-font-family: var(--font-mono);
+	--command-menu-kbd-box-shadow: 0 1px 0 var(--border);
+}
+
+.ms-toast {
+	--toast-z-index: 300;
+	--toast-position: relative;
+	--toast-width: 100%;
+	--toast-box-sizing: border-box;
+	--toast-margin: 0;
+	--toast-padding: 11px 14px;
+	--toast-border-radius: var(--radius);
+	--toast-font-family: var(--font-sans);
+	--toast-font-size: 13px;
+	--toast-align-items: flex-start;
+	--toast-subtext-font-size: 12px;
+	--toast-subtext-color: rgba(255, 255, 255, 0.78);
+	--toast-subtext-margin: 3px 0 0 0;
+
+	/* Desaturated editorial fills — deep enough to keep white text AA, never
+	   fire-engine. Info is a dark ink chip in both modes (the "exhibition label"). */
+	--toast-success-background-color: #1f6b46;
+	--toast-error-background-color: #b51e3a;
+	--toast-info-background-color: #2a2c34;
+
+	box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
+	border-radius: var(--radius);
+	pointer-events: auto;
 }
 
 /* ==========================================================================

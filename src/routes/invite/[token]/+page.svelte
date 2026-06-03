@@ -39,9 +39,7 @@
 				{#if data.note}
 					<div class="note">"{data.note}"</div>
 				{/if}
-				<p>
-					Add your email to claim this invite. We'll send a magic link so you can sign in.
-				</p>
+				<p>Add your email to claim this invite. We'll send a magic link so you can sign in.</p>
 				{#if data.grantsAdmin}
 					<div class="badge">
 						<Icon name="shield" size={12} />

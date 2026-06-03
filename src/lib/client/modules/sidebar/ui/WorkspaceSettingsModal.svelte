@@ -1,5 +1,6 @@
 <script lang="ts">
-	import Modal from '$lib/client/components/Modal.svelte';
+	import type { Attachment } from 'svelte/attachments';
+	import { Modal, Button } from '@juspay/svelte-ui-components';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { workspaces, type Workspace } from '$lib/client/modules/workspaces';
 	import { toasts } from '$lib/client/modules/toasts';
@@ -38,21 +39,21 @@
 
 	let searchToken = 0;
 
-	$effect(() => {
+	// Reset the form and load members when the modal's content mounts (the
+	// modal is shown) and whenever the workspace it's pointed at changes.
+	const initForWorkspace: Attachment = () => {
 		const ws = workspace;
-		if (ws) {
-			renameDraft = ws.name;
-			renameError = '';
-			addError = '';
-			pickerQuery = '';
-			pickerSuggestions = [];
-			pickerOpen = false;
-			loadMembers(ws.id);
-		} else {
-			members = [];
-			loadingMembers = false;
+		if (!ws) {
+			return;
 		}
-	});
+		renameDraft = ws.name;
+		renameError = '';
+		addError = '';
+		pickerQuery = '';
+		pickerSuggestions = [];
+		pickerOpen = false;
+		loadMembers(ws.id);
+	};
 
 	async function loadMembers(workspaceId: string) {
 		loadingMembers = true;
@@ -62,7 +63,7 @@
 			if (!res.ok) {
 				throw new Error((await res.text()) || `Request failed (${res.status})`);
 			}
-			const data = (await res.json()) as { members: Member[] };
+			const data: { members: Member[] } = await res.json();
 			members = data.members;
 		} catch (e) {
 			membersError = e instanceof Error ? e.message : 'Failed to load members';
@@ -74,13 +75,11 @@
 	async function searchPicker(q: string) {
 		const token = ++searchToken;
 		try {
-			const res = await fetch(
-				`/api/app-members${q ? `?q=${encodeURIComponent(q)}` : ''}`
-			);
+			const res = await fetch(`/api/app-members${q ? `?q=${encodeURIComponent(q)}` : ''}`);
 			if (!res.ok) {
 				return;
 			}
-			const data = (await res.json()) as { emails: string[] };
+			const data: { emails: string[] } = await res.json();
 			if (token !== searchToken) {
 				return;
 			}
@@ -93,8 +92,7 @@
 		}
 	}
 
-	function onPickerInput(e: Event) {
-		pickerQuery = (e.currentTarget as HTMLInputElement).value;
+	function onPickerInput() {
 		pickerOpen = true;
 		searchPicker(pickerQuery.trim());
 	}
@@ -125,8 +123,7 @@
 			pickerActiveIdx = (pickerActiveIdx + 1) % pickerSuggestions.length;
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault();
-			pickerActiveIdx =
-				(pickerActiveIdx - 1 + pickerSuggestions.length) % pickerSuggestions.length;
+			pickerActiveIdx = (pickerActiveIdx - 1 + pickerSuggestions.length) % pickerSuggestions.length;
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			pickSuggestion(pickerSuggestions[pickerActiveIdx]);
@@ -181,14 +178,11 @@
 		const previous = member.role;
 		member.role = role;
 		try {
-			const res = await fetch(
-				`/api/workspaces/${ws.id}/members/${member.userId}`,
-				{
-					method: 'PATCH',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ role })
-				}
-			);
+			const res = await fetch(`/api/workspaces/${ws.id}/members/${member.userId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ role })
+			});
 			if (!res.ok) {
 				throw new Error((await res.text()) || `Request failed (${res.status})`);
 			}
@@ -212,10 +206,9 @@
 		const previous = members;
 		members = members.filter((m) => m.userId !== member.userId);
 		try {
-			const res = await fetch(
-				`/api/workspaces/${ws.id}/members/${member.userId}`,
-				{ method: 'DELETE' }
-			);
+			const res = await fetch(`/api/workspaces/${ws.id}/members/${member.userId}`, {
+				method: 'DELETE'
+			});
 			if (!res.ok) {
 				throw new Error((await res.text()) || `Request failed (${res.status})`);
 			}
@@ -255,169 +248,177 @@
 	}
 </script>
 
-<Modal
-	open={workspace !== null}
-	title="Workspace settings"
-	description={workspace?.name ?? ''}
-	{onClose}
->
-	{#snippet children()}
-		{#if workspace}
-			{@const wsColor = colorForKey(workspace.id)}
-			<div class="ws-card">
-				<span
-					class="ws-tile"
-					style="--tile-from: {wsColor.from}; --tile-to: {wsColor.to};"
-					aria-hidden="true"
-				>
-					{initialFor(workspace.name)}
-				</span>
-				<div class="ws-meta">
-					<span class="ws-name">{workspace.name}</span>
-					<span class="ws-sub">
-						{members.length === 0
-							? 'Owner only'
-							: `${members.length + 1} member${members.length === 0 ? '' : 's'}`}
-					</span>
-				</div>
-			</div>
+{#if workspace}
+	<Modal
+		classes="ms-modal"
+		size="fit-content"
+		header={{ text: 'Workspace settings' }}
+		onoverlayClick={onClose}
+	>
+		{#snippet content()}
+			{#if workspace}
+				{@const wsColor = colorForKey(workspace.id)}
+				<div class="ws-settings" {@attach initForWorkspace}>
+					<div class="ws-card">
+						<span
+							class="ws-tile"
+							style="--tile-from: {wsColor.from}; --tile-to: {wsColor.to};"
+							aria-hidden="true"
+						>
+							{initialFor(workspace.name)}
+						</span>
+						<div class="ws-meta">
+							<span class="ws-name">{workspace.name}</span>
+							<span class="ws-sub">
+								{members.length === 0
+									? 'Owner only'
+									: `${members.length + 1} member${members.length === 0 ? '' : 's'}`}
+							</span>
+						</div>
+					</div>
 
-			<section class="block">
-				<div class="block-label">Name</div>
-				<div class="rename-row">
-					<input
-						type="text"
-						class="text-input"
-						bind:value={renameDraft}
-						maxlength="80"
-						disabled={!isOwner || renameSaving}
-						placeholder="Workspace name"
-					/>
-					<button
-						type="button"
-						class="btn primary"
-						disabled={!isOwner ||
-							renameSaving ||
-							!renameDraft.trim() ||
-							renameDraft.trim() === workspace.name}
-						onclick={saveRename}
-					>
-						{renameSaving ? 'Saving…' : 'Save'}
-					</button>
-				</div>
-				{#if renameError}
-					<p class="error">{renameError}</p>
-				{/if}
-				{#if !isOwner}
-					<p class="hint">Only the workspace owner can rename it.</p>
-				{/if}
-			</section>
-
-			<section class="block">
-				<div class="block-label">Members</div>
-
-				{#if loadingMembers}
-					<p class="hint">Loading…</p>
-				{:else if membersError}
-					<p class="error">{membersError}</p>
-				{:else if members.length === 0}
-					<p class="hint">No one else has access yet.</p>
-				{:else}
-					<ul class="member-list">
-						{#each members as m (m.userId)}
-							<li class="member">
-								<span class="member-email">{m.email}</span>
-								{#if isOwner}
-									<select
-										class="role-select"
-										value={m.role}
-										onchange={(e) =>
-											changeRole(m, (e.currentTarget as HTMLSelectElement).value as 'editor' | 'viewer')}
-									>
-										<option value="editor">Editor</option>
-										<option value="viewer">Viewer</option>
-									</select>
-									<button
-										type="button"
-										class="member-remove"
-										title="Remove"
-										aria-label="Remove member"
-										onclick={() => removeMember(m)}
-									>
-										<Icon name="trash" size={13} />
-									</button>
-								{:else}
-									<span class="role-pill">{m.role}</span>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				{/if}
-
-				{#if isOwner}
-					<div class="add-row">
-						<div class="picker-wrap">
+					<section class="block">
+						<div class="block-label">Name</div>
+						<div class="rename-row">
 							<input
-								type="email"
+								type="text"
 								class="text-input"
-								placeholder="Add by email"
-								value={pickerQuery}
-								oninput={onPickerInput}
-								onfocus={onPickerFocus}
-								onkeydown={onPickerKeydown}
-								disabled={addingMember}
-								autocomplete="off"
+								bind:value={renameDraft}
+								maxlength="80"
+								disabled={!isOwner || renameSaving}
+								placeholder="Workspace name"
 							/>
-							{#if pickerOpen && pickerSuggestions.length > 0}
-								<ul class="picker-suggestions" role="listbox">
-									{#each pickerSuggestions as email, i (email)}
-										<li>
-											<button
-												type="button"
-												class="picker-suggestion"
-												class:active={i === pickerActiveIdx}
-												onmousedown={(e) => {
-													e.preventDefault();
-													pickSuggestion(email);
+							<button
+								type="button"
+								class="btn primary"
+								disabled={!isOwner ||
+									renameSaving ||
+									!renameDraft.trim() ||
+									renameDraft.trim() === workspace.name}
+								onclick={saveRename}
+							>
+								{renameSaving ? 'Saving…' : 'Save'}
+							</button>
+						</div>
+						{#if renameError}
+							<p class="error">{renameError}</p>
+						{/if}
+						{#if !isOwner}
+							<p class="hint">Only the workspace owner can rename it.</p>
+						{/if}
+					</section>
+
+					<section class="block">
+						<div class="block-label">Members</div>
+
+						{#if loadingMembers}
+							<p class="hint">Loading…</p>
+						{:else if membersError}
+							<p class="error">{membersError}</p>
+						{:else if members.length === 0}
+							<p class="hint">No one else has access yet.</p>
+						{:else}
+							<ul class="member-list">
+								{#each members as m (m.userId)}
+									<li class="member">
+										<span class="member-email">{m.email}</span>
+										{#if isOwner}
+											<select
+												class="role-select"
+												value={m.role}
+												onchange={(e) => {
+													const next = e.currentTarget.value;
+													if (next === 'editor' || next === 'viewer') {
+														changeRole(m, next);
+													}
 												}}
 											>
-												{email}
+												<option value="editor">Editor</option>
+												<option value="viewer">Viewer</option>
+											</select>
+											<button
+												type="button"
+												class="member-remove"
+												title="Remove"
+												aria-label="Remove member"
+												onclick={() => removeMember(m)}
+											>
+												<Icon name="trash" size={13} />
 											</button>
-										</li>
-									{/each}
-								</ul>
+										{:else}
+											<span class="role-pill">{m.role}</span>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if isOwner}
+							<div class="add-row">
+								<div class="picker-wrap">
+									<input
+										type="email"
+										class="text-input"
+										placeholder="Add by email"
+										bind:value={pickerQuery}
+										oninput={onPickerInput}
+										onfocus={onPickerFocus}
+										onkeydown={onPickerKeydown}
+										disabled={addingMember}
+										autocomplete="off"
+									/>
+									{#if pickerOpen && pickerSuggestions.length > 0}
+										<ul class="picker-suggestions" role="listbox">
+											{#each pickerSuggestions as email, i (email)}
+												<li>
+													<button
+														type="button"
+														class="picker-suggestion"
+														class:active={i === pickerActiveIdx}
+														onmousedown={(e) => {
+															e.preventDefault();
+															pickSuggestion(email);
+														}}
+													>
+														{email}
+													</button>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</div>
+								<select class="role-select" bind:value={pickerRole} disabled={addingMember}>
+									<option value="editor">Editor</option>
+									<option value="viewer">Viewer</option>
+								</select>
+								<button
+									type="button"
+									class="btn primary"
+									onclick={addMember}
+									disabled={addingMember || !pickerQuery.trim()}
+								>
+									{addingMember ? 'Adding…' : 'Add'}
+								</button>
+							</div>
+							{#if addError}
+								<p class="error">{addError}</p>
 							{/if}
-						</div>
-						<select
-							class="role-select"
-							bind:value={pickerRole}
-							disabled={addingMember}
-						>
-							<option value="editor">Editor</option>
-							<option value="viewer">Viewer</option>
-						</select>
-						<button
-							type="button"
-							class="btn primary"
-							onclick={addMember}
-							disabled={addingMember || !pickerQuery.trim()}
-						>
-							{addingMember ? 'Adding…' : 'Add'}
-						</button>
-					</div>
-					{#if addError}
-						<p class="error">{addError}</p>
-					{/if}
-				{/if}
-			</section>
-		{/if}
-	{/snippet}
-	{#snippet footer()}
-		<button type="button" class="btn ghost" onclick={onClose}>Done</button>
-	{/snippet}
-</Modal>
+						{/if}
+					</section>
+				</div>
+			{/if}
+		{/snippet}
+		{#snippet footerSnippet()}
+			<Button text="Done" classes="btn-secondary" onclick={onClose} />
+		{/snippet}
+	</Modal>
+{/if}
 
 <style>
+	.ws-settings {
+		width: min(480px, 92vw);
+		padding: 18px 20px 20px;
+	}
 	.ws-card {
 		display: flex;
 		align-items: center;
@@ -541,15 +542,6 @@
 	.btn.primary:hover:not(:disabled) {
 		opacity: 0.9;
 	}
-	.btn.ghost {
-		color: var(--accents-6);
-		background: transparent;
-		border-color: var(--border);
-	}
-	.btn.ghost:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
-	}
 
 	.error {
 		margin: 4px 0 0;
@@ -599,7 +591,10 @@
 		border: 1px solid transparent;
 		border-radius: 5px;
 		cursor: pointer;
-		transition: color 120ms, background 120ms, border-color 120ms;
+		transition:
+			color 120ms,
+			background 120ms,
+			border-color 120ms;
 	}
 	.member-remove:hover {
 		color: var(--geist-error);

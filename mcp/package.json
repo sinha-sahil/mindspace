@@ -1,0 +1,36 @@
+{
+	"name": "mindspace-mcp",
+	"version": "0.1.0",
+	"description": "MCP server for mindspace — lets an LLM create projects, upload markdown documents, and fetch text-anchored comment threads.",
+	"type": "module",
+	"bin": {
+		"mindspace-mcp": "./dist/index.js"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsc && chmod +x dist/index.js",
+		"dev": "tsc --watch",
+		"start": "node dist/index.js"
+	},
+	"keywords": [
+		"mcp",
+		"claude",
+		"mindspace",
+		"excalidraw",
+		"markdown"
+	],
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.18.0",
+		"zod": "^3.23.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"typescript": "^5.6.0"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}

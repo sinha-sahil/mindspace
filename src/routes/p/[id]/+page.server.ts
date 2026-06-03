@@ -11,8 +11,12 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		.eq('id', params.id)
 		.maybeSingle();
 
-	if (dbError) {throw error(500, dbError.message);}
-	if (!project) {throw error(404, 'Project not found');}
+	if (dbError) {
+		throw error(500, dbError.message);
+	}
+	if (!project) {
+		throw error(404, 'Project not found');
+	}
 
 	// Determine read/edit:
 	//   - public link: read-only for everyone
@@ -36,7 +40,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}
 	}
 
-	if (!canView) {throw error(404, 'Project not found');}
+	if (!canView) {
+		throw error(404, 'Project not found');
+	}
 
 	return {
 		project: {

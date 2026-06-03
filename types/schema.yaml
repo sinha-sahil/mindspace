@@ -9,6 +9,12 @@ types:
       - private
       - link
 
+  ProjectKind:
+    type: string
+    enum:
+      - whiteboard
+      - doc
+
   ProjectRow:
     type: object
     required:
@@ -16,6 +22,7 @@ types:
       - workspace_id
       - name
       - visibility
+      - kind
       - created_at
       - updated_at
     properties:
@@ -25,6 +32,8 @@ types:
         type: string
       name:
         type: string
+      kind:
+        $ref: '#/types/ProjectKind'
       scene:
         type: unknown
       visibility:
@@ -37,6 +46,72 @@ types:
       updated_at:
         type: string
         format: date-time
+
+  DocumentRow:
+    type: object
+    required:
+      - id
+      - project_id
+      - name
+      - content
+      - created_at
+      - updated_at
+    properties:
+      id:
+        type: string
+      project_id:
+        type: string
+      name:
+        type: string
+      content:
+        type: string
+      position:
+        type: number
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+
+  DocumentCommentRow:
+    type: object
+    required:
+      - id
+      - document_id
+      - body
+      - anchor_prefix
+      - anchor_suffix
+      - created_at
+    properties:
+      id:
+        type: string
+      document_id:
+        type: string
+      parent_id:
+        type: string
+      body:
+        type: string
+      anchor_quote:
+        type: string
+      anchor_prefix:
+        type: string
+      anchor_suffix:
+        type: string
+      anchor_start:
+        type: number
+      anchor_end:
+        type: number
+      created_by:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      resolved_at:
+        type: string
+        format: date-time
+      resolved_by:
+        type: string
 
   WorkspaceRow:
     type: object
@@ -157,3 +232,33 @@ types:
         type: string
       response:
         type: unknown
+
+  ApiTokenRow:
+    type: object
+    required:
+      - id
+      - user_id
+      - name
+      - token_hash
+      - token_prefix
+      - created_at
+    properties:
+      id:
+        type: string
+      user_id:
+        type: string
+      name:
+        type: string
+      token_hash:
+        type: string
+      token_prefix:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      last_used_at:
+        type: string
+        format: date-time
+      expires_at:
+        type: string
+        format: date-time

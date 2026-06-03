@@ -17,11 +17,7 @@ async function ensurePersonalWorkspace(
 	// where we're a member. If either returns a row we're done.
 	const [owned, membered] = await Promise.all([
 		supabase.from('workspaces').select('id').eq('owner_id', userId).limit(1),
-		supabase
-			.from('workspace_members')
-			.select('workspace_id')
-			.eq('user_id', userId)
-			.limit(1)
+		supabase.from('workspace_members').select('workspace_id').eq('user_id', userId).limit(1)
 	]);
 
 	if ((owned.data && owned.data.length > 0) || (membered.data && membered.data.length > 0)) {
