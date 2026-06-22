@@ -2,11 +2,9 @@
 	import Logo from '$lib/client/components/Logo.svelte';
 	import MermaidFullscreen from '$lib/client/modules/documents/ui/MermaidFullscreen.svelte';
 	import { Whiteboard } from '$lib/client/modules/whiteboard';
+	import { TodoReadOnly } from '$lib/client/modules/todos';
 	import { formatDate as fmtDate } from '$lib/client/utils/format';
-	import {
-		renderMarkdown,
-		renderMermaidDiagrams
-	} from '$lib/client/modules/documents/markdown';
+	import { renderMarkdown, renderMermaidDiagrams } from '$lib/client/modules/documents/markdown';
 
 	let { data } = $props();
 	const { project, documents, isOwner, sharedWithYou } = $derived(data);
@@ -80,6 +78,8 @@
 				{/if}
 			</div>
 		</div>
+	{:else if project.kind === 'todo'}
+		<TodoReadOnly scene={project.scene} />
 	{:else}
 		<div class="board">
 			<Whiteboard scene={project.scene} readOnly />

@@ -14,6 +14,7 @@ types:
     enum:
       - whiteboard
       - doc
+      - todo
 
   ShareRole:
     type: string

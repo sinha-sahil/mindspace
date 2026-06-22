@@ -9,6 +9,7 @@
 	import { CommandPalette } from '$lib/client/modules/command-palette';
 	import { WhatsNewModal, whatsNew } from '$lib/client/modules/whats-new';
 	import { DocProjectView, documents } from '$lib/client/modules/documents';
+	import { TodoProjectView } from '$lib/client/modules/todos';
 	import { toasts } from '$lib/client/modules/toasts';
 
 	let { data } = $props();
@@ -122,6 +123,15 @@
 			{@const active = projects.active}
 			{#if active.kind === 'doc'}
 				<DocProjectView projectId={active.id} {supabase} />
+			{:else if active.kind === 'todo'}
+				{#key active.id}
+					<TodoProjectView
+						project={active}
+						saving={projects.isSaving}
+						onSceneChange={(scene) => projects.saveScene(active.id, scene)}
+						onRename={(name) => projects.rename(active.id, name)}
+					/>
+				{/key}
 			{:else if splitView.enabled}
 				<div class="split" bind:this={splitContainerEl}>
 					<div class="pane-slot" style="flex: {splitView.ratio};">

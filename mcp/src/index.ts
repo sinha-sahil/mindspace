@@ -170,6 +170,27 @@ server.registerTool(
 );
 
 server.registerTool(
+	'create_todo_project',
+	{
+		title: 'Create Todo List Project',
+		description:
+			'Create a new todo-list project: nested checkboxes grouped into sections and arranged across one or more columns. Opens with a starter column for the user to fill in.',
+		inputSchema: {
+			workspace_id: z.string().uuid().describe('UUID of the destination workspace.'),
+			name: z.string().min(1).max(120).describe('Display name for the project.')
+		}
+	},
+	async ({ workspace_id, name }) =>
+		jsonResult(
+			await mindspaceApi('POST', '/api/mcp/projects', {
+				workspace_id,
+				name,
+				kind: 'todo'
+			})
+		)
+);
+
+server.registerTool(
 	'list_documents',
 	{
 		title: 'List Documents',

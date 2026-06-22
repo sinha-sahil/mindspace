@@ -32,12 +32,14 @@ export function _decodeVisibility(rawInput: unknown): Visibility | undefined {
 export type ProjectKind =
   | 'whiteboard'
   | 'doc'
+  | 'todo'
 ;
 
 export function decodeProjectKind(rawInput: unknown): ProjectKind | null {
   switch (rawInput) {
     case 'whiteboard':
     case 'doc':
+    case 'todo':
      return rawInput;
   }
   return null;
@@ -47,6 +49,7 @@ export function _decodeProjectKind(rawInput: unknown): ProjectKind | undefined {
   switch (rawInput) {
     case 'whiteboard':
     case 'doc':
+    case 'todo':
     return rawInput;
   }
   return;

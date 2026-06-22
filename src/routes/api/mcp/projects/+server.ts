@@ -32,10 +32,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let kind: ProjectKind = 'whiteboard';
 	if ('kind' in body && typeof body.kind === 'string') {
-		if (body.kind === 'whiteboard' || body.kind === 'doc') {
+		if (body.kind === 'whiteboard' || body.kind === 'doc' || body.kind === 'todo') {
 			kind = body.kind;
 		} else {
-			throw error(400, 'kind must be "whiteboard" or "doc"');
+			throw error(400, 'kind must be "whiteboard", "doc", or "todo"');
 		}
 	}
 

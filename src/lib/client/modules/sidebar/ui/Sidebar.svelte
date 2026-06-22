@@ -405,7 +405,13 @@
 		newProjectMenuOpen = false;
 		const created = await projects.add('', kind);
 		if (created) {
-			toasts.success(kind === 'doc' ? 'Doc project created' : 'Project created', {
+			const label =
+				kind === 'doc'
+					? 'Doc project created'
+					: kind === 'todo'
+						? 'Todo list created'
+						: 'Project created';
+			toasts.success(label, {
 				description: created.name
 			});
 		}
@@ -738,6 +744,17 @@
 								<span class="kind-hint">Markdown notes with comment threads</span>
 							</span>
 						</button>
+						<button
+							type="button"
+							class="popover-item kind-item"
+							onclick={() => createProjectOfKind('todo')}
+						>
+							<span class="popover-icon"><Icon name="list" size={14} /></span>
+							<span class="kind-text">
+								<span class="popover-item-text">Todo list</span>
+								<span class="kind-hint">Nested checklists with columns</span>
+							</span>
+						</button>
 					</div>
 				{/if}
 			</div>
@@ -817,6 +834,10 @@
 								{#if project.kind === 'doc'}
 									<span class="kind-icon" aria-hidden="true">
 										<Icon name="pencil" size={11} />
+									</span>
+								{:else if project.kind === 'todo'}
+									<span class="kind-icon" aria-hidden="true">
+										<Icon name="list" size={11} />
 									</span>
 								{:else}
 									<span class="dot" aria-hidden="true"></span>
