@@ -1383,9 +1383,10 @@
 		background: var(--accents-2);
 	}
 	.brand-text {
-		font-weight: 600;
-		font-size: 14px;
-		letter-spacing: -0.01em;
+		font-family: var(--font-display);
+		font-weight: 500;
+		font-size: 18px;
+		letter-spacing: -0.015em;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -1834,8 +1835,22 @@
 		background: var(--surface);
 	}
 	.item.active {
-		background: var(--surface);
-		box-shadow: inset 0 0 0 1px var(--border);
+		background: var(--accent-soft);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+	}
+	/* Foil-edge active rule — a lit accent bar down the left edge. */
+	.item.active:not(.icon-only)::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 3px;
+		height: 56%;
+		border-radius: var(--radius-pill);
+		background: var(--accent);
+		box-shadow: 0 0 10px -1px var(--accent-glow);
+		z-index: 1;
 	}
 	.item.dragging {
 		/* Visually remove from the list — the floating ghost takes its place. */

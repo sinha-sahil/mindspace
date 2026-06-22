@@ -15,6 +15,12 @@ types:
       - whiteboard
       - doc
 
+  ShareRole:
+    type: string
+    enum:
+      - viewer
+      - editor
+
   ProjectRow:
     type: object
     required:
@@ -38,12 +44,38 @@ types:
         type: unknown
       visibility:
         $ref: '#/types/Visibility'
+      link_expires_at:
+        type: string
+        format: date-time
       position:
         type: number
       created_at:
         type: string
         format: date-time
       updated_at:
+        type: string
+        format: date-time
+
+  ProjectShareRow:
+    type: object
+    required:
+      - id
+      - project_id
+      - email
+      - role
+      - created_at
+    properties:
+      id:
+        type: string
+      project_id:
+        type: string
+      email:
+        type: string
+      role:
+        $ref: '#/types/ShareRole'
+      added_by:
+        type: string
+      created_at:
         type: string
         format: date-time
 
