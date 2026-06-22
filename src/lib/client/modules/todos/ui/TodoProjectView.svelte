@@ -252,9 +252,27 @@
 		B.toggleNodeKind(board, id);
 		persist();
 	};
+	const onCycleEffort = (id: string) => {
+		B.cycleEffort(board, id);
+		persist();
+	};
+	const onCycleTime = (id: string) => {
+		B.cycleTime(board, id);
+		persist();
+	};
 	const onFocused = () => {
 		focusId = null;
 	};
+
+	// ----- view (sort + filter) -----
+	function setSort(sort: B.TodoSort) {
+		B.setView(board, { ...board.view, sort });
+		persist();
+	}
+	function toggleHideDone() {
+		B.setView(board, { ...board.view, hideDone: !board.view.hideDone });
+		persist();
+	}
 
 	// ----- column operations -----
 	function addTask(columnId: string) {
@@ -331,6 +349,49 @@
 			{#if totalProgress.total > 0}
 				<span class="overall">{totalProgress.done}/{totalProgress.total} done</span>
 			{/if}
+
+			<div class="sort-group" role="group" aria-label="Sort tasks">
+				<span class="sort-label">Sort</span>
+				<button
+					type="button"
+					class="sort-btn"
+					class:active={board.view.sort === 'manual'}
+					title="Manual order"
+					onclick={() => setSort('manual')}
+				>
+					Manual
+				</button>
+				<button
+					type="button"
+					class="sort-btn"
+					class:active={board.view.sort === 'effort'}
+					title="Heaviest effort first"
+					onclick={() => setSort('effort')}
+				>
+					Effort
+				</button>
+				<button
+					type="button"
+					class="sort-btn"
+					class:active={board.view.sort === 'time'}
+					title="Longest time first"
+					onclick={() => setSort('time')}
+				>
+					Time
+				</button>
+			</div>
+			<button
+				type="button"
+				class="filter-btn"
+				class:active={board.view.hideDone}
+				title={board.view.hideDone ? 'Show completed' : 'Hide completed'}
+				aria-pressed={board.view.hideDone}
+				onclick={toggleHideDone}
+			>
+				<Icon name="check" size={12} />
+				<span>Hide done</span>
+			</button>
+
 			<span class="save-pill" class:saving>
 				<span class="dot"></span>{saving ? 'Saving' : 'Saved'}
 			</span>
@@ -409,10 +470,11 @@
 					{/if}
 
 					<div class="nodes">
-						{#each column.nodes as node (node.id)}
+						{#each B.viewNodes(column.nodes, board.view) as node (node.id)}
 							<TodoNode
 								{node}
 								depth={0}
+								view={board.view}
 								{focusId}
 								{onFocused}
 								{onToggle}
@@ -425,10 +487,14 @@
 								{onMove}
 								{onToggleCollapse}
 								{onToggleKind}
+								{onCycleEffort}
+								{onCycleTime}
 							/>
 						{/each}
 						{#if column.nodes.length === 0}
 							<p class="col-empty">No items yet.</p>
+						{:else if B.viewNodes(column.nodes, board.view).length === 0}
+							<p class="col-empty">Everything's done. 🎉</p>
 						{/if}
 					</div>
 
@@ -534,6 +600,67 @@
 		50% {
 			opacity: 0.4;
 		}
+	}
+
+	.sort-group {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		padding: 2px;
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 7px;
+	}
+	.sort-label {
+		padding: 0 6px 0 4px;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+		color: var(--accents-5);
+	}
+	.sort-btn {
+		padding: 3px 9px;
+		font: inherit;
+		font-size: 11.5px;
+		font-weight: 500;
+		color: var(--accents-6);
+		background: transparent;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.sort-btn:hover {
+		color: var(--geist-foreground);
+		background: var(--surface);
+	}
+	.sort-btn.active {
+		color: var(--geist-foreground);
+		background: var(--surface);
+		box-shadow: inset 0 0 0 1px var(--border);
+	}
+	.filter-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 5px 10px;
+		font: inherit;
+		font-size: 11.5px;
+		font-weight: 500;
+		color: var(--accents-6);
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		cursor: pointer;
+	}
+	.filter-btn:hover {
+		color: var(--geist-foreground);
+		border-color: var(--accents-3);
+	}
+	.filter-btn.active {
+		color: var(--geist-background);
+		background: var(--geist-foreground);
+		border-color: var(--geist-foreground);
 	}
 
 	.zoom-group {

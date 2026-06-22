@@ -15,12 +15,20 @@
 
 export type TodoNodeKind = 'task' | 'section';
 
+/** Estimate scale shared by effort and time: 0 = unset, 1 = low … 3 = high. */
+export type Rating = 0 | 1 | 2 | 3;
+export const MAX_RATING = 3;
+
 export type TodoNode = {
 	id: string;
 	kind: TodoNodeKind;
 	text: string;
 	/** Only meaningful for `task` nodes. */
 	done: boolean;
+	/** Effort estimate (0–3). Treated as a "ticket" rating; sections ignore it. */
+	effort: Rating;
+	/** Time estimate (0–3). */
+	time: Rating;
 	collapsed: boolean;
 	children: TodoNode[];
 };
@@ -42,10 +50,18 @@ export type TodoViewport = {
 	zoom: number;
 };
 
+/** How tasks are ordered for display, and whether completed ones are hidden. */
+export type TodoSort = 'manual' | 'effort' | 'time';
+export type TodoView = {
+	sort: TodoSort;
+	hideDone: boolean;
+};
+
 export type TodoBoard = {
 	version: 1;
 	columns: TodoColumn[];
 	viewport: TodoViewport;
+	view: TodoView;
 };
 
 export const DEFAULT_COLUMN_WIDTH = 300;
@@ -68,11 +84,29 @@ function len36(): string {
 }
 
 export function newTask(text = ''): TodoNode {
-	return { id: uid(), kind: 'task', text, done: false, collapsed: false, children: [] };
+	return {
+		id: uid(),
+		kind: 'task',
+		text,
+		done: false,
+		effort: 0,
+		time: 0,
+		collapsed: false,
+		children: []
+	};
 }
 
 export function newSection(text = ''): TodoNode {
-	return { id: uid(), kind: 'section', text, done: false, collapsed: false, children: [] };
+	return {
+		id: uid(),
+		kind: 'section',
+		text,
+		done: false,
+		effort: 0,
+		time: 0,
+		collapsed: false,
+		children: []
+	};
 }
 
 export function newColumn(
@@ -88,7 +122,8 @@ export function createEmptyBoard(): TodoBoard {
 	return {
 		version: 1,
 		columns: [newColumn('To do', LAYOUT_ORIGIN, LAYOUT_ORIGIN)],
-		viewport: { x: 0, y: 0, zoom: 1 }
+		viewport: { x: 0, y: 0, zoom: 1 },
+		view: { sort: 'manual', hideDone: false }
 	};
 }
 
@@ -129,9 +164,19 @@ function normalizeNode(raw: unknown): TodoNode | null {
 		kind,
 		text: 'text' in raw && typeof raw.text === 'string' ? raw.text : '',
 		done: kind === 'task' && 'done' in raw && raw.done === true,
+		effort: 'effort' in raw ? toRating(raw.effort) : 0,
+		time: 'time' in raw ? toRating(raw.time) : 0,
 		collapsed: 'collapsed' in raw && raw.collapsed === true,
 		children
 	};
+}
+
+/** Coerce arbitrary stored input to a valid 0–3 rating. */
+function toRating(value: unknown): Rating {
+	if (value === 1 || value === 2 || value === 3) {
+		return value;
+	}
+	return 0;
 }
 
 function normalizeBoard(raw: unknown): TodoBoard {
@@ -178,7 +223,20 @@ function normalizeBoard(raw: unknown): TodoBoard {
 	if (columns.length === 0) {
 		return createEmptyBoard();
 	}
-	return { version: 1, columns, viewport: normalizeViewport(raw) };
+	return { version: 1, columns, viewport: normalizeViewport(raw), view: normalizeView(raw) };
+}
+
+function normalizeView(raw: object): TodoView {
+	let sort: TodoSort = 'manual';
+	let hideDone = false;
+	if ('view' in raw && typeof raw.view === 'object' && raw.view !== null) {
+		const v = raw.view;
+		if ('sort' in v && (v.sort === 'effort' || v.sort === 'time' || v.sort === 'manual')) {
+			sort = v.sort;
+		}
+		hideDone = 'hideDone' in v && v.hideDone === true;
+	}
+	return { sort, hideDone };
 }
 
 function normalizeViewport(raw: object): TodoViewport {
@@ -339,6 +397,39 @@ export function setText(board: TodoBoard, id: string, text: string): void {
 	}
 }
 
+/** Cycle a task's effort rating 0 → 1 → 2 → 3 → 0. */
+export function cycleEffort(board: TodoBoard, id: string): void {
+	const ctx = findContext(board, id);
+	if (ctx && ctx.node.kind === 'task') {
+		ctx.node.effort = nextRating(ctx.node.effort);
+	}
+}
+
+/** Cycle a task's time rating 0 → 1 → 2 → 3 → 0. */
+export function cycleTime(board: TodoBoard, id: string): void {
+	const ctx = findContext(board, id);
+	if (ctx && ctx.node.kind === 'task') {
+		ctx.node.time = nextRating(ctx.node.time);
+	}
+}
+
+function nextRating(value: Rating): Rating {
+	if (value === 1) {
+		return 2;
+	}
+	if (value === 2) {
+		return 3;
+	}
+	if (value === 3) {
+		return 0;
+	}
+	return 1;
+}
+
+export function setView(board: TodoBoard, view: TodoView): void {
+	board.view = view;
+}
+
 export function toggleCollapsed(board: TodoBoard, id: string): void {
 	const ctx = findContext(board, id);
 	if (ctx) {
@@ -438,4 +529,24 @@ export function countProgress(nodes: TodoNode[]): Progress {
 	};
 	walk(nodes);
 	return { done, total };
+}
+
+/**
+ * Apply the board's view (hide-done filter + effort/time sort) to ONE level of
+ * a sibling list for display. Returns existing node references — never mutates
+ * or copies — so edits keep flowing back to the real board by id, and callers
+ * recurse by calling this again on each node's children.
+ *
+ * Sort is stable and descending (heaviest first); section headings always sort
+ * to the top of their sibling list so they keep anchoring the items beneath
+ * them, and unrated tasks fall to the bottom.
+ */
+export function viewNodes(nodes: TodoNode[], view: TodoView): TodoNode[] {
+	let list = view.hideDone ? nodes.filter((n) => !(n.kind === 'task' && n.done)) : nodes;
+	if (view.sort === 'effort' || view.sort === 'time') {
+		const key = (n: TodoNode) =>
+			n.kind === 'section' ? Number.MAX_SAFE_INTEGER : view.sort === 'effort' ? n.effort : n.time;
+		list = [...list].sort((a, b) => key(b) - key(a));
+	}
+	return list;
 }

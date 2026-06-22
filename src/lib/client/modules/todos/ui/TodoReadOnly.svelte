@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
-	import { parseBoard, countProgress, type TodoNode } from '../board';
+	import { parseBoard, countProgress, viewNodes, type TodoNode } from '../board';
 
 	type Props = {
 		/** Serialized board JSON (same shape stored in project.scene). */
@@ -67,6 +67,17 @@
 	}
 </script>
 
+{#snippet rating(label: string, level: number, kind: 'effort' | 'time')}
+	<span class="rating {kind}" title="{label}: {['—', 'low', 'medium', 'high'][level]}">
+		<span class="rk">{label}</span>
+		<span class="marks">
+			{#each [1, 2, 3] as lvl (lvl)}
+				<span class="mark" class:on={level >= lvl}></span>
+			{/each}
+		</span>
+	</span>
+{/snippet}
+
 {#snippet renderNode(node: TodoNode, depth: number)}
 	<div class="node" class:section={node.kind === 'section'} style="--depth: {depth}">
 		<div class="row" class:done={node.kind === 'task' && node.done}>
@@ -78,10 +89,16 @@
 				<span class="section-mark" aria-hidden="true"></span>
 			{/if}
 			<span class="text">{node.text || ' '}</span>
+			{#if node.kind === 'task' && (node.effort > 0 || node.time > 0)}
+				<span class="ratings">
+					{#if node.effort > 0}{@render rating('E', node.effort, 'effort')}{/if}
+					{#if node.time > 0}{@render rating('T', node.time, 'time')}{/if}
+				</span>
+			{/if}
 		</div>
 		{#if node.children.length > 0}
 			<div class="children">
-				{#each node.children as child (child.id)}
+				{#each viewNodes(node.children, board.view) as child (child.id)}
 					{@render renderNode(child, depth + 1)}
 				{/each}
 			</div>
@@ -116,7 +133,7 @@
 					</div>
 				{/if}
 				<div class="nodes">
-					{#each column.nodes as node (node.id)}
+					{#each viewNodes(column.nodes, board.view) as node (node.id)}
 						{@render renderNode(node, 0)}
 					{/each}
 					{#if column.nodes.length === 0}
@@ -266,5 +283,45 @@
 		margin-left: 16px;
 		padding-left: 8px;
 		border-left: 1px solid var(--border);
+	}
+
+	.ratings {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+	.rating {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		height: 16px;
+		padding: 0 5px;
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+	}
+	.rk {
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: var(--accents-6);
+	}
+	.marks {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.mark {
+		width: 4px;
+		height: 4px;
+		border-radius: 50%;
+		background: var(--accents-3);
+	}
+	.rating.effort .mark.on {
+		background: var(--saffron, #e0a106);
+	}
+	.rating.time .mark.on {
+		background: var(--sage, #5f9a6f);
 	}
 </style>

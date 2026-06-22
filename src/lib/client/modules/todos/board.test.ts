@@ -118,4 +118,55 @@ describe('todo board', () => {
 		const again = B.parseBoard(B.serializeBoard(b));
 		expect(again.viewport).toEqual({ x: -120, y: 80, zoom: 1.5 });
 	});
+
+	it('cycles effort/time ratings 0→1→2→3→0 and persists them', () => {
+		const b = B.createEmptyBoard();
+		const t = b.columns[0].nodes[0];
+		expect(t.effort).toBe(0);
+		for (const expected of [1, 2, 3, 0]) {
+			B.cycleEffort(b, t.id);
+			expect(t.effort).toBe(expected);
+		}
+		B.cycleTime(b, t.id);
+		const again = B.parseBoard(B.serializeBoard(b));
+		expect(again.columns[0].nodes[0].time).toBe(1);
+	});
+
+	it('sorts tasks by rating (desc) without mutating the stored order', () => {
+		const b = B.createEmptyBoard();
+		const col = b.columns[0];
+		const low = B.newTask('low');
+		low.effort = 1;
+		const high = B.newTask('high');
+		high.effort = 3;
+		const none = B.newTask('none');
+		col.nodes = [low, high, none];
+		const sorted = B.viewNodes(col.nodes, { sort: 'effort', hideDone: false });
+		expect(sorted.map((n) => n.text)).toEqual(['high', 'low', 'none']);
+		// non-destructive: the board keeps manual order
+		expect(col.nodes.map((n) => n.text)).toEqual(['low', 'high', 'none']);
+	});
+
+	it('keeps section headings pinned above tasks when sorting', () => {
+		const s = B.newSection('Heading');
+		const t = B.newTask('task');
+		t.effort = 3;
+		const sorted = B.viewNodes([t, s], { sort: 'effort', hideDone: false });
+		expect(sorted[0].kind).toBe('section');
+	});
+
+	it('hideDone filters out completed tasks for display only', () => {
+		const a = B.newTask('a');
+		const done = B.newTask('done');
+		done.done = true;
+		const shown = B.viewNodes([a, done], { sort: 'manual', hideDone: true });
+		expect(shown.map((n) => n.text)).toEqual(['a']);
+	});
+
+	it('persists view sort/hideDone across serialize/parse', () => {
+		const b = B.createEmptyBoard();
+		B.setView(b, { sort: 'time', hideDone: true });
+		const again = B.parseBoard(B.serializeBoard(b));
+		expect(again.view).toEqual({ sort: 'time', hideDone: true });
+	});
 });

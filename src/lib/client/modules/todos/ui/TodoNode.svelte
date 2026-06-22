@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
-	import { countProgress, type TodoNode } from '../board';
+	import { countProgress, viewNodes, type TodoNode, type TodoView } from '../board';
 	import Self from './TodoNode.svelte';
 
 	type Props = {
 		node: TodoNode;
 		depth: number;
+		view: TodoView;
 		focusId: string | null;
 		onFocused: () => void;
 		onToggle: (id: string) => void;
@@ -19,11 +20,14 @@
 		onMove: (id: string, dir: -1 | 1) => void;
 		onToggleCollapse: (id: string) => void;
 		onToggleKind: (id: string) => void;
+		onCycleEffort: (id: string) => void;
+		onCycleTime: (id: string) => void;
 	};
 
 	let {
 		node,
 		depth,
+		view,
 		focusId,
 		onFocused,
 		onToggle,
@@ -35,8 +39,15 @@
 		onOutdent,
 		onMove,
 		onToggleCollapse,
-		onToggleKind
+		onToggleKind,
+		onCycleEffort,
+		onCycleTime
 	}: Props = $props();
+
+	const EFFORT_LABELS = ['Set effort', 'Low effort', 'Medium effort', 'High effort'];
+	const TIME_LABELS = ['Set time', 'Quick', 'Medium time', 'Long'];
+
+	const childrenToShow = $derived(viewNodes(node.children, view));
 
 	// When the parent hands us focus (after an add/indent), grab it. Attachments
 	// are the sanctioned reactive primitive here — they re-run when the values
@@ -126,6 +137,41 @@
 			<span class="count">{progress.done}/{progress.total}</span>
 		{/if}
 
+		{#if node.kind === 'task'}
+			<div class="ratings">
+				<button
+					type="button"
+					class="rating effort"
+					class:set={node.effort > 0}
+					title={EFFORT_LABELS[node.effort]}
+					aria-label={EFFORT_LABELS[node.effort]}
+					onclick={() => onCycleEffort(node.id)}
+				>
+					<span class="rk">E</span>
+					<span class="bars">
+						{#each [1, 2, 3] as lvl (lvl)}
+							<span class="bar b{lvl}" class:on={node.effort >= lvl}></span>
+						{/each}
+					</span>
+				</button>
+				<button
+					type="button"
+					class="rating time"
+					class:set={node.time > 0}
+					title={TIME_LABELS[node.time]}
+					aria-label={TIME_LABELS[node.time]}
+					onclick={() => onCycleTime(node.id)}
+				>
+					<span class="rk">T</span>
+					<span class="dots">
+						{#each [1, 2, 3] as lvl (lvl)}
+							<span class="dot" class:on={node.time >= lvl}></span>
+						{/each}
+					</span>
+				</button>
+			</div>
+		{/if}
+
 		<div class="actions">
 			<button
 				type="button"
@@ -159,10 +205,11 @@
 
 	{#if hasChildren && !node.collapsed}
 		<div class="children">
-			{#each node.children as child (child.id)}
+			{#each childrenToShow as child (child.id)}
 				<Self
 					node={child}
 					depth={depth + 1}
+					{view}
 					{focusId}
 					{onFocused}
 					{onToggle}
@@ -175,6 +222,8 @@
 					{onMove}
 					{onToggleCollapse}
 					{onToggleKind}
+					{onCycleEffort}
+					{onCycleTime}
 				/>
 			{/each}
 		</div>
@@ -338,6 +387,89 @@
 	.act.danger:hover {
 		color: var(--geist-error);
 		background: rgba(238, 0, 0, 0.08);
+	}
+
+	/* ----- effort / time "ticket" ratings ----- */
+	.ratings {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+	.rating {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		height: 18px;
+		padding: 0 5px;
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		cursor: pointer;
+		/* Unset chips stay out of the way until you hover the row. */
+		opacity: 0;
+		transition:
+			opacity 100ms,
+			border-color 100ms;
+	}
+	.rating.set {
+		opacity: 1;
+	}
+	.row:hover .rating {
+		opacity: 1;
+	}
+	.rating:hover {
+		border-color: var(--accents-4);
+	}
+	.rk {
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: var(--accents-5);
+	}
+	.rating.set .rk {
+		color: var(--accents-6);
+	}
+
+	/* effort = ascending bars */
+	.bars {
+		display: inline-flex;
+		align-items: flex-end;
+		gap: 1px;
+		height: 10px;
+	}
+	.bar {
+		width: 2.5px;
+		border-radius: 1px;
+		background: var(--accents-3);
+	}
+	.bar.b1 {
+		height: 4px;
+	}
+	.bar.b2 {
+		height: 7px;
+	}
+	.bar.b3 {
+		height: 10px;
+	}
+	.bar.on {
+		background: var(--saffron, #e0a106);
+	}
+
+	/* time = dots */
+	.dots {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.dot {
+		width: 4px;
+		height: 4px;
+		border-radius: 50%;
+		background: var(--accents-3);
+	}
+	.dot.on {
+		background: var(--sage, #5f9a6f);
 	}
 
 	/* Nesting guide rail + indent. */

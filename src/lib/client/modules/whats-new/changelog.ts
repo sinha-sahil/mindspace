@@ -29,6 +29,25 @@ export type Release = {
 
 export const CHANGELOG: Release[] = [
 	{
+		id: '2026-06-22-ticket-ratings',
+		date: 'June 2026',
+		title: 'Effort & time on every to-do',
+		features: [
+			{
+				icon: 'hash',
+				title: 'Rate effort and time',
+				description:
+					'Each to-do now carries an effort and a time estimate (low / medium / high). Click the little E and T chips on a task to set them — handy for sizing work like tickets.'
+			},
+			{
+				icon: 'list',
+				title: 'Sort the heavy ones to the top',
+				description:
+					"Sort any board by Effort or Time to float the biggest items up, or hide completed tasks with one toggle. It's a view — your manual order is kept underneath, and the choice is remembered per board."
+			}
+		]
+	},
+	{
 		id: '2026-06-22-todo-canvas',
 		date: 'June 2026',
 		title: 'To-do lists on an infinite canvas',
