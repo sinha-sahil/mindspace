@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import type { Project } from '$lib/client/modules/projects';
 	import * as B from '../board';
@@ -23,6 +24,153 @@
 
 	function persist() {
 		onSceneChange(B.serializeBoard(board));
+	}
+
+	// ----- canvas viewport (pan + zoom) -----
+	const MIN_ZOOM = 0.3;
+	const MAX_ZOOM = 2.2;
+	let viewportEl: HTMLDivElement | null = $state(null);
+	let pan = $state({ x: untrack(() => board.viewport.x), y: untrack(() => board.viewport.y) });
+	let zoom = $state(untrack(() => board.viewport.zoom));
+	let panning = $state(false);
+	let draggingCard = $state(false);
+	let viewportPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clamp(value: number, min: number, max: number) {
+		return Math.min(max, Math.max(min, value));
+	}
+
+	function commitViewport() {
+		B.setViewport(board, { x: pan.x, y: pan.y, zoom });
+		persist();
+	}
+
+	// Pan/zoom fire in bursts; coalesce the saves so we don't serialize on every
+	// wheel tick. Position drags persist on pointer-up instead (see below).
+	function scheduleViewportSave() {
+		if (viewportPersistTimer) {
+			clearTimeout(viewportPersistTimer);
+		}
+		viewportPersistTimer = setTimeout(commitViewport, 400);
+	}
+
+	// Wheel handling needs { passive: false } to call preventDefault, so wire it
+	// through an attachment rather than an inline handler.
+	const canvasWheel: Attachment<HTMLElement> = (el) => {
+		const onWheel = (e: WheelEvent) => {
+			e.preventDefault();
+			if (e.ctrlKey || e.metaKey) {
+				// Pinch / ctrl+wheel → zoom toward the cursor.
+				const rect = el.getBoundingClientRect();
+				const cx = e.clientX - rect.left;
+				const cy = e.clientY - rect.top;
+				const prev = zoom;
+				const next = clamp(prev * Math.exp(-e.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM);
+				const wx = (cx - pan.x) / prev;
+				const wy = (cy - pan.y) / prev;
+				pan = { x: cx - wx * next, y: cy - wy * next };
+				zoom = next;
+			} else {
+				// Two-finger / wheel scroll → pan.
+				pan = { x: pan.x - e.deltaX, y: pan.y - e.deltaY };
+			}
+			scheduleViewportSave();
+		};
+		el.addEventListener('wheel', onWheel, { passive: false });
+		return () => el.removeEventListener('wheel', onWheel);
+	};
+
+	// Drag empty canvas to pan. Cards stop propagation, so this only fires on the
+	// background.
+	function startPan(e: PointerEvent) {
+		if (e.button !== 0 || !viewportEl) {
+			return;
+		}
+		// Only pan from empty canvas — clicks that land on a card (its body,
+		// inputs, buttons) shouldn't move the view.
+		if (e.target instanceof Element && e.target.closest('.card')) {
+			return;
+		}
+		panning = true;
+		const startX = e.clientX;
+		const startY = e.clientY;
+		const origin = { ...pan };
+		const el = viewportEl;
+		el.setPointerCapture(e.pointerId);
+		const move = (ev: PointerEvent) => {
+			pan = { x: origin.x + (ev.clientX - startX), y: origin.y + (ev.clientY - startY) };
+		};
+		const up = () => {
+			panning = false;
+			el.removeEventListener('pointermove', move);
+			el.removeEventListener('pointerup', up);
+			commitViewport();
+		};
+		el.addEventListener('pointermove', move);
+		el.addEventListener('pointerup', up);
+	}
+
+	// Drag a column card by its header. Deltas are divided by zoom so the card
+	// tracks the cursor 1:1 in world space regardless of zoom level.
+	function startCardDrag(e: PointerEvent, column: B.TodoColumn) {
+		if (e.button !== 0) {
+			return;
+		}
+		e.stopPropagation();
+		draggingCard = true;
+		const startX = e.clientX;
+		const startY = e.clientY;
+		const originX = column.x;
+		const originY = column.y;
+		const handle = e.currentTarget;
+		if (!(handle instanceof HTMLElement)) {
+			return;
+		}
+		handle.setPointerCapture(e.pointerId);
+		const move = (ev: PointerEvent) => {
+			column.x = originX + (ev.clientX - startX) / zoom;
+			column.y = originY + (ev.clientY - startY) / zoom;
+		};
+		const up = () => {
+			draggingCard = false;
+			handle.removeEventListener('pointermove', move);
+			handle.removeEventListener('pointerup', up);
+			persist();
+		};
+		handle.addEventListener('pointermove', move);
+		handle.addEventListener('pointerup', up);
+	}
+
+	function zoomBy(factor: number) {
+		if (!viewportEl) {
+			return;
+		}
+		const rect = viewportEl.getBoundingClientRect();
+		const cx = rect.width / 2;
+		const cy = rect.height / 2;
+		const prev = zoom;
+		const next = clamp(prev * factor, MIN_ZOOM, MAX_ZOOM);
+		const wx = (cx - pan.x) / prev;
+		const wy = (cy - pan.y) / prev;
+		pan = { x: cx - wx * next, y: cy - wy * next };
+		zoom = next;
+		commitViewport();
+	}
+
+	// Frame all cards: reset zoom to 1 and pan so the content's top-left sits at
+	// a small inset from the viewport origin.
+	function resetView() {
+		if (board.columns.length === 0) {
+			pan = { x: 0, y: 0 };
+			zoom = 1;
+			commitViewport();
+			return;
+		}
+		const minX = Math.min(...board.columns.map((c) => c.x));
+		const minY = Math.min(...board.columns.map((c) => c.y));
+		zoom = 1;
+		pan = { x: 24 - minX, y: 24 - minY };
+		commitViewport();
 	}
 
 	// ----- project title rename (mirrors DocProjectView) -----
@@ -137,7 +285,16 @@
 		persist();
 	}
 	function addColumn() {
-		B.addColumn(board);
+		// Drop the new card at the centre of the current viewport.
+		let position: { x: number; y: number } | null = null;
+		if (viewportEl) {
+			const rect = viewportEl.getBoundingClientRect();
+			position = {
+				x: (rect.width / 2 - pan.x) / zoom - B.DEFAULT_COLUMN_WIDTH / 2,
+				y: (rect.height / 2 - pan.y) / zoom - 40
+			};
+		}
+		B.addColumn(board, position);
 		persist();
 	}
 
@@ -177,90 +334,117 @@
 			<span class="save-pill" class:saving>
 				<span class="dot"></span>{saving ? 'Saving' : 'Saved'}
 			</span>
+			<div class="zoom-group" role="group" aria-label="Zoom">
+				<button type="button" class="zoom-btn" title="Zoom out" onclick={() => zoomBy(1 / 1.2)}>
+					<Icon name="x" size={13} />
+				</button>
+				<button type="button" class="zoom-level" title="Reset view" onclick={resetView}>
+					{Math.round(zoom * 100)}%
+				</button>
+				<button type="button" class="zoom-btn" title="Zoom in" onclick={() => zoomBy(1.2)}>
+					<Icon name="plus" size={13} />
+				</button>
+			</div>
 			<button type="button" class="add-col-btn" onclick={addColumn}>
 				<Icon name="plus" size={13} />
-				<span>Column</span>
+				<span>List</span>
 			</button>
 		</div>
 	</header>
 
-	<div class="board">
-		{#each board.columns as column (column.id)}
-			{@const progress = B.countProgress(column.nodes)}
-			<div class="column">
-				<header class="col-head">
-					<input
-						class="col-title"
-						value={column.title}
-						placeholder="Column title"
-						oninput={(e) => renameColumn(column.id, e.currentTarget.value)}
-						aria-label="Column title"
-					/>
-					{#if progress.total > 0}
-						<span class="col-count">{progress.done}/{progress.total}</span>
-					{/if}
-					{#if board.columns.length > 1}
-						<button
-							type="button"
-							class="col-del"
-							title="Delete column"
-							aria-label="Delete column"
-							onclick={() => removeColumn(column.id, column.title)}
-						>
-							<Icon name="x" size={13} />
-						</button>
-					{/if}
-				</header>
-
-				{#if progress.total > 0}
-					<div class="col-bar">
-						<span
-							class="col-bar-fill"
-							style="width: {progress.total ? (progress.done / progress.total) * 100 : 0}%"
-						></span>
-					</div>
-				{/if}
-
-				<div class="nodes">
-					{#each column.nodes as node (node.id)}
-						<TodoNode
-							{node}
-							depth={0}
-							{focusId}
-							{onFocused}
-							{onToggle}
-							{onText}
-							{onEnter}
-							{onAddChild}
-							{onDelete}
-							{onIndent}
-							{onOutdent}
-							{onMove}
-							{onToggleCollapse}
-							{onToggleKind}
+	<div
+		class="viewport"
+		class:panning
+		class:dragging={draggingCard}
+		role="application"
+		aria-label="Todo list canvas — drag to pan, scroll to move, ctrl/cmd+scroll to zoom"
+		bind:this={viewportEl}
+		onpointerdown={startPan}
+		{@attach canvasWheel}
+		style="background-position: {pan.x}px {pan.y}px; background-size: {24 * zoom}px {24 * zoom}px;"
+	>
+		<div class="world" style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});">
+			{#each board.columns as column (column.id)}
+				{@const progress = B.countProgress(column.nodes)}
+				<div class="card" style="left: {column.x}px; top: {column.y}px; width: {column.width}px;">
+					<header
+						class="card-head"
+						role="button"
+						tabindex="-1"
+						aria-label="Drag to move list"
+						onpointerdown={(e) => startCardDrag(e, column)}
+						title="Drag to move"
+					>
+						<span class="grip" aria-hidden="true"><Icon name="grip" size={13} /></span>
+						<input
+							class="col-title"
+							value={column.title}
+							placeholder="List title"
+							oninput={(e) => renameColumn(column.id, e.currentTarget.value)}
+							onpointerdown={(e) => e.stopPropagation()}
+							aria-label="List title"
 						/>
-					{/each}
+						{#if progress.total > 0}
+							<span class="col-count">{progress.done}/{progress.total}</span>
+						{/if}
+						{#if board.columns.length > 1}
+							<button
+								type="button"
+								class="col-del"
+								title="Delete list"
+								aria-label="Delete list"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => removeColumn(column.id, column.title)}
+							>
+								<Icon name="trash" size={12} />
+							</button>
+						{/if}
+					</header>
 
-					{#if column.nodes.length === 0}
-						<p class="col-empty">No items yet.</p>
+					{#if progress.total > 0}
+						<div class="col-bar">
+							<span class="col-bar-fill" style="width: {(progress.done / progress.total) * 100}%"
+							></span>
+						</div>
 					{/if}
+
+					<div class="nodes">
+						{#each column.nodes as node (node.id)}
+							<TodoNode
+								{node}
+								depth={0}
+								{focusId}
+								{onFocused}
+								{onToggle}
+								{onText}
+								{onEnter}
+								{onAddChild}
+								{onDelete}
+								{onIndent}
+								{onOutdent}
+								{onMove}
+								{onToggleCollapse}
+								{onToggleKind}
+							/>
+						{/each}
+						{#if column.nodes.length === 0}
+							<p class="col-empty">No items yet.</p>
+						{/if}
+					</div>
+
+					<footer class="col-foot">
+						<button type="button" class="foot-btn" onclick={() => addTask(column.id)}>
+							<Icon name="plus" size={12} /><span>Task</span>
+						</button>
+						<button type="button" class="foot-btn ghost" onclick={() => addSection(column.id)}>
+							<Icon name="list" size={12} /><span>Section</span>
+						</button>
+					</footer>
 				</div>
+			{/each}
+		</div>
 
-				<footer class="col-foot">
-					<button type="button" class="foot-btn" onclick={() => addTask(column.id)}>
-						<Icon name="plus" size={12} /><span>Task</span>
-					</button>
-					<button type="button" class="foot-btn ghost" onclick={() => addSection(column.id)}>
-						<Icon name="list" size={12} /><span>Section</span>
-					</button>
-				</footer>
-			</div>
-		{/each}
-
-		<button type="button" class="add-column" onclick={addColumn} aria-label="Add column">
-			<Icon name="plus" size={16} />
-			<span>Add column</span>
-		</button>
+		<span class="canvas-hint">Drag the canvas to pan · scroll to move · ⌘/Ctrl+scroll to zoom</span>
 	</div>
 </section>
 
@@ -283,6 +467,7 @@
 		border-bottom: 1px solid var(--border);
 		min-height: 48px;
 		flex-shrink: 0;
+		z-index: 2;
 	}
 	.title-btn {
 		margin: 0;
@@ -350,6 +535,48 @@
 			opacity: 0.4;
 		}
 	}
+
+	.zoom-group {
+		display: inline-flex;
+		align-items: center;
+		padding: 2px;
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 7px;
+	}
+	.zoom-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 22px;
+		padding: 0;
+		color: var(--accents-6);
+		background: transparent;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.zoom-btn:hover {
+		color: var(--geist-foreground);
+		background: var(--surface);
+	}
+	.zoom-level {
+		min-width: 42px;
+		padding: 0 4px;
+		font: inherit;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		color: var(--accents-6);
+		background: transparent;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.zoom-level:hover {
+		color: var(--geist-foreground);
+		background: var(--surface);
+	}
 	.add-col-btn {
 		display: inline-flex;
 		align-items: center;
@@ -368,35 +595,62 @@
 		opacity: 0.9;
 	}
 
-	.board {
+	/* ----- canvas ----- */
+	.viewport {
 		flex: 1;
 		min-height: 0;
-		display: flex;
-		align-items: flex-start;
-		gap: 16px;
-		padding: 18px 20px;
-		overflow-x: auto;
-		overflow-y: hidden;
+		position: relative;
+		overflow: hidden;
+		background-color: var(--bg);
+		background-image: radial-gradient(circle, var(--accents-3) 1px, transparent 1px);
+		cursor: grab;
+		touch-action: none;
+	}
+	.viewport.panning {
+		cursor: grabbing;
+	}
+	.viewport.dragging {
+		cursor: grabbing;
+	}
+	.world {
+		position: absolute;
+		top: 0;
+		left: 0;
+		transform-origin: 0 0;
+		/* Zero-size origin so absolutely-positioned cards lay out in world space. */
+		width: 0;
+		height: 0;
 	}
 
-	.column {
-		flex: 0 0 320px;
-		width: 320px;
-		max-height: 100%;
+	.card {
+		position: absolute;
 		display: flex;
 		flex-direction: column;
-		min-height: 0;
-		background: var(--accents-1);
+		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 12px;
-		overflow: hidden;
+		box-shadow: var(--shadow-md, 0 8px 30px -12px rgba(0, 0, 0, 0.25));
 	}
-	.col-head {
+	.card-head {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 10px 10px 8px 12px;
+		gap: 6px;
+		padding: 8px 8px 6px 8px;
+		border-bottom: 1px solid var(--border);
+		cursor: grab;
+	}
+	.card-head:active {
+		cursor: grabbing;
+	}
+	.grip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--accents-4);
 		flex-shrink: 0;
+	}
+	.card-head:hover .grip {
+		color: var(--accents-6);
 	}
 	.col-title {
 		flex: 1;
@@ -411,9 +665,10 @@
 		border: 1px solid transparent;
 		border-radius: 5px;
 		outline: none;
+		cursor: text;
 	}
 	.col-title:focus {
-		background: var(--surface);
+		background: var(--accents-1);
 		border-color: var(--border);
 	}
 	.col-title::placeholder {
@@ -446,7 +701,7 @@
 
 	.col-bar {
 		height: 3px;
-		margin: 0 12px 6px;
+		margin: 6px 12px 0;
 		border-radius: 3px;
 		background: var(--accents-2);
 		overflow: hidden;
@@ -461,13 +716,10 @@
 	}
 
 	.nodes {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-		padding: 2px 8px 8px;
+		padding: 6px 8px;
 	}
 	.col-empty {
-		margin: 6px 6px 10px;
+		margin: 6px;
 		font-size: 12px;
 		color: var(--accents-4);
 	}
@@ -475,9 +727,8 @@
 	.col-foot {
 		display: flex;
 		gap: 6px;
-		padding: 8px 10px 10px;
+		padding: 6px 10px 10px;
 		border-top: 1px solid var(--border);
-		flex-shrink: 0;
 	}
 	.foot-btn {
 		display: inline-flex;
@@ -488,7 +739,7 @@
 		font-size: 12px;
 		font-weight: 500;
 		color: var(--accents-6);
-		background: var(--surface);
+		background: var(--accents-1);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
@@ -501,31 +752,18 @@
 		background: transparent;
 	}
 
-	.add-column {
-		flex: 0 0 200px;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		align-self: stretch;
-		max-height: 96px;
-		padding: 14px;
-		font: inherit;
-		font-size: 13px;
-		font-weight: 500;
+	.canvas-hint {
+		position: absolute;
+		left: 50%;
+		bottom: 12px;
+		transform: translateX(-50%);
+		padding: 4px 12px;
+		font-size: 11px;
 		color: var(--accents-5);
-		background: transparent;
-		border: 1px dashed var(--border);
-		border-radius: 12px;
-		cursor: pointer;
-		transition:
-			color 120ms,
-			border-color 120ms,
-			background 120ms;
-	}
-	.add-column:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-4);
-		background: var(--accents-1);
+		background: color-mix(in srgb, var(--surface) 82%, transparent);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-pill, 999px);
+		pointer-events: none;
+		white-space: nowrap;
 	}
 </style>

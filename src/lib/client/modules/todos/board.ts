@@ -29,12 +29,29 @@ export type TodoColumn = {
 	id: string;
 	title: string;
 	nodes: TodoNode[];
+	/** Position on the free canvas, in world (pre-zoom) coordinates. */
+	x: number;
+	y: number;
+	width: number;
+};
+
+/** Pan/zoom of the canvas, persisted so the view is restored on reopen. */
+export type TodoViewport = {
+	x: number;
+	y: number;
+	zoom: number;
 };
 
 export type TodoBoard = {
 	version: 1;
 	columns: TodoColumn[];
+	viewport: TodoViewport;
 };
+
+export const DEFAULT_COLUMN_WIDTH = 300;
+/** Spacing used when laying out columns that have no saved position (legacy). */
+const LAYOUT_GAP = 28;
+const LAYOUT_ORIGIN = 40;
 
 function uid(): string {
 	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -58,14 +75,20 @@ export function newSection(text = ''): TodoNode {
 	return { id: uid(), kind: 'section', text, done: false, collapsed: false, children: [] };
 }
 
-export function newColumn(title = 'New column'): TodoColumn {
-	return { id: uid(), title, nodes: [newTask('')] };
+export function newColumn(
+	title = 'New column',
+	x = LAYOUT_ORIGIN,
+	y = LAYOUT_ORIGIN,
+	width = DEFAULT_COLUMN_WIDTH
+): TodoColumn {
+	return { id: uid(), title, nodes: [newTask('')], x, y, width };
 }
 
 export function createEmptyBoard(): TodoBoard {
 	return {
 		version: 1,
-		columns: [{ id: uid(), title: 'To do', nodes: [newTask('')] }]
+		columns: [newColumn('To do', LAYOUT_ORIGIN, LAYOUT_ORIGIN)],
+		viewport: { x: 0, y: 0, zoom: 1 }
 	};
 }
 
@@ -134,16 +157,40 @@ function normalizeBoard(raw: unknown): TodoBoard {
 				}
 			}
 		}
+		const width = 'width' in c && typeof c.width === 'number' ? c.width : DEFAULT_COLUMN_WIDTH;
+		// Boards created before the canvas had no x/y — fall back to the old
+		// left-to-right row so existing todo lists open exactly where they were.
+		const index = columns.length;
+		const x =
+			'x' in c && typeof c.x === 'number'
+				? c.x
+				: LAYOUT_ORIGIN + index * (DEFAULT_COLUMN_WIDTH + LAYOUT_GAP);
+		const y = 'y' in c && typeof c.y === 'number' ? c.y : LAYOUT_ORIGIN;
 		columns.push({
 			id: 'id' in c && typeof c.id === 'string' ? c.id : uid(),
 			title: 'title' in c && typeof c.title === 'string' ? c.title : 'Column',
-			nodes
+			nodes,
+			x,
+			y,
+			width
 		});
 	}
 	if (columns.length === 0) {
 		return createEmptyBoard();
 	}
-	return { version: 1, columns };
+	return { version: 1, columns, viewport: normalizeViewport(raw) };
+}
+
+function normalizeViewport(raw: object): TodoViewport {
+	if ('viewport' in raw && typeof raw.viewport === 'object' && raw.viewport !== null) {
+		const v = raw.viewport;
+		return {
+			x: 'x' in v && typeof v.x === 'number' ? v.x : 0,
+			y: 'y' in v && typeof v.y === 'number' ? v.y : 0,
+			zoom: 'zoom' in v && typeof v.zoom === 'number' ? v.zoom : 1
+		};
+	}
+	return { x: 0, y: 0, zoom: 1 };
 }
 
 // ----- tree navigation -----
@@ -188,10 +235,39 @@ function findIn(
 
 // ----- mutations (operate in place on the board) -----
 
-export function addColumn(board: TodoBoard): TodoColumn {
-	const column = newColumn(`Column ${board.columns.length + 1}`);
+/**
+ * Add a column. When `position` is given (canvas world coords) the card lands
+ * there; otherwise it's placed just to the right of the rightmost column.
+ */
+export function addColumn(
+	board: TodoBoard,
+	position: { x: number; y: number } | null = null
+): TodoColumn {
+	let x = LAYOUT_ORIGIN;
+	let y = LAYOUT_ORIGIN;
+	if (position) {
+		x = position.x;
+		y = position.y;
+	} else if (board.columns.length > 0) {
+		const right = Math.max(...board.columns.map((c) => c.x + c.width));
+		x = right + LAYOUT_GAP;
+		y = board.columns[0].y;
+	}
+	const column = newColumn(`Column ${board.columns.length + 1}`, x, y);
 	board.columns.push(column);
 	return column;
+}
+
+export function setColumnPosition(board: TodoBoard, columnId: string, x: number, y: number): void {
+	const column = board.columns.find((c) => c.id === columnId);
+	if (column) {
+		column.x = x;
+		column.y = y;
+	}
+}
+
+export function setViewport(board: TodoBoard, viewport: TodoViewport): void {
+	board.viewport = viewport;
 }
 
 export function removeColumn(board: TodoBoard, columnId: string): void {

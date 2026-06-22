@@ -80,4 +80,42 @@ describe('todo board', () => {
 		B.removeColumn(b, b.columns[0].id);
 		expect(b.columns.length).toBe(1);
 	});
+
+	it('gives every column canvas geometry and a viewport', () => {
+		const b = B.createEmptyBoard();
+		const col = b.columns[0];
+		expect(typeof col.x).toBe('number');
+		expect(typeof col.y).toBe('number');
+		expect(col.width).toBe(B.DEFAULT_COLUMN_WIDTH);
+		expect(b.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
+	});
+
+	it('migrates legacy (positionless) columns into a row layout', () => {
+		const legacy = JSON.stringify({
+			columns: [
+				{ id: 'a', title: 'A', nodes: [] },
+				{ id: 'b', title: 'B', nodes: [] }
+			]
+		});
+		const b = B.parseBoard(legacy);
+		expect(b.columns[0].x).toBeLessThan(b.columns[1].x);
+		expect(b.columns[0].y).toBe(b.columns[1].y);
+		expect(b.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
+	});
+
+	it('addColumn places a card at an explicit canvas position', () => {
+		const b = B.createEmptyBoard();
+		const col = B.addColumn(b, { x: 500, y: 220 });
+		expect(col.x).toBe(500);
+		expect(col.y).toBe(220);
+		B.setColumnPosition(b, col.id, 10, 20);
+		expect(b.columns.find((c) => c.id === col.id)?.x).toBe(10);
+	});
+
+	it('persists viewport pan/zoom across serialize/parse', () => {
+		const b = B.createEmptyBoard();
+		B.setViewport(b, { x: -120, y: 80, zoom: 1.5 });
+		const again = B.parseBoard(B.serializeBoard(b));
+		expect(again.viewport).toEqual({ x: -120, y: 80, zoom: 1.5 });
+	});
 });

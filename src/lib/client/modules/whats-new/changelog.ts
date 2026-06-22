@@ -29,6 +29,25 @@ export type Release = {
 
 export const CHANGELOG: Release[] = [
 	{
+		id: '2026-06-22-todo-canvas',
+		date: 'June 2026',
+		title: 'To-do lists on an infinite canvas',
+		features: [
+			{
+				icon: 'list',
+				title: 'Nested to-do lists',
+				description:
+					'A new kind of project: checklists with checkboxes, section headings, and to-dos you can nest as deep as you like. Hit "+ New project" in the sidebar and pick "Todo list". Enter adds a sibling, Tab / Shift+Tab nest and un-nest, ⌘/Ctrl+Enter ticks an item, and checking a parent ticks everything under it.'
+			},
+			{
+				icon: 'grip',
+				title: 'Arrange them on a free canvas',
+				description:
+					'Each list is a card you can drag anywhere on an infinite canvas — pan by dragging the background or scrolling, and ⌘/Ctrl+scroll (or the zoom controls) to zoom. Your layout and view are saved, and shared links open to the same arrangement.'
+			}
+		]
+	},
+	{
 		id: '2026-05-26-mcp-update',
 		date: 'May 2026',
 		title: 'Push fresh source into mindspace',

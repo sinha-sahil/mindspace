@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { parseBoard, countProgress, type TodoNode } from '../board';
 
@@ -9,6 +11,60 @@
 	let { scene }: Props = $props();
 
 	const board = $derived(parseBoard(scene));
+
+	// Read-only canvas: pan + zoom to explore, but nothing is editable or
+	// draggable. Seed the view from the saved viewport once.
+	const MIN_ZOOM = 0.3;
+	const MAX_ZOOM = 2.2;
+	let viewportEl: HTMLDivElement | null = $state(null);
+	let pan = $state(untrack(() => ({ x: board.viewport.x, y: board.viewport.y })));
+	let zoom = $state(untrack(() => board.viewport.zoom));
+	let panning = $state(false);
+
+	function clamp(v: number, min: number, max: number) {
+		return Math.min(max, Math.max(min, v));
+	}
+
+	const canvasWheel: Attachment<HTMLElement> = (el) => {
+		const onWheel = (e: WheelEvent) => {
+			e.preventDefault();
+			if (e.ctrlKey || e.metaKey) {
+				const rect = el.getBoundingClientRect();
+				const cx = e.clientX - rect.left;
+				const cy = e.clientY - rect.top;
+				const prev = zoom;
+				const next = clamp(prev * Math.exp(-e.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM);
+				pan = { x: cx - ((cx - pan.x) / prev) * next, y: cy - ((cy - pan.y) / prev) * next };
+				zoom = next;
+			} else {
+				pan = { x: pan.x - e.deltaX, y: pan.y - e.deltaY };
+			}
+		};
+		el.addEventListener('wheel', onWheel, { passive: false });
+		return () => el.removeEventListener('wheel', onWheel);
+	};
+
+	function startPan(e: PointerEvent) {
+		if (e.button !== 0 || !viewportEl) {
+			return;
+		}
+		panning = true;
+		const startX = e.clientX;
+		const startY = e.clientY;
+		const origin = { ...pan };
+		const el = viewportEl;
+		el.setPointerCapture(e.pointerId);
+		const move = (ev: PointerEvent) => {
+			pan = { x: origin.x + (ev.clientX - startX), y: origin.y + (ev.clientY - startY) };
+		};
+		const up = () => {
+			panning = false;
+			el.removeEventListener('pointermove', move);
+			el.removeEventListener('pointerup', up);
+		};
+		el.addEventListener('pointermove', move);
+		el.addEventListener('pointerup', up);
+	}
 </script>
 
 {#snippet renderNode(node: TodoNode, depth: number)}
@@ -21,7 +77,7 @@
 			{:else}
 				<span class="section-mark" aria-hidden="true"></span>
 			{/if}
-			<span class="text">{node.text || ' '}</span>
+			<span class="text">{node.text || ' '}</span>
 		</div>
 		{#if node.children.length > 0}
 			<div class="children">
@@ -33,64 +89,83 @@
 	</div>
 {/snippet}
 
-<div class="board">
-	{#each board.columns as column (column.id)}
-		{@const progress = countProgress(column.nodes)}
-		<div class="column">
-			<header class="col-head">
-				<span class="col-title">{column.title}</span>
+<div
+	class="viewport"
+	class:panning
+	role="application"
+	aria-label="Todo list canvas (read only) — drag to pan, scroll to move"
+	bind:this={viewportEl}
+	onpointerdown={startPan}
+	{@attach canvasWheel}
+	style="background-position: {pan.x}px {pan.y}px; background-size: {24 * zoom}px {24 * zoom}px;"
+>
+	<div class="world" style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});">
+		{#each board.columns as column (column.id)}
+			{@const progress = countProgress(column.nodes)}
+			<div class="card" style="left: {column.x}px; top: {column.y}px; width: {column.width}px;">
+				<header class="card-head">
+					<span class="col-title">{column.title}</span>
+					{#if progress.total > 0}
+						<span class="col-count">{progress.done}/{progress.total}</span>
+					{/if}
+				</header>
 				{#if progress.total > 0}
-					<span class="col-count">{progress.done}/{progress.total}</span>
+					<div class="col-bar">
+						<span class="col-bar-fill" style="width: {(progress.done / progress.total) * 100}%"
+						></span>
+					</div>
 				{/if}
-			</header>
-			{#if progress.total > 0}
-				<div class="col-bar">
-					<span class="col-bar-fill" style="width: {(progress.done / progress.total) * 100}%"
-					></span>
+				<div class="nodes">
+					{#each column.nodes as node (node.id)}
+						{@render renderNode(node, 0)}
+					{/each}
+					{#if column.nodes.length === 0}
+						<p class="col-empty">No items.</p>
+					{/if}
 				</div>
-			{/if}
-			<div class="nodes">
-				{#each column.nodes as node (node.id)}
-					{@render renderNode(node, 0)}
-				{/each}
-				{#if column.nodes.length === 0}
-					<p class="col-empty">No items.</p>
-				{/if}
 			</div>
-		</div>
-	{/each}
+		{/each}
+	</div>
 </div>
 
 <style>
-	.board {
+	.viewport {
 		flex: 1;
 		min-height: 0;
-		display: flex;
-		align-items: flex-start;
-		gap: 16px;
-		padding: 18px 20px;
-		overflow-x: auto;
-		overflow-y: hidden;
+		position: relative;
+		overflow: hidden;
+		background-color: var(--bg);
+		background-image: radial-gradient(circle, var(--accents-3) 1px, transparent 1px);
+		cursor: grab;
+		touch-action: none;
 	}
-	.column {
-		flex: 0 0 320px;
-		width: 320px;
-		max-height: 100%;
+	.viewport.panning {
+		cursor: grabbing;
+	}
+	.world {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 0;
+		height: 0;
+		transform-origin: 0 0;
+	}
+
+	.card {
+		position: absolute;
 		display: flex;
 		flex-direction: column;
-		min-height: 0;
-		background: var(--accents-1);
+		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 12px;
-		overflow: hidden;
+		box-shadow: var(--shadow-md, 0 8px 30px -12px rgba(0, 0, 0, 0.25));
 	}
-	.col-head {
+	.card-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
 		padding: 10px 12px 8px;
-		flex-shrink: 0;
 	}
 	.col-title {
 		min-width: 0;
@@ -109,11 +184,10 @@
 	}
 	.col-bar {
 		height: 3px;
-		margin: 0 12px 6px;
+		margin: 0 12px;
 		border-radius: 3px;
 		background: var(--accents-2);
 		overflow: hidden;
-		flex-shrink: 0;
 	}
 	.col-bar-fill {
 		display: block;
@@ -122,10 +196,7 @@
 		background: var(--accent, var(--geist-success));
 	}
 	.nodes {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-		padding: 2px 12px 12px;
+		padding: 6px 12px 12px;
 	}
 	.col-empty {
 		margin: 6px 4px;
