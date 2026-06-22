@@ -406,15 +406,14 @@
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
-		/* Unset chips stay out of the way until you hover the row. */
-		opacity: 0;
+		/* Always visible (muted when unset) so the rating control is discoverable;
+		   it brightens once set or on row hover. */
+		opacity: 0.6;
 		transition:
 			opacity 100ms,
 			border-color 100ms;
 	}
-	.rating.set {
-		opacity: 1;
-	}
+	.rating.set,
 	.row:hover .rating {
 		opacity: 1;
 	}
