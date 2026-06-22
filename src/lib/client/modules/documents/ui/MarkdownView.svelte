@@ -4,7 +4,13 @@
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { comments } from '../comments.svelte';
-	import { renderMarkdown, anchorFromSelection, applyHighlights, type Anchor } from '../markdown';
+	import {
+		renderMarkdown,
+		renderMermaidDiagrams,
+		anchorFromSelection,
+		applyHighlights,
+		type Anchor
+	} from '../markdown';
 
 	type Props = {
 		documentId: string;
@@ -187,6 +193,13 @@
 		comments.setOrphans(orphans);
 	};
 
+	// Upgrade mermaid placeholders to SVG after the markdown is rendered. Runs
+	// when the container is (re)created by the {#key} block — i.e. on every
+	// content change — so edited diagrams re-render against a clean DOM.
+	const renderDiagrams: Attachment<HTMLDivElement> = (node) => {
+		renderMermaidDiagrams(node);
+	};
+
 	onMount(() => {
 		// onMount runs browser-only; the returned cleanup runs on unmount.
 		// Using this pattern instead of a separate onDestroy avoids reaching
@@ -204,6 +217,7 @@
 			role="article"
 			{@attach highlightSaved}
 			{@attach captureMarkClicks}
+			{@attach renderDiagrams}
 		>
 			{@html html}
 		</div>
@@ -336,6 +350,54 @@
 		padding: 0;
 		background: transparent;
 		border: none;
+	}
+	/* Mermaid: drop the code-block chrome and center the rendered SVG. */
+	.md-render :global(pre.mermaid-diagram) {
+		position: relative;
+		padding: 0;
+		background: transparent;
+		border: none;
+		text-align: center;
+	}
+	.md-render :global(pre.mermaid-diagram svg) {
+		max-width: 100%;
+		height: auto;
+	}
+	/* Fullscreen trigger — fades in on diagram hover, top-right corner. */
+	.md-render :global(.mermaid-fullscreen-btn) {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		color: var(--accents-6);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity var(--duration-fast, 120ms) var(--ease-out, ease);
+	}
+	.md-render :global(pre.mermaid-diagram:hover .mermaid-fullscreen-btn),
+	.md-render :global(.mermaid-fullscreen-btn:focus-visible) {
+		opacity: 1;
+	}
+	.md-render :global(.mermaid-fullscreen-btn:hover) {
+		color: var(--geist-foreground);
+		background: var(--accents-1);
+	}
+	.md-render :global(.mermaid-fullscreen-btn svg) {
+		width: 15px;
+		height: 15px;
+	}
+	.md-render :global(pre.mermaid-error) {
+		text-align: left;
+		color: var(--geist-error, #e00);
+		white-space: pre-wrap;
 	}
 	.md-render :global(blockquote) {
 		margin: 1em 0;

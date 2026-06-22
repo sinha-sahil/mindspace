@@ -7,6 +7,7 @@
  */
 import type {
 	ProjectRow,
+	ProjectShareRow,
 	WorkspaceRow,
 	AppMemberRow,
 	PasskeyRow,
@@ -15,13 +16,15 @@ import type {
 	DocumentCommentRow,
 	ApiTokenRow,
 	Visibility,
-	ProjectKind
+	ProjectKind,
+	ShareRole
 } from './generated/types';
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type {
 	ProjectRow,
+	ProjectShareRow,
 	WorkspaceRow,
 	AppMemberRow,
 	PasskeyRow,
@@ -30,7 +33,8 @@ export type {
 	DocumentCommentRow,
 	ApiTokenRow,
 	Visibility,
-	ProjectKind
+	ProjectKind,
+	ShareRole
 };
 
 export type Database = {
@@ -88,6 +92,7 @@ export type Database = {
 					kind?: ProjectKind;
 					scene?: Json | null;
 					visibility?: Visibility;
+					link_expires_at?: string | null;
 					position?: number | null;
 				};
 				Update: {
@@ -95,8 +100,23 @@ export type Database = {
 					kind?: ProjectKind;
 					scene?: Json | null;
 					visibility?: Visibility;
+					link_expires_at?: string | null;
 					position?: number | null;
 					workspace_id?: string;
+				};
+				Relationships: [];
+			};
+			project_shares: {
+				Row: ProjectShareRow;
+				Insert: {
+					id?: string;
+					project_id: string;
+					email: string;
+					role?: ShareRole;
+					added_by?: string | null;
+				};
+				Update: {
+					role?: ShareRole;
 				};
 				Relationships: [];
 			};

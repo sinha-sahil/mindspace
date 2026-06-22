@@ -12,6 +12,8 @@ export type Project = {
 	kind: ProjectKind;
 	scene: string;
 	visibility: Visibility;
+	/** Public-link expiry (ms epoch). null = no expiry (legacy links only). */
+	linkExpiresAt: number | null;
 	position: number;
 	createdAt: number;
 	updatedAt: number;
@@ -39,6 +41,7 @@ export function rowToProject(row: ProjectRow): Project {
 		kind: row.kind,
 		scene: row.scene !== null ? JSON.stringify(row.scene) : '',
 		visibility: row.visibility ?? 'private',
+		linkExpiresAt: row.link_expires_at ? new Date(row.link_expires_at).getTime() : null,
 		position: row.position ?? 0,
 		createdAt: new Date(row.created_at).getTime(),
 		updatedAt: new Date(row.updated_at).getTime()
@@ -104,7 +107,9 @@ function createStore() {
 
 		const { data, error } = await supabase
 			.from('projects')
-			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
+			.select(
+				'id, workspace_id, name, kind, scene, visibility, link_expires_at, position, created_at, updated_at'
+			)
 			.eq('workspace_id', workspaceId)
 			.order('position', { ascending: true })
 			.order('updated_at', { ascending: false });
@@ -173,7 +178,9 @@ function createStore() {
 				scene: null,
 				position: newPosition
 			})
-			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
+			.select(
+				'id, workspace_id, name, kind, scene, visibility, link_expires_at, position, created_at, updated_at'
+			)
 			.single();
 
 		if (error || !data) {
@@ -340,7 +347,11 @@ function createStore() {
 		return true;
 	}
 
-	async function setVisibility(id: string, visibility: Visibility) {
+	/**
+	 * Change visibility. Public links carry an expiry (`linkExpiresAt`, ms
+	 * epoch) — required when enabling 'link'; cleared when going private.
+	 */
+	async function setVisibility(id: string, visibility: Visibility, linkExpiresAt?: number) {
 		if (!client) {
 			return;
 		}
@@ -349,10 +360,17 @@ function createStore() {
 			return;
 		}
 		const previous = project.visibility;
+		const previousExpiry = project.linkExpiresAt;
+		const expiry = visibility === 'link' ? (linkExpiresAt ?? null) : null;
 		project.visibility = visibility;
-		const { error } = await client.from('projects').update({ visibility }).eq('id', id);
+		project.linkExpiresAt = expiry;
+		const { error } = await client
+			.from('projects')
+			.update({ visibility, link_expires_at: expiry ? new Date(expiry).toISOString() : null })
+			.eq('id', id);
 		if (error) {
 			project.visibility = previous;
+			project.linkExpiresAt = previousExpiry;
 			fail(error.message);
 			return;
 		}
@@ -444,7 +462,9 @@ function createStore() {
 
 		const { data, error } = await client
 			.from('projects')
-			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
+			.select(
+				'id, workspace_id, name, kind, scene, visibility, link_expires_at, position, created_at, updated_at'
+			)
 			.eq('workspace_id', ws)
 			.order('position', { ascending: true })
 			.order('updated_at', { ascending: false });

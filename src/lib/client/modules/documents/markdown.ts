@@ -8,6 +8,46 @@ marked.setOptions({
 	breaks: true
 });
 
+/** CSS class marking a rendered placeholder that holds Mermaid source. */
+const MERMAID_CLASS = 'mermaid-diagram';
+
+/** Lucide "maximize" glyph — inlined because the diagram button is built in
+ *  plain DOM (post-sanitization), not via the Svelte <Icon> component. */
+const MAXIMIZE_ICON =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+
+/** Class on the per-diagram button that opens the fullscreen overlay. The
+ *  fullscreen UI itself lives in MermaidFullscreen.svelte, which listens for
+ *  clicks on this class. */
+export const MERMAID_FULLSCREEN_BTN_CLASS = 'mermaid-fullscreen-btn';
+
+/** Escape the characters that are unsafe inside HTML text content. The raw
+ *  Mermaid source (which contains `<`, `>`, `&`, `-->`, etc.) is stored as the
+ *  element's text content so DOMPurify keeps it intact; `renderMermaidDiagrams`
+ *  later reads it back via `textContent`, which un-escapes these entities. */
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;');
+}
+
+// Intercept fenced code blocks tagged `mermaid` and emit a placeholder that
+// carries the diagram source as text. Everything else falls back to marked's
+// default code renderer (return `false`). The actual SVG is rendered on the
+// client, after sanitization, by `renderMermaidDiagrams`.
+marked.use({
+	renderer: {
+		code(token) {
+			const lang = (token.lang ?? '').trim().split(/\s+/)[0].toLowerCase();
+			if (lang === 'mermaid') {
+				return `<pre class="${MERMAID_CLASS}">${escapeHtml(token.text)}</pre>`;
+			}
+			return false;
+		}
+	}
+});
+
 /**
  * DOMPurify is lazy-loaded in the browser only. Importing
  * `isomorphic-dompurify` at module top pulls jsdom into the SSR chunk,
@@ -35,7 +75,87 @@ export function renderMarkdown(source: string): string {
 	if (typeof html !== 'string') {
 		return '';
 	}
+	// `pre.mermaid-diagram` placeholders survive sanitization (DOMPurify keeps
+	// `pre` + `class` + text content); they're upgraded to SVG client-side.
 	return DOMPurify.sanitize(html);
+}
+
+/**
+ * Mermaid is heavy (~1MB) and browser-only, so it's lazy-loaded the first time
+ * a diagram actually needs rendering and cached thereafter. `null` until then.
+ */
+type MermaidApi = {
+	initialize: (config: Record<string, unknown>) => void;
+	render: (id: string, src: string) => Promise<{ svg: string }>;
+};
+let mermaid: MermaidApi | null = null;
+let mermaidTheme: 'dark' | 'default' | null = null;
+let diagramSeq = 0;
+
+/** Resolve the app's active theme to a Mermaid theme name. The app sets
+ *  `data-theme` on <html>; absent means "follow system preference". */
+function currentMermaidTheme(): 'dark' | 'default' {
+	const attr = document.documentElement.getAttribute('data-theme');
+	if (attr === 'dark') {
+		return 'dark';
+	}
+	if (attr === 'light') {
+		return 'default';
+	}
+	return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
+}
+
+/**
+ * Find every un-rendered `pre.mermaid-diagram` placeholder in `container` and
+ * replace its contents with the rendered SVG. Safe to call repeatedly: already
+ * processed nodes carry `data-processed` and are skipped. Call after the
+ * markdown is rendered (and re-call when the rendered DOM is rebuilt).
+ *
+ * Diagrams render independently — one diagram with a syntax error shows an
+ * inline error message without blocking the others.
+ */
+export async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
+	const nodes = container.querySelectorAll<HTMLElement>(
+		`pre.${MERMAID_CLASS}:not([data-processed])`
+	);
+	if (nodes.length === 0) {
+		return;
+	}
+
+	const theme = currentMermaidTheme();
+	if (!mermaid || mermaidTheme !== theme) {
+		const mod = await import('mermaid');
+		mermaid = mod.default as unknown as MermaidApi;
+		// `securityLevel: 'strict'` makes Mermaid sanitize diagram labels and
+		// strip any embedded HTML/scripts — the rendered SVG bypasses our
+		// DOMPurify pass, so Mermaid must do its own sanitization.
+		mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme });
+		mermaidTheme = theme;
+	}
+
+	for (const node of nodes) {
+		const src = node.textContent ?? '';
+		// Mark first so a thrown render never leaves a node to be retried forever.
+		node.setAttribute('data-processed', 'true');
+		try {
+			const { svg } = await mermaid.render(`mermaid-${diagramSeq++}`, src);
+			node.innerHTML = svg;
+			node.classList.add('mermaid-rendered');
+			// Overlay a fullscreen trigger. Built in plain DOM since this runs
+			// after sanitization; MermaidFullscreen.svelte handles the click.
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = MERMAID_FULLSCREEN_BTN_CLASS;
+			btn.setAttribute('aria-label', 'View diagram fullscreen');
+			btn.title = 'View fullscreen';
+			btn.innerHTML = MAXIMIZE_ICON;
+			node.appendChild(btn);
+		} catch (err) {
+			node.classList.add('mermaid-error');
+			node.textContent =
+				err instanceof Error ? `Diagram error: ${err.message}` : 'Failed to render diagram.';
+		}
+	}
 }
 
 /** A W3C-style text anchor: the quoted text plus disambiguating context. */

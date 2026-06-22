@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { replaceState } from '$app/navigation';
-	import { Button } from '@juspay/svelte-ui-components';
 	import { Sidebar } from '$lib/client/modules/sidebar';
 	import { ProjectPane } from '$lib/client/modules/whiteboard';
 	import { projects } from '$lib/client/modules/projects';
@@ -139,7 +138,7 @@
 							saving={projects.isSaving}
 							onSceneChange={(scene) => projects.saveScene(active.id, scene)}
 							onRename={(name) => projects.rename(active.id, name)}
-							onSetVisibility={(v) => projects.setVisibility(active.id, v)}
+							onSetVisibility={(v, exp) => projects.setVisibility(active.id, v, exp)}
 						/>
 					</div>
 
@@ -194,15 +193,26 @@
 					saving={projects.isSaving}
 					onSceneChange={(scene) => projects.saveScene(active.id, scene)}
 					onRename={(name) => projects.rename(active.id, name)}
-					onSetVisibility={(v) => projects.setVisibility(active.id, v)}
+					onSetVisibility={(v, exp) => projects.setVisibility(active.id, v, exp)}
 				/>
 			{/if}
 		{:else}
-			<div class="empty">
-				<div class="empty-card">
-					<h2>This workspace is empty</h2>
-					<p>Create your first project to start drawing.</p>
-					<Button text="+ New project" onclick={() => projects.add()} />
+			<div class="empty grainy">
+				<div class="empty-stage">
+					<span class="empty-eyebrow">{workspaces.active?.name ?? 'Workspace'} · Empty</span>
+					<h2 class="empty-title display">
+						A blank<br /><span class="display-italic gradient-text">canvas.</span>
+					</h2>
+					<p class="empty-lede">
+						Nothing here yet. Start a whiteboard to sketch, diagram, and think out loud — every
+						change autosaves as you go.
+					</p>
+					<div class="empty-actions">
+						<button type="button" class="empty-cta" onclick={() => projects.add()}>
+							<span class="empty-cta-glyph">＋</span> New whiteboard
+						</button>
+						<span class="empty-footnote">Private to this workspace until you share it.</span>
+					</div>
 				</div>
 			</div>
 		{/if}
@@ -282,36 +292,112 @@
 
 	.empty {
 		flex: 1;
+		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 32px;
+		padding: 48px;
+		overflow: hidden;
+		background: var(--bg);
 	}
-	.empty-card {
+	/* Ambient accent bloom behind the first-run prompt. */
+	.empty::before {
+		content: '';
+		position: absolute;
+		width: 760px;
+		height: 760px;
+		top: -18%;
+		left: 50%;
+		transform: translateX(-50%);
+		background: var(--accent-gradient-soft);
+		filter: blur(90px);
+		opacity: 0.75;
+		border-radius: 50%;
+		pointer-events: none;
+	}
+	.empty-stage {
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		max-width: 560px;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 12px;
-		padding: 48px 56px;
-		max-width: 420px;
-		text-align: center;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-lg);
-		background: var(--accents-1);
+		gap: 18px;
 	}
-	.empty-card h2 {
-		margin: 0;
-		font-size: 18px;
+	.empty-eyebrow {
+		font-size: 11px;
 		font-weight: 600;
-		letter-spacing: -0.01em;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
-	.empty-card p {
+	.empty-title {
 		margin: 0;
+		font-size: clamp(40px, 6vw, 66px);
+		line-height: 0.98;
+		letter-spacing: -0.025em;
+		color: var(--fg);
+	}
+	.empty-title .gradient-text {
+		font-style: italic;
+	}
+	.empty-lede {
+		margin: 0;
+		max-width: 44ch;
+		font-size: 15px;
+		line-height: 1.6;
+		color: var(--fg-2);
+	}
+	.empty-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 16px;
+		margin-top: 8px;
+	}
+	.empty-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 9px;
+		height: 44px;
+		padding: 0 22px;
+		font: inherit;
 		font-size: 14px;
-		color: var(--accents-5);
+		font-weight: 600;
+		color: #fff;
+		background: var(--accent-gradient);
+		background-size: 180% 100%;
+		background-position: 0 50%;
+		border: none;
+		border-radius: var(--radius);
+		cursor: pointer;
+		box-shadow:
+			0 8px 30px -10px var(--accent-glow),
+			0 1px 0 rgba(255, 255, 255, 0.2) inset;
+		transition:
+			background-position 700ms ease,
+			transform 120ms var(--ease-spring),
+			box-shadow 200ms;
+	}
+	.empty-cta:hover {
+		background-position: 100% 50%;
+		transform: translateY(-1px);
+		box-shadow:
+			0 14px 36px -10px var(--accent-glow),
+			0 1px 0 rgba(255, 255, 255, 0.25) inset;
+	}
+	.empty-cta-glyph {
+		font-size: 17px;
+		line-height: 1;
+	}
+	.empty-footnote {
+		font-family: var(--font-display);
+		font-style: italic;
+		font-size: 13px;
+		color: var(--muted);
 	}
 	.muted {
-		color: var(--accents-5);
+		color: var(--muted);
 		font-size: 13px;
 	}
 </style>

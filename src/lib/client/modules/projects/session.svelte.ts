@@ -37,7 +37,9 @@ export function createProjectSession(supabase: AppSupabaseClient, projectId: str
 	(async () => {
 		const { data, error } = await supabase
 			.from('projects')
-			.select('id, workspace_id, name, kind, scene, visibility, position, created_at, updated_at')
+			.select(
+				'id, workspace_id, name, kind, scene, visibility, link_expires_at, position, created_at, updated_at'
+			)
 			.eq('id', projectId)
 			.single();
 		if (destroyed) {
@@ -106,16 +108,23 @@ export function createProjectSession(supabase: AppSupabaseClient, projectId: str
 		}
 	}
 
-	async function setVisibility(v: Visibility) {
+	async function setVisibility(v: Visibility, linkExpiresAt?: number) {
 		const project = state.project;
 		if (!project) {
 			return;
 		}
 		const previous = project.visibility;
+		const previousExpiry = project.linkExpiresAt;
+		const expiry = v === 'link' ? (linkExpiresAt ?? null) : null;
 		project.visibility = v;
-		const { error } = await supabase.from('projects').update({ visibility: v }).eq('id', projectId);
+		project.linkExpiresAt = expiry;
+		const { error } = await supabase
+			.from('projects')
+			.update({ visibility: v, link_expires_at: expiry ? new Date(expiry).toISOString() : null })
+			.eq('id', projectId);
 		if (error) {
 			project.visibility = previous;
+			project.linkExpiresAt = previousExpiry;
 			state.error = error.message;
 		}
 	}

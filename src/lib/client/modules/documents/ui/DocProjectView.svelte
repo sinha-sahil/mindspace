@@ -8,6 +8,7 @@
 	import MarkdownView from './MarkdownView.svelte';
 	import MarkdownEditor from './MarkdownEditor.svelte';
 	import CommentsPanel from './CommentsPanel.svelte';
+	import MermaidFullscreen from './MermaidFullscreen.svelte';
 	import type { AppSupabaseClient } from '../../../../../app';
 
 	type Props = {
@@ -348,6 +349,8 @@
 		{/key}
 	{/if}
 </section>
+
+<MermaidFullscreen />
 
 <style>
 	.layout {
