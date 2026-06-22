@@ -137,7 +137,38 @@
 			<span class="count">{progress.done}/{progress.total}</span>
 		{/if}
 
+		<div class="actions">
+			<button
+				type="button"
+				class="act"
+				title={node.kind === 'task' ? 'Make section heading' : 'Make to-do item'}
+				aria-label="Toggle item type"
+				onclick={() => onToggleKind(node.id)}
+			>
+				<Icon name={node.kind === 'task' ? 'list' : 'check'} size={12} />
+			</button>
+			<button
+				type="button"
+				class="act"
+				title="Add sub-item"
+				aria-label="Add sub-item"
+				onclick={() => onAddChild(node.id)}
+			>
+				<Icon name="plus" size={12} />
+			</button>
+			<button
+				type="button"
+				class="act danger"
+				title="Delete"
+				aria-label="Delete item"
+				onclick={() => onDelete(node.id)}
+			>
+				<Icon name="trash" size={11} />
+			</button>
+		</div>
+
 		{#if node.kind === 'task'}
+			<!-- Ratings sit at the far right edge of the row. -->
 			<div class="ratings">
 				<button
 					type="button"
@@ -171,36 +202,6 @@
 				</button>
 			</div>
 		{/if}
-
-		<div class="actions">
-			<button
-				type="button"
-				class="act"
-				title={node.kind === 'task' ? 'Make section heading' : 'Make to-do item'}
-				aria-label="Toggle item type"
-				onclick={() => onToggleKind(node.id)}
-			>
-				<Icon name={node.kind === 'task' ? 'list' : 'check'} size={12} />
-			</button>
-			<button
-				type="button"
-				class="act"
-				title="Add sub-item"
-				aria-label="Add sub-item"
-				onclick={() => onAddChild(node.id)}
-			>
-				<Icon name="plus" size={12} />
-			</button>
-			<button
-				type="button"
-				class="act danger"
-				title="Delete"
-				aria-label="Delete item"
-				onclick={() => onDelete(node.id)}
-			>
-				<Icon name="trash" size={11} />
-			</button>
-		</div>
 	</div>
 
 	{#if hasChildren && !node.collapsed}

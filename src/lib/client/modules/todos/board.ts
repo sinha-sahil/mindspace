@@ -40,7 +40,11 @@ export type TodoColumn = {
 	/** Position on the free canvas, in world (pre-zoom) coordinates. */
 	x: number;
 	y: number;
-	width: number;
+	/** Explicit width in px, or null to auto-fit the widest item (the default). */
+	width: number | null;
+	/** Rating for the whole card/list ("the task itself"), independent of items. */
+	effort: Rating;
+	time: Rating;
 };
 
 /** Pan/zoom of the canvas, persisted so the view is restored on reopen. */
@@ -65,6 +69,8 @@ export type TodoBoard = {
 };
 
 export const DEFAULT_COLUMN_WIDTH = 300;
+export const MIN_COLUMN_WIDTH = 220;
+export const MAX_COLUMN_WIDTH = 680;
 /** Spacing used when laying out columns that have no saved position (legacy). */
 const LAYOUT_GAP = 28;
 const LAYOUT_ORIGIN = 40;
@@ -113,9 +119,38 @@ export function newColumn(
 	title = 'New column',
 	x = LAYOUT_ORIGIN,
 	y = LAYOUT_ORIGIN,
-	width = DEFAULT_COLUMN_WIDTH
+	width: number | null = null
 ): TodoColumn {
-	return { id: uid(), title, nodes: [newTask('')], x, y, width };
+	return { id: uid(), title, nodes: [newTask('')], x, y, width, effort: 0, time: 0 };
+}
+
+/**
+ * Estimate the width that fits a card's widest line (longest task text or the
+ * title), clamped to the allowed range. Used when `width` is null (auto). It's
+ * a font-metric estimate rather than a DOM measurement so it stays pure and
+ * recomputes reactively as items change.
+ */
+export function autoColumnWidth(column: TodoColumn): number {
+	const CHAR = 7.1; // ~average glyph width at the row font size
+	// Header line: grip + title + room for the rating chips and delete button.
+	let widest = 96 + column.title.length * CHAR;
+	const walk = (nodes: TodoNode[], depth: number) => {
+		for (const n of nodes) {
+			// Row line: checkbox/twisty + nesting indent + text + rating chips.
+			const line = 124 + depth * 22 + n.text.length * CHAR;
+			if (line > widest) {
+				widest = line;
+			}
+			walk(n.children, depth + 1);
+		}
+	};
+	walk(column.nodes, 0);
+	return Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(widest)));
+}
+
+/** The width a card actually renders at: explicit if set, else auto-fit. */
+export function effectiveColumnWidth(column: TodoColumn): number {
+	return column.width ?? autoColumnWidth(column);
 }
 
 export function createEmptyBoard(): TodoBoard {
@@ -202,7 +237,14 @@ function normalizeBoard(raw: unknown): TodoBoard {
 				}
 			}
 		}
-		const width = 'width' in c && typeof c.width === 'number' ? c.width : DEFAULT_COLUMN_WIDTH;
+		// Auto-fit by default. Treat a missing width — or the old fixed 300px
+		// default from the first canvas release — as auto, so existing boards
+		// start fitting their content too. Any other stored number is an
+		// explicit width the user dragged to.
+		const width: number | null =
+			'width' in c && typeof c.width === 'number' && c.width !== DEFAULT_COLUMN_WIDTH
+				? c.width
+				: null;
 		// Boards created before the canvas had no x/y — fall back to the old
 		// left-to-right row so existing todo lists open exactly where they were.
 		const index = columns.length;
@@ -217,7 +259,9 @@ function normalizeBoard(raw: unknown): TodoBoard {
 			nodes,
 			x,
 			y,
-			width
+			width,
+			effort: 'effort' in c ? toRating(c.effort) : 0,
+			time: 'time' in c ? toRating(c.time) : 0
 		});
 	}
 	if (columns.length === 0) {
@@ -307,7 +351,7 @@ export function addColumn(
 		x = position.x;
 		y = position.y;
 	} else if (board.columns.length > 0) {
-		const right = Math.max(...board.columns.map((c) => c.x + c.width));
+		const right = Math.max(...board.columns.map((c) => c.x + effectiveColumnWidth(c)));
 		x = right + LAYOUT_GAP;
 		y = board.columns[0].y;
 	}
@@ -459,6 +503,38 @@ export function renameColumn(board: TodoBoard, columnId: string, title: string):
 	const column = board.columns.find((c) => c.id === columnId);
 	if (column) {
 		column.title = title;
+	}
+}
+
+/** Resize a card, clamped to the allowed width range. */
+export function setColumnWidth(board: TodoBoard, columnId: string, width: number): void {
+	const column = board.columns.find((c) => c.id === columnId);
+	if (column) {
+		column.width = Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(width)));
+	}
+}
+
+/** Drop an explicit width so the card goes back to auto-fitting its content. */
+export function clearColumnWidth(board: TodoBoard, columnId: string): void {
+	const column = board.columns.find((c) => c.id === columnId);
+	if (column) {
+		column.width = null;
+	}
+}
+
+/** Cycle the whole card's effort rating 0 → 1 → 2 → 3 → 0. */
+export function cycleColumnEffort(board: TodoBoard, columnId: string): void {
+	const column = board.columns.find((c) => c.id === columnId);
+	if (column) {
+		column.effort = nextRating(column.effort);
+	}
+}
+
+/** Cycle the whole card's time rating 0 → 1 → 2 → 3 → 0. */
+export function cycleColumnTime(board: TodoBoard, columnId: string): void {
+	const column = board.columns.find((c) => c.id === columnId);
+	if (column) {
+		column.time = nextRating(column.time);
 	}
 }
 

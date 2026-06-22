@@ -2,7 +2,13 @@
 	import { untrack } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
-	import { parseBoard, countProgress, viewNodes, type TodoNode } from '../board';
+	import {
+		parseBoard,
+		countProgress,
+		viewNodes,
+		effectiveColumnWidth,
+		type TodoNode
+	} from '../board';
 
 	type Props = {
 		/** Serialized board JSON (same shape stored in project.scene). */
@@ -119,9 +125,18 @@
 	<div class="world" style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});">
 		{#each board.columns as column (column.id)}
 			{@const progress = countProgress(column.nodes)}
-			<div class="card" style="left: {column.x}px; top: {column.y}px; width: {column.width}px;">
+			<div
+				class="card"
+				style="left: {column.x}px; top: {column.y}px; width: {effectiveColumnWidth(column)}px;"
+			>
 				<header class="card-head">
 					<span class="col-title">{column.title}</span>
+					{#if column.effort > 0 || column.time > 0}
+						<span class="ratings">
+							{#if column.effort > 0}{@render rating('E', column.effort, 'effort')}{/if}
+							{#if column.time > 0}{@render rating('T', column.time, 'time')}{/if}
+						</span>
+					{/if}
 					{#if progress.total > 0}
 						<span class="col-count">{progress.done}/{progress.total}</span>
 					{/if}

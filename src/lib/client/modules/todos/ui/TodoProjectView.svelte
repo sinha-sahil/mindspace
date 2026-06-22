@@ -315,6 +315,48 @@
 		B.addColumn(board, position);
 		persist();
 	}
+	const onCycleColumnEffort = (columnId: string) => {
+		B.cycleColumnEffort(board, columnId);
+		persist();
+	};
+	const onCycleColumnTime = (columnId: string) => {
+		B.cycleColumnTime(board, columnId);
+		persist();
+	};
+
+	// Drag the right edge to set an explicit width; double-click it to auto-fit.
+	let resizing = $state(false);
+	function startResize(e: PointerEvent, column: B.TodoColumn) {
+		if (e.button !== 0) {
+			return;
+		}
+		e.stopPropagation();
+		const handle = e.currentTarget;
+		if (!(handle instanceof HTMLElement)) {
+			return;
+		}
+		const card = handle.closest('.card');
+		const startWidth =
+			card instanceof HTMLElement ? card.offsetWidth : B.effectiveColumnWidth(column);
+		const startX = e.clientX;
+		resizing = true;
+		handle.setPointerCapture(e.pointerId);
+		const move = (ev: PointerEvent) => {
+			B.setColumnWidth(board, column.id, startWidth + (ev.clientX - startX) / zoom);
+		};
+		const up = () => {
+			resizing = false;
+			handle.removeEventListener('pointermove', move);
+			handle.removeEventListener('pointerup', up);
+			persist();
+		};
+		handle.addEventListener('pointermove', move);
+		handle.addEventListener('pointerup', up);
+	}
+	function resetWidth(columnId: string) {
+		B.clearColumnWidth(board, columnId);
+		persist();
+	}
 
 	const totalProgress = $derived.by(() => {
 		const all = board.columns.flatMap((c) => c.nodes);
@@ -417,6 +459,7 @@
 		class="viewport"
 		class:panning
 		class:dragging={draggingCard}
+		class:resizing
 		role="application"
 		aria-label="Todo list canvas — drag to pan, scroll to move, ctrl/cmd+scroll to zoom"
 		bind:this={viewportEl}
@@ -427,7 +470,10 @@
 		<div class="world" style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});">
 			{#each board.columns as column (column.id)}
 				{@const progress = B.countProgress(column.nodes)}
-				<div class="card" style="left: {column.x}px; top: {column.y}px; width: {column.width}px;">
+				<div
+					class="card"
+					style="left: {column.x}px; top: {column.y}px; width: {B.effectiveColumnWidth(column)}px;"
+				>
 					<header
 						class="card-head"
 						role="button"
@@ -445,6 +491,42 @@
 							onpointerdown={(e) => e.stopPropagation()}
 							aria-label="List title"
 						/>
+						<div class="card-ratings">
+							<button
+								type="button"
+								class="rating effort"
+								class:set={column.effort > 0}
+								title={['Set list effort', 'Low effort', 'Medium effort', 'High effort'][
+									column.effort
+								]}
+								aria-label="List effort"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => onCycleColumnEffort(column.id)}
+							>
+								<span class="rk">E</span>
+								<span class="bars">
+									{#each [1, 2, 3] as lvl (lvl)}
+										<span class="bar b{lvl}" class:on={column.effort >= lvl}></span>
+									{/each}
+								</span>
+							</button>
+							<button
+								type="button"
+								class="rating time"
+								class:set={column.time > 0}
+								title={['Set list time', 'Quick', 'Medium time', 'Long'][column.time]}
+								aria-label="List time"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => onCycleColumnTime(column.id)}
+							>
+								<span class="rk">T</span>
+								<span class="dots">
+									{#each [1, 2, 3] as lvl (lvl)}
+										<span class="dot" class:on={column.time >= lvl}></span>
+									{/each}
+								</span>
+							</button>
+						</div>
 						{#if progress.total > 0}
 							<span class="col-count">{progress.done}/{progress.total}</span>
 						{/if}
@@ -506,6 +588,19 @@
 							<Icon name="list" size={12} /><span>Section</span>
 						</button>
 					</footer>
+
+					<div
+						class="resize-handle"
+						class:explicit={column.width !== null}
+						role="separator"
+						aria-orientation="vertical"
+						aria-label="Resize list — double-click to auto-fit"
+						title={column.width !== null
+							? 'Drag to resize · double-click to auto-fit'
+							: 'Drag to resize'}
+						onpointerdown={(e) => startResize(e, column)}
+						ondblclick={() => resetWidth(column.id)}
+					></div>
 				</div>
 			{/each}
 		</div>
@@ -739,6 +834,10 @@
 	.viewport.dragging {
 		cursor: grabbing;
 	}
+	.viewport.resizing {
+		cursor: ew-resize;
+		user-select: none;
+	}
 	.world {
 		position: absolute;
 		top: 0;
@@ -757,6 +856,119 @@
 		border: 1px solid var(--border);
 		border-radius: 12px;
 		box-shadow: var(--shadow-md, 0 8px 30px -12px rgba(0, 0, 0, 0.25));
+	}
+
+	/* Right-edge drag strip to resize the card. */
+	.resize-handle {
+		position: absolute;
+		top: 8px;
+		bottom: 8px;
+		right: -4px;
+		width: 9px;
+		border-radius: 6px;
+		cursor: ew-resize;
+		touch-action: none;
+	}
+	.resize-handle::before {
+		content: '';
+		position: absolute;
+		top: 50%;
+		right: 4px;
+		width: 3px;
+		height: 30px;
+		transform: translateY(-50%);
+		border-radius: 3px;
+		background: var(--accents-3);
+		opacity: 0;
+		transition: opacity 120ms;
+	}
+	.card:hover .resize-handle::before {
+		opacity: 1;
+	}
+	.resize-handle:hover::before {
+		background: var(--accent, var(--accents-5));
+		height: 44px;
+	}
+	.resize-handle.explicit::before {
+		opacity: 0.6;
+	}
+
+	/* card-level effort / time chips (mirror the per-task chips) */
+	.card-ratings {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+	.rating {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		height: 18px;
+		padding: 0 5px;
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		cursor: pointer;
+		opacity: 0.6;
+		transition:
+			opacity 100ms,
+			border-color 100ms;
+	}
+	.rating.set {
+		opacity: 1;
+	}
+	.card-head:hover .rating {
+		opacity: 1;
+	}
+	.rating:hover {
+		border-color: var(--accents-4);
+	}
+	.rk {
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: var(--accents-5);
+	}
+	.rating.set .rk {
+		color: var(--accents-6);
+	}
+	.bars {
+		display: inline-flex;
+		align-items: flex-end;
+		gap: 1px;
+		height: 10px;
+	}
+	.bar {
+		width: 2.5px;
+		border-radius: 1px;
+		background: var(--accents-3);
+	}
+	.bar.b1 {
+		height: 4px;
+	}
+	.bar.b2 {
+		height: 7px;
+	}
+	.bar.b3 {
+		height: 10px;
+	}
+	.bar.on {
+		background: var(--saffron, #e0a106);
+	}
+	.dots {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.dot {
+		width: 4px;
+		height: 4px;
+		border-radius: 50%;
+		background: var(--accents-3);
+	}
+	.dot.on {
+		background: var(--sage, #5f9a6f);
 	}
 	.card-head {
 		display: flex;

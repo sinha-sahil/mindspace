@@ -86,8 +86,29 @@ describe('todo board', () => {
 		const col = b.columns[0];
 		expect(typeof col.x).toBe('number');
 		expect(typeof col.y).toBe('number');
-		expect(col.width).toBe(B.DEFAULT_COLUMN_WIDTH);
+		expect(col.width).toBeNull(); // auto-fit by default
 		expect(b.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
+	});
+
+	it('auto-fits width to the widest item, clamped to bounds', () => {
+		const b = B.createEmptyBoard();
+		const col = b.columns[0];
+		col.nodes = [B.newTask('short')];
+		const narrow = B.effectiveColumnWidth(col);
+		col.nodes = [B.newTask('a really very long task title that should widen the card a lot')];
+		const wide = B.effectiveColumnWidth(col);
+		expect(wide).toBeGreaterThan(narrow);
+		expect(narrow).toBeGreaterThanOrEqual(B.MIN_COLUMN_WIDTH);
+		expect(wide).toBeLessThanOrEqual(B.MAX_COLUMN_WIDTH);
+	});
+
+	it('clearColumnWidth returns a resized card to auto-fit', () => {
+		const b = B.createEmptyBoard();
+		const id = b.columns[0].id;
+		B.setColumnWidth(b, id, 400);
+		expect(b.columns[0].width).toBe(400);
+		B.clearColumnWidth(b, id);
+		expect(b.columns[0].width).toBeNull();
 	});
 
 	it('migrates legacy (positionless) columns into a row layout', () => {
@@ -168,5 +189,31 @@ describe('todo board', () => {
 		B.setView(b, { sort: 'time', hideDone: true });
 		const again = B.parseBoard(B.serializeBoard(b));
 		expect(again.view).toEqual({ sort: 'time', hideDone: true });
+	});
+
+	it('clamps column width to the allowed range and persists it', () => {
+		const b = B.createEmptyBoard();
+		const id = b.columns[0].id;
+		B.setColumnWidth(b, id, 5000);
+		expect(b.columns[0].width).toBe(B.MAX_COLUMN_WIDTH);
+		B.setColumnWidth(b, id, 10);
+		expect(b.columns[0].width).toBe(B.MIN_COLUMN_WIDTH);
+		B.setColumnWidth(b, id, 360);
+		const again = B.parseBoard(B.serializeBoard(b));
+		expect(again.columns[0].width).toBe(360);
+	});
+
+	it('cycles and persists card-level effort/time ratings', () => {
+		const b = B.createEmptyBoard();
+		const id = b.columns[0].id;
+		expect(b.columns[0].effort).toBe(0);
+		B.cycleColumnEffort(b, id);
+		B.cycleColumnTime(b, id);
+		B.cycleColumnTime(b, id);
+		expect(b.columns[0].effort).toBe(1);
+		expect(b.columns[0].time).toBe(2);
+		const again = B.parseBoard(B.serializeBoard(b));
+		expect(again.columns[0].effort).toBe(1);
+		expect(again.columns[0].time).toBe(2);
 	});
 });
