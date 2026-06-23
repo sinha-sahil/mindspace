@@ -29,6 +29,8 @@ export type TodoNode = {
 	effort: Rating;
 	/** Time estimate (0–3). */
 	time: Rating;
+	/** Priority (0–3), shown as "burning" flames. */
+	priority: Rating;
 	collapsed: boolean;
 	children: TodoNode[];
 };
@@ -45,6 +47,7 @@ export type TodoColumn = {
 	/** Rating for the whole card/list ("the task itself"), independent of items. */
 	effort: Rating;
 	time: Rating;
+	priority: Rating;
 };
 
 /** Pan/zoom of the canvas, persisted so the view is restored on reopen. */
@@ -55,7 +58,7 @@ export type TodoViewport = {
 };
 
 /** How tasks are ordered for display, and whether completed ones are hidden. */
-export type TodoSort = 'manual' | 'effort' | 'time';
+export type TodoSort = 'manual' | 'effort' | 'time' | 'priority';
 export type TodoView = {
 	sort: TodoSort;
 	hideDone: boolean;
@@ -97,6 +100,7 @@ export function newTask(text = ''): TodoNode {
 		done: false,
 		effort: 0,
 		time: 0,
+		priority: 0,
 		collapsed: false,
 		children: []
 	};
@@ -110,6 +114,7 @@ export function newSection(text = ''): TodoNode {
 		done: false,
 		effort: 0,
 		time: 0,
+		priority: 0,
 		collapsed: false,
 		children: []
 	};
@@ -121,7 +126,7 @@ export function newColumn(
 	y = LAYOUT_ORIGIN,
 	width: number | null = null
 ): TodoColumn {
-	return { id: uid(), title, nodes: [newTask('')], x, y, width, effort: 0, time: 0 };
+	return { id: uid(), title, nodes: [newTask('')], x, y, width, effort: 0, time: 0, priority: 0 };
 }
 
 /**
@@ -133,11 +138,11 @@ export function newColumn(
 export function autoColumnWidth(column: TodoColumn): number {
 	const CHAR = 7.1; // ~average glyph width at the row font size
 	// Header line: grip + title + room for the rating chips and delete button.
-	let widest = 96 + column.title.length * CHAR;
+	let widest = 130 + column.title.length * CHAR;
 	const walk = (nodes: TodoNode[], depth: number) => {
 		for (const n of nodes) {
-			// Row line: checkbox/twisty + nesting indent + text + rating chips.
-			const line = 124 + depth * 22 + n.text.length * CHAR;
+			// Row line: checkbox/twisty + nesting indent + text + three rating chips.
+			const line = 158 + depth * 22 + n.text.length * CHAR;
 			if (line > widest) {
 				widest = line;
 			}
@@ -201,6 +206,7 @@ function normalizeNode(raw: unknown): TodoNode | null {
 		done: kind === 'task' && 'done' in raw && raw.done === true,
 		effort: 'effort' in raw ? toRating(raw.effort) : 0,
 		time: 'time' in raw ? toRating(raw.time) : 0,
+		priority: 'priority' in raw ? toRating(raw.priority) : 0,
 		collapsed: 'collapsed' in raw && raw.collapsed === true,
 		children
 	};
@@ -261,7 +267,8 @@ function normalizeBoard(raw: unknown): TodoBoard {
 			y,
 			width,
 			effort: 'effort' in c ? toRating(c.effort) : 0,
-			time: 'time' in c ? toRating(c.time) : 0
+			time: 'time' in c ? toRating(c.time) : 0,
+			priority: 'priority' in c ? toRating(c.priority) : 0
 		});
 	}
 	if (columns.length === 0) {
@@ -275,7 +282,10 @@ function normalizeView(raw: object): TodoView {
 	let hideDone = false;
 	if ('view' in raw && typeof raw.view === 'object' && raw.view !== null) {
 		const v = raw.view;
-		if ('sort' in v && (v.sort === 'effort' || v.sort === 'time' || v.sort === 'manual')) {
+		if (
+			'sort' in v &&
+			(v.sort === 'effort' || v.sort === 'time' || v.sort === 'priority' || v.sort === 'manual')
+		) {
 			sort = v.sort;
 		}
 		hideDone = 'hideDone' in v && v.hideDone === true;
@@ -457,6 +467,14 @@ export function cycleTime(board: TodoBoard, id: string): void {
 	}
 }
 
+/** Cycle a task's priority ("burning") rating 0 → 1 → 2 → 3 → 0. */
+export function cyclePriority(board: TodoBoard, id: string): void {
+	const ctx = findContext(board, id);
+	if (ctx && ctx.node.kind === 'task') {
+		ctx.node.priority = nextRating(ctx.node.priority);
+	}
+}
+
 function nextRating(value: Rating): Rating {
 	if (value === 1) {
 		return 2;
@@ -535,6 +553,14 @@ export function cycleColumnTime(board: TodoBoard, columnId: string): void {
 	const column = board.columns.find((c) => c.id === columnId);
 	if (column) {
 		column.time = nextRating(column.time);
+	}
+}
+
+/** Cycle the whole card's priority ("burning") rating 0 → 1 → 2 → 3 → 0. */
+export function cycleColumnPriority(board: TodoBoard, columnId: string): void {
+	const column = board.columns.find((c) => c.id === columnId);
+	if (column) {
+		column.priority = nextRating(column.priority);
 	}
 }
 
@@ -619,9 +645,9 @@ export function countProgress(nodes: TodoNode[]): Progress {
  */
 export function viewNodes(nodes: TodoNode[], view: TodoView): TodoNode[] {
 	let list = view.hideDone ? nodes.filter((n) => !(n.kind === 'task' && n.done)) : nodes;
-	if (view.sort === 'effort' || view.sort === 'time') {
-		const key = (n: TodoNode) =>
-			n.kind === 'section' ? Number.MAX_SAFE_INTEGER : view.sort === 'effort' ? n.effort : n.time;
+	const sort = view.sort;
+	if (sort === 'effort' || sort === 'time' || sort === 'priority') {
+		const key = (n: TodoNode) => (n.kind === 'section' ? Number.MAX_SAFE_INTEGER : n[sort]);
 		list = [...list].sort((a, b) => key(b) - key(a));
 	}
 	return list;

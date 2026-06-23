@@ -168,6 +168,25 @@ describe('todo board', () => {
 		expect(col.nodes.map((n) => n.text)).toEqual(['low', 'high', 'none']);
 	});
 
+	it('cycles priority and sorts by it (most on-fire first)', () => {
+		const cool = B.newTask('cool');
+		cool.priority = 1;
+		const hot = B.newTask('hot');
+		hot.priority = 3;
+		const none = B.newTask('none');
+		const sorted = B.viewNodes([cool, hot, none], { sort: 'priority', hideDone: false });
+		expect(sorted.map((n) => n.text)).toEqual(['hot', 'cool', 'none']);
+
+		const b = B.createEmptyBoard();
+		const id = b.columns[0].nodes[0].id;
+		B.cyclePriority(b, id);
+		B.cyclePriority(b, id);
+		B.cycleColumnPriority(b, b.columns[0].id);
+		const again = B.parseBoard(B.serializeBoard(b));
+		expect(again.columns[0].nodes[0].priority).toBe(2);
+		expect(again.columns[0].priority).toBe(1);
+	});
+
 	it('keeps section headings pinned above tasks when sorting', () => {
 		const s = B.newSection('Heading');
 		const t = B.newTask('task');

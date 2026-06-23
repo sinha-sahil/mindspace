@@ -9,6 +9,7 @@
 		effectiveColumnWidth,
 		type TodoNode
 	} from '../board';
+	import Flame from './Flame.svelte';
 
 	type Props = {
 		/** Serialized board JSON (same shape stored in project.scene). */
@@ -84,6 +85,16 @@
 	</span>
 {/snippet}
 
+{#snippet priorityBadge(level: number)}
+	<span class="rating priority" title="Priority: {['—', 'low', 'high', 'burning'][level]}">
+		<span class="flames">
+			{#each [1, 2, 3] as lvl (lvl)}
+				<Flame on={level >= lvl} size={11} />
+			{/each}
+		</span>
+	</span>
+{/snippet}
+
 {#snippet renderNode(node: TodoNode, depth: number)}
 	<div class="node" class:section={node.kind === 'section'} style="--depth: {depth}">
 		<div class="row" class:done={node.kind === 'task' && node.done}>
@@ -95,8 +106,9 @@
 				<span class="section-mark" aria-hidden="true"></span>
 			{/if}
 			<span class="text">{node.text || ' '}</span>
-			{#if node.kind === 'task' && (node.effort > 0 || node.time > 0)}
+			{#if node.kind === 'task' && (node.effort > 0 || node.time > 0 || node.priority > 0)}
 				<span class="ratings">
+					{#if node.priority > 0}{@render priorityBadge(node.priority)}{/if}
 					{#if node.effort > 0}{@render rating('E', node.effort, 'effort')}{/if}
 					{#if node.time > 0}{@render rating('T', node.time, 'time')}{/if}
 				</span>
@@ -131,8 +143,9 @@
 			>
 				<header class="card-head">
 					<span class="col-title">{column.title}</span>
-					{#if column.effort > 0 || column.time > 0}
+					{#if column.effort > 0 || column.time > 0 || column.priority > 0}
 						<span class="ratings">
+							{#if column.priority > 0}{@render priorityBadge(column.priority)}{/if}
 							{#if column.effort > 0}{@render rating('E', column.effort, 'effort')}{/if}
 							{#if column.time > 0}{@render rating('T', column.time, 'time')}{/if}
 						</span>
@@ -338,5 +351,10 @@
 	}
 	.rating.time .mark.on {
 		background: var(--sage, #5f9a6f);
+	}
+	.flames {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
 	}
 </style>

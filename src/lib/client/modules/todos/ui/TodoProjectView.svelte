@@ -5,6 +5,7 @@
 	import type { Project } from '$lib/client/modules/projects';
 	import * as B from '../board';
 	import TodoNode from './TodoNode.svelte';
+	import Flame from './Flame.svelte';
 
 	type Props = {
 		project: Project;
@@ -260,6 +261,10 @@
 		B.cycleTime(board, id);
 		persist();
 	};
+	const onCyclePriority = (id: string) => {
+		B.cyclePriority(board, id);
+		persist();
+	};
 	const onFocused = () => {
 		focusId = null;
 	};
@@ -321,6 +326,10 @@
 	};
 	const onCycleColumnTime = (columnId: string) => {
 		B.cycleColumnTime(board, columnId);
+		persist();
+	};
+	const onCycleColumnPriority = (columnId: string) => {
+		B.cycleColumnPriority(board, columnId);
 		persist();
 	};
 
@@ -421,6 +430,15 @@
 				>
 					Time
 				</button>
+				<button
+					type="button"
+					class="sort-btn"
+					class:active={board.view.sort === 'priority'}
+					title="Most on-fire first"
+					onclick={() => setSort('priority')}
+				>
+					Priority
+				</button>
 			</div>
 			<button
 				type="button"
@@ -492,6 +510,23 @@
 							aria-label="List title"
 						/>
 						<div class="card-ratings">
+							<button
+								type="button"
+								class="rating priority"
+								class:set={column.priority > 0}
+								title={['Set list priority', 'Low priority', 'High priority', 'Burning 🔥'][
+									column.priority
+								]}
+								aria-label="List priority"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => onCycleColumnPriority(column.id)}
+							>
+								<span class="flames">
+									{#each [1, 2, 3] as lvl (lvl)}
+										<Flame on={column.priority >= lvl} size={11} />
+									{/each}
+								</span>
+							</button>
 							<button
 								type="button"
 								class="rating effort"
@@ -571,6 +606,7 @@
 								{onToggleKind}
 								{onCycleEffort}
 								{onCycleTime}
+								{onCyclePriority}
 							/>
 						{/each}
 						{#if column.nodes.length === 0}
@@ -969,6 +1005,11 @@
 	}
 	.dot.on {
 		background: var(--sage, #5f9a6f);
+	}
+	.flames {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
 	}
 	.card-head {
 		display: flex;

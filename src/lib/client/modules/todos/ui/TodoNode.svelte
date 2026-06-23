@@ -2,6 +2,7 @@
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { countProgress, viewNodes, type TodoNode, type TodoView } from '../board';
+	import Flame from './Flame.svelte';
 	import Self from './TodoNode.svelte';
 
 	type Props = {
@@ -22,6 +23,7 @@
 		onToggleKind: (id: string) => void;
 		onCycleEffort: (id: string) => void;
 		onCycleTime: (id: string) => void;
+		onCyclePriority: (id: string) => void;
 	};
 
 	let {
@@ -41,11 +43,13 @@
 		onToggleCollapse,
 		onToggleKind,
 		onCycleEffort,
-		onCycleTime
+		onCycleTime,
+		onCyclePriority
 	}: Props = $props();
 
 	const EFFORT_LABELS = ['Set effort', 'Low effort', 'Medium effort', 'High effort'];
 	const TIME_LABELS = ['Set time', 'Quick', 'Medium time', 'Long'];
+	const PRIORITY_LABELS = ['Set priority', 'Low priority', 'High priority', 'Burning 🔥'];
 
 	const childrenToShow = $derived(viewNodes(node.children, view));
 
@@ -172,6 +176,20 @@
 			<div class="ratings">
 				<button
 					type="button"
+					class="rating priority"
+					class:set={node.priority > 0}
+					title={PRIORITY_LABELS[node.priority]}
+					aria-label={PRIORITY_LABELS[node.priority]}
+					onclick={() => onCyclePriority(node.id)}
+				>
+					<span class="flames">
+						{#each [1, 2, 3] as lvl (lvl)}
+							<Flame on={node.priority >= lvl} size={11} />
+						{/each}
+					</span>
+				</button>
+				<button
+					type="button"
 					class="rating effort"
 					class:set={node.effort > 0}
 					title={EFFORT_LABELS[node.effort]}
@@ -225,6 +243,7 @@
 					{onToggleKind}
 					{onCycleEffort}
 					{onCycleTime}
+					{onCyclePriority}
 				/>
 			{/each}
 		</div>
@@ -454,6 +473,13 @@
 	}
 	.bar.on {
 		background: var(--saffron, #e0a106);
+	}
+
+	/* priority = burning flames */
+	.flames {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
 	}
 
 	/* time = dots */

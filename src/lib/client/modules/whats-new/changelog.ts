@@ -29,6 +29,19 @@ export type Release = {
 
 export const CHANGELOG: Release[] = [
 	{
+		id: '2026-06-23-priority-fire',
+		date: 'June 2026',
+		title: 'Priority, on fire 🔥',
+		features: [
+			{
+				icon: 'sparkles',
+				title: 'Burning priority rating',
+				description:
+					'To-dos (and whole lists) now have a priority rating shown as flames — one flame for low, three for burning hot. Click the 🔥 chip on a task to set it, then Sort → Priority to float the most on-fire items to the top.'
+			}
+		]
+	},
+	{
 		id: '2026-06-22-ticket-ratings',
 		date: 'June 2026',
 		title: 'Effort & time on every to-do',
