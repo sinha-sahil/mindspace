@@ -106,10 +106,13 @@ server.registerTool(
 	{
 		title: 'List Projects',
 		description:
-			'List projects in a workspace. Optional kind filter ("whiteboard" or "doc") narrows the result. Each project has id, name, kind, visibility, created_at, updated_at.',
+			'List projects in a workspace. Optional kind filter ("whiteboard", "doc", "todo", or "sheet") narrows the result. Each project has id, name, kind, visibility, created_at, updated_at.',
 		inputSchema: {
 			workspace_id: z.string().uuid().describe('UUID of the workspace, from list_workspaces.'),
-			kind: z.enum(['whiteboard', 'doc']).optional().describe('Filter by kind. Omit to get both.')
+			kind: z
+				.enum(['whiteboard', 'doc', 'todo', 'sheet'])
+				.optional()
+				.describe('Filter by kind. Omit to get all.')
 		}
 	},
 	async ({ workspace_id, kind }) => {
@@ -188,6 +191,83 @@ server.registerTool(
 				kind: 'todo'
 			})
 		)
+);
+
+server.registerTool(
+	'create_sheet_project',
+	{
+		title: 'Create Spreadsheet Project',
+		description:
+			'Create a new spreadsheet project: a workbook of cells with formulas, multiple tabs, and formatting. Opens with one empty "Sheet1". Use set_sheet_cells afterwards to populate it, and get_sheet to read it back with computed values.',
+		inputSchema: {
+			workspace_id: z.string().uuid().describe('UUID of the destination workspace.'),
+			name: z.string().min(1).max(120).describe('Display name for the project.')
+		}
+	},
+	async ({ workspace_id, name }) =>
+		jsonResult(
+			await mindspaceApi('POST', '/api/mcp/projects', {
+				workspace_id,
+				name,
+				kind: 'sheet'
+			})
+		)
+);
+
+server.registerTool(
+	'get_sheet',
+	{
+		title: 'Read Spreadsheet',
+		description:
+			'Read every tab of a spreadsheet project. Returns each sheet with its id, name, grid size, and a map of non-empty cells keyed by A1 address — each cell carries its raw `value` (a literal or "=formula"), the engine-`computed` value, and a formatted `display` string. Use this to inspect results before or after writing.',
+		inputSchema: {
+			project_id: z.string().uuid().describe('UUID of a kind="sheet" project.')
+		}
+	},
+	async ({ project_id }) =>
+		jsonResult(await mindspaceApi('GET', `/api/mcp/projects/${project_id}/sheet`))
+);
+
+server.registerTool(
+	'set_sheet_cells',
+	{
+		title: 'Write Spreadsheet Cells',
+		description:
+			'Write raw inputs to cells of a spreadsheet by A1 address. Each cell `value` is a literal ("hello", "42", "3.14", "TRUE") or a formula beginning with "=" (e.g. "=SUM(A1:A10)", "=B2*1.2", "=VLOOKUP(...)"). An empty value clears the cell. Targets the active tab by default; pass sheet_id or sheet_name to choose another (set create_sheet:true to add a new named tab). Returns the updated sheet with recomputed values.',
+		inputSchema: {
+			project_id: z.string().uuid().describe('UUID of a kind="sheet" project.'),
+			cells: z
+				.array(
+					z.object({
+						a1: z.string().describe('Cell address, e.g. "A1", "B12", "AA3".'),
+						value: z.string().describe('Literal or "=formula". Empty string clears the cell.')
+					})
+				)
+				.min(1)
+				.describe('The cells to write.'),
+			sheet_id: z.string().optional().describe('Target tab by id (from get_sheet).'),
+			sheet_name: z.string().optional().describe('Target tab by name instead of id.'),
+			create_sheet: z
+				.boolean()
+				.optional()
+				.describe('If true and sheet_name does not exist, create it.')
+		}
+	},
+	async ({ project_id, cells, sheet_id, sheet_name, create_sheet }) => {
+		const payload: Record<string, unknown> = { cells };
+		if (sheet_id !== undefined) {
+			payload.sheet_id = sheet_id;
+		}
+		if (sheet_name !== undefined) {
+			payload.sheet_name = sheet_name;
+		}
+		if (create_sheet !== undefined) {
+			payload.create_sheet = create_sheet;
+		}
+		return jsonResult(
+			await mindspaceApi('PATCH', `/api/mcp/projects/${project_id}/sheet`, payload)
+		);
+	}
 );
 
 server.registerTool(

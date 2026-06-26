@@ -29,6 +29,31 @@ export type Release = {
 
 export const CHANGELOG: Release[] = [
 	{
+		id: '2026-06-26-spreadsheets',
+		date: 'June 2026',
+		title: 'Spreadsheets arrive 📊',
+		features: [
+			{
+				icon: 'table',
+				title: 'A new Spreadsheet project',
+				description:
+					'Hit "+ New project" and pick "Spreadsheet" for a full grid of cells with multiple tabs, formatting (bold, colors, number formats, alignment), resizable rows and columns, and copy/paste straight from Google Sheets or Excel. Everything autosaves as you type.'
+			},
+			{
+				icon: 'hash',
+				title: 'Formulas & 70+ functions',
+				description:
+					'Start any cell with "=" to compute. Cell and range references (A1, $B$2, A1:C9), cross-sheet refs (Sheet2!A1), and a Google-Sheets-compatible function library — SUM, IF, VLOOKUP, INDEX/MATCH, COUNTIF, and many more — with live error values and cycle detection.'
+			},
+			{
+				icon: 'command',
+				title: 'Drive sheets from Claude',
+				description:
+					'New MCP tools let an LLM create a spreadsheet, read its cells with computed values, and write values or formulas by A1 address — so Claude can build and update sheets for you end to end.'
+			}
+		]
+	},
+	{
 		id: '2026-06-23-priority-fire',
 		date: 'June 2026',
 		title: 'Priority, on fire 🔥',

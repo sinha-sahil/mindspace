@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSupabaseAdmin } from '$lib/server/supabase-admin';
 import { userIsWorkspaceEditor } from '$lib/server/mcp-helpers';
+import { createEmptyBook, serializeBook } from '$lib/client/modules/sheets/model';
 import type { Json, ProjectKind } from '$lib/database.types';
 
 /**
@@ -32,10 +33,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let kind: ProjectKind = 'whiteboard';
 	if ('kind' in body && typeof body.kind === 'string') {
-		if (body.kind === 'whiteboard' || body.kind === 'doc' || body.kind === 'todo') {
+		if (
+			body.kind === 'whiteboard' ||
+			body.kind === 'doc' ||
+			body.kind === 'todo' ||
+			body.kind === 'sheet'
+		) {
 			kind = body.kind;
 		} else {
-			throw error(400, 'kind must be "whiteboard", "doc", or "todo"');
+			throw error(400, 'kind must be "whiteboard", "doc", "todo", or "sheet"');
 		}
 	}
 
@@ -51,6 +57,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		} catch {
 			throw error(400, 'scene must be JSON-serializable');
 		}
+	}
+
+	// Seed spreadsheets with an empty workbook so their sheet ids are stable from
+	// creation — get_sheet/set_sheet_cells can target a tab by id right away
+	// instead of getting a fresh random id on each empty read.
+	if (kind === 'sheet' && scene === null) {
+		scene = JSON.parse(serializeBook(createEmptyBook()));
 	}
 
 	const admin = getSupabaseAdmin();

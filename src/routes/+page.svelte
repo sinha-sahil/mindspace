@@ -10,6 +10,7 @@
 	import { WhatsNewModal, whatsNew } from '$lib/client/modules/whats-new';
 	import { DocProjectView, documents } from '$lib/client/modules/documents';
 	import { TodoProjectView } from '$lib/client/modules/todos';
+	import { SheetProjectView } from '$lib/client/modules/sheets';
 	import { toasts } from '$lib/client/modules/toasts';
 
 	let { data } = $props();
@@ -126,6 +127,15 @@
 			{:else if active.kind === 'todo'}
 				{#key active.id}
 					<TodoProjectView
+						project={active}
+						saving={projects.isSaving}
+						onSceneChange={(scene) => projects.saveScene(active.id, scene)}
+						onRename={(name) => projects.rename(active.id, name)}
+					/>
+				{/key}
+			{:else if active.kind === 'sheet'}
+				{#key active.id}
+					<SheetProjectView
 						project={active}
 						saving={projects.isSaving}
 						onSceneChange={(scene) => projects.saveScene(active.id, scene)}

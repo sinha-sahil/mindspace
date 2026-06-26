@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 		.eq('workspace_id', params.id)
 		.order('position', { ascending: true })
 		.order('created_at', { ascending: false });
-	if (kind === 'whiteboard' || kind === 'doc' || kind === 'todo') {
+	if (kind === 'whiteboard' || kind === 'doc' || kind === 'todo' || kind === 'sheet') {
 		query = query.eq('kind', kind);
 	}
 

@@ -3,6 +3,7 @@
 	import MermaidFullscreen from '$lib/client/modules/documents/ui/MermaidFullscreen.svelte';
 	import { Whiteboard } from '$lib/client/modules/whiteboard';
 	import { TodoReadOnly } from '$lib/client/modules/todos';
+	import { SheetReadOnly } from '$lib/client/modules/sheets';
 	import { formatDate as fmtDate } from '$lib/client/utils/format';
 	import { renderMarkdown, renderMermaidDiagrams } from '$lib/client/modules/documents/markdown';
 
@@ -80,6 +81,10 @@
 		</div>
 	{:else if project.kind === 'todo'}
 		<TodoReadOnly scene={project.scene} />
+	{:else if project.kind === 'sheet'}
+		<div class="board">
+			<SheetReadOnly scene={project.scene} />
+		</div>
 	{:else}
 		<div class="board">
 			<Whiteboard scene={project.scene} readOnly />

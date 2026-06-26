@@ -48,7 +48,7 @@ const TOOLS: ToolDef[] = [
 		name: 'list_projects',
 		title: 'List Projects',
 		description:
-			'List projects in a workspace. Optional kind filter ("whiteboard" or "doc") narrows the result. Each project has id, name, kind, visibility, created_at, updated_at.',
+			'List projects in a workspace. Optional kind filter ("whiteboard", "doc", "todo", or "sheet") narrows the result. Each project has id, name, kind, visibility, created_at, updated_at.',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -59,8 +59,8 @@ const TOOLS: ToolDef[] = [
 				},
 				kind: {
 					type: 'string',
-					enum: ['whiteboard', 'doc'],
-					description: 'Filter by kind. Omit to get both.'
+					enum: ['whiteboard', 'doc', 'todo', 'sheet'],
+					description: 'Filter by kind. Omit to get all.'
 				}
 			},
 			required: ['workspace_id'],
@@ -97,6 +97,86 @@ const TOOLS: ToolDef[] = [
 				name: { type: 'string', minLength: 1, maxLength: 120 }
 			},
 			required: ['workspace_id', 'name'],
+			additionalProperties: false
+		}
+	},
+	{
+		name: 'create_todo_project',
+		title: 'Create Todo List Project',
+		description:
+			'Create a new todo-list project: nested checkboxes grouped into sections and arranged across one or more columns on a free canvas.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				workspace_id: { type: 'string', format: 'uuid' },
+				name: { type: 'string', minLength: 1, maxLength: 120 }
+			},
+			required: ['workspace_id', 'name'],
+			additionalProperties: false
+		}
+	},
+	{
+		name: 'create_sheet_project',
+		title: 'Create Spreadsheet Project',
+		description:
+			'Create a new spreadsheet project: a workbook of cells with formulas, multiple tabs, and formatting. Opens with one empty "Sheet1". Use set_sheet_cells to populate it and get_sheet to read it back with computed values.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				workspace_id: { type: 'string', format: 'uuid' },
+				name: { type: 'string', minLength: 1, maxLength: 120 }
+			},
+			required: ['workspace_id', 'name'],
+			additionalProperties: false
+		}
+	},
+	{
+		name: 'get_sheet',
+		title: 'Read Spreadsheet',
+		description:
+			'Read every tab of a spreadsheet project. Returns each sheet with its id, name, grid size, and a map of non-empty cells keyed by A1 address — each cell carries its raw `value` (a literal or "=formula"), the engine-`computed` value, and a formatted `display` string.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				project_id: { type: 'string', format: 'uuid' }
+			},
+			required: ['project_id'],
+			additionalProperties: false
+		}
+	},
+	{
+		name: 'set_sheet_cells',
+		title: 'Write Spreadsheet Cells',
+		description:
+			'Write raw inputs to cells of a spreadsheet by A1 address. Each cell `value` is a literal ("hello", "42", "TRUE") or a formula beginning with "=" (e.g. "=SUM(A1:A10)", "=B2*1.2"). An empty value clears the cell. Targets the active tab by default; pass sheet_id or sheet_name to choose another (set create_sheet:true to add a new named tab). Returns the updated sheet with recomputed values.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				project_id: { type: 'string', format: 'uuid' },
+				cells: {
+					type: 'array',
+					minItems: 1,
+					items: {
+						type: 'object',
+						properties: {
+							a1: { type: 'string', description: 'Cell address, e.g. "A1", "B12", "AA3".' },
+							value: {
+								type: 'string',
+								description: 'Literal or "=formula". Empty clears the cell.'
+							}
+						},
+						required: ['a1', 'value'],
+						additionalProperties: false
+					}
+				},
+				sheet_id: { type: 'string', description: 'Target tab by id (from get_sheet).' },
+				sheet_name: { type: 'string', description: 'Target tab by name instead of id.' },
+				create_sheet: {
+					type: 'boolean',
+					description: 'If true and sheet_name does not exist, create it.'
+				}
+			},
+			required: ['project_id', 'cells'],
 			additionalProperties: false
 		}
 	},
@@ -343,7 +423,7 @@ async function handle(
 					capabilities: { tools: { listChanged: false } },
 					serverInfo: { name: 'mindspace', version: '1.0.0' },
 					instructions:
-						'Use list_workspaces first to discover workspace_ids. For doc projects, use create_doc_project then upload_markdown. For whiteboards, create_whiteboard_project can optionally accept an Excalidraw scene.'
+						'Use list_workspaces first to discover workspace_ids. For doc projects, use create_doc_project then upload_markdown. For whiteboards, create_whiteboard_project can optionally accept an Excalidraw scene. For spreadsheets, create_sheet_project then set_sheet_cells (write literals or "=formulas" by A1 address) and get_sheet to read computed values.'
 				}
 			};
 
@@ -442,6 +522,63 @@ async function dispatchTool(
 				name: projectName,
 				kind: 'doc'
 			});
+		}
+
+		case 'create_todo_project': {
+			const wsId = asString(args.workspace_id);
+			const projectName = asString(args.name);
+			if (!wsId || !projectName) {
+				throw new Error('create_todo_project: workspace_id and name are required');
+			}
+			return callApi(f, authHeader, 'POST', '/api/mcp/projects', {
+				workspace_id: wsId,
+				name: projectName,
+				kind: 'todo'
+			});
+		}
+
+		case 'create_sheet_project': {
+			const wsId = asString(args.workspace_id);
+			const projectName = asString(args.name);
+			if (!wsId || !projectName) {
+				throw new Error('create_sheet_project: workspace_id and name are required');
+			}
+			return callApi(f, authHeader, 'POST', '/api/mcp/projects', {
+				workspace_id: wsId,
+				name: projectName,
+				kind: 'sheet'
+			});
+		}
+
+		case 'get_sheet': {
+			const projectId = asString(args.project_id);
+			if (!projectId) {
+				throw new Error('get_sheet: project_id is required');
+			}
+			return callApi(f, authHeader, 'GET', `/api/mcp/projects/${projectId}/sheet`);
+		}
+
+		case 'set_sheet_cells': {
+			const projectId = asString(args.project_id);
+			if (!projectId) {
+				throw new Error('set_sheet_cells: project_id is required');
+			}
+			if (!Array.isArray(args.cells) || args.cells.length === 0) {
+				throw new Error('set_sheet_cells: cells must be a non-empty array of { a1, value }');
+			}
+			const payload: Record<string, unknown> = { cells: args.cells };
+			const sheetId = asString(args.sheet_id);
+			if (sheetId) {
+				payload.sheet_id = sheetId;
+			}
+			const sheetName = asString(args.sheet_name);
+			if (sheetName) {
+				payload.sheet_name = sheetName;
+			}
+			if (typeof args.create_sheet === 'boolean') {
+				payload.create_sheet = args.create_sheet;
+			}
+			return callApi(f, authHeader, 'PATCH', `/api/mcp/projects/${projectId}/sheet`, payload);
 		}
 
 		case 'list_documents': {

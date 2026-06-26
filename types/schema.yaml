@@ -15,6 +15,7 @@ types:
       - whiteboard
       - doc
       - todo
+      - sheet
 
   ShareRole:
     type: string

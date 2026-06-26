@@ -116,8 +116,9 @@
 			<div class="mcp-install">
 				<p class="mcp-intro">
 					Connect Claude Code (or any MCP-aware client) to mindspace so an LLM can browse your
-					workspaces, create whiteboards from Excalidraw scenes, upload markdown documents, and read
-					text-anchored comment threads. Nothing to install locally.
+					workspaces, create whiteboards from Excalidraw scenes, upload markdown documents, build
+					spreadsheets with formulas, and read text-anchored comment threads. Nothing to install
+					locally.
 				</p>
 
 				<!-- Scope tabs -->

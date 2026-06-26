@@ -1,6 +1,6 @@
 # mindspace MCP
 
-An [MCP](https://modelcontextprotocol.io) server that gives an LLM client (Claude Code, Claude Desktop, Cursor, …) the ability to drive a [mindspace](https://www.mindspace.casa) workspace — create whiteboard projects (optionally seeded with an Excalidraw scene), spin up doc projects, upload markdown documents, and read back text-anchored comment threads.
+An [MCP](https://modelcontextprotocol.io) server that gives an LLM client (Claude Code, Claude Desktop, Cursor, …) the ability to drive a [mindspace](https://www.mindspace.casa) workspace — create whiteboard projects (optionally seeded with an Excalidraw scene), spin up doc projects, upload markdown documents, build spreadsheets with formulas, and read back text-anchored comment threads.
 
 > **Most people don't need anything in this directory.** mindspace already hosts the MCP server at `https://www.mindspace.casa/mcp`. The instructions below cover the hosted (HTTP) flow first, and the local stdio binary second for when you need it (local dev, corp networks that block the domain, etc.).
 
@@ -9,9 +9,13 @@ An [MCP](https://modelcontextprotocol.io) server that gives an LLM client (Claud
 | Tool                        | What it does                                                                                 |
 | --------------------------- | -------------------------------------------------------------------------------------------- |
 | `list_workspaces`           | Workspaces this token can access (call this first).                                          |
-| `list_projects`             | Projects in a workspace. Optional `kind` filter (`whiteboard` or `doc`).                     |
+| `list_projects`             | Projects in a workspace. Optional `kind` filter (`whiteboard` / `doc` / `todo` / `sheet`).   |
 | `create_whiteboard_project` | New whiteboard project. Optional Excalidraw `scene` JSON to pre-fill it.                     |
 | `create_doc_project`        | New doc project (a folder for markdown documents).                                           |
+| `create_todo_project`       | New todo-list project (nested checklists on a canvas).                                       |
+| `create_sheet_project`      | New spreadsheet project (a workbook of cells, formulas, and tabs).                           |
+| `get_sheet`                 | Read a spreadsheet's tabs + cells with raw input, computed value, and display string.        |
+| `set_sheet_cells`           | Write literals or `=formulas` to cells by A1 address; returns the recomputed sheet.          |
 | `list_documents`            | Markdown files in a doc project.                                                             |
 | `upload_markdown`           | Upload a NEW `.md` file (as `name` + `content`) into a doc project.                          |
 | `update_markdown`           | Refresh an existing document in place — preserves comment threads; anchors drift gracefully. |
@@ -141,4 +145,4 @@ curl -X POST -H "Authorization: Bearer mind_..." -H "Content-Type: application/j
   https://www.mindspace.casa/mcp
 ```
 
-Should return all 7 tools with their JSON-Schema input specs.
+Should return the full tool list with their JSON-Schema input specs.

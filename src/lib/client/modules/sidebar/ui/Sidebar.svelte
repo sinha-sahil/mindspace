@@ -410,7 +410,9 @@
 					? 'Doc project created'
 					: kind === 'todo'
 						? 'Todo list created'
-						: 'Project created';
+						: kind === 'sheet'
+							? 'Spreadsheet created'
+							: 'Project created';
 			toasts.success(label, {
 				description: created.name
 			});
@@ -755,6 +757,17 @@
 								<span class="kind-hint">Nested checklists with columns</span>
 							</span>
 						</button>
+						<button
+							type="button"
+							class="popover-item kind-item"
+							onclick={() => createProjectOfKind('sheet')}
+						>
+							<span class="popover-icon"><Icon name="table" size={14} /></span>
+							<span class="kind-text">
+								<span class="popover-item-text">Spreadsheet</span>
+								<span class="kind-hint">Cells, formulas &amp; functions</span>
+							</span>
+						</button>
 					</div>
 				{/if}
 			</div>
@@ -838,6 +851,10 @@
 								{:else if project.kind === 'todo'}
 									<span class="kind-icon" aria-hidden="true">
 										<Icon name="list" size={11} />
+									</span>
+								{:else if project.kind === 'sheet'}
+									<span class="kind-icon" aria-hidden="true">
+										<Icon name="table" size={11} />
 									</span>
 								{:else}
 									<span class="dot" aria-hidden="true"></span>
