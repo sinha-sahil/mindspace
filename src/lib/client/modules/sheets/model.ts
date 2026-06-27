@@ -16,6 +16,7 @@
  */
 
 export type Align = 'left' | 'center' | 'right';
+export type VAlign = 'top' | 'middle' | 'bottom';
 
 /**
  * How a numeric cell value is displayed. 'auto' shows numbers as-is and lets
@@ -26,12 +27,19 @@ export type NumberFormat =
 	| 'number'
 	| 'integer'
 	| 'currency'
+	| 'accounting'
 	| 'percent'
 	| 'scientific'
 	| 'date'
 	| 'datetime'
 	| 'time'
+	| 'duration'
 	| 'text';
+
+export type BorderStyle = 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double';
+export type Border = { style: BorderStyle; color: string };
+/** Per-side cell borders. */
+export type Borders = { top?: Border; right?: Border; bottom?: Border; left?: Border };
 
 export type CellFormat = {
 	bold?: boolean;
@@ -39,13 +47,48 @@ export type CellFormat = {
 	underline?: boolean;
 	strike?: boolean;
 	align?: Align;
+	/** Vertical alignment within the row. Default 'middle'. */
+	valign?: VAlign;
 	/** Text color (any CSS color string). */
 	color?: string;
 	/** Background fill (any CSS color string). */
 	bg?: string;
+	/** Font family (a value from FONT_FAMILIES). */
+	font?: string;
+	/** Font size in px. */
+	size?: number;
+	/** Left indent level (each level ≈ 12px). */
+	indent?: number;
 	numFmt?: NumberFormat;
+	/** Decimal-place override for number/currency/percent/accounting formats. */
+	decimals?: number;
+	/** Per-side borders. */
+	borders?: Borders;
 	wrap?: boolean;
 };
+
+/** A merged block of cells. The top-left ("anchor") holds the value. */
+export type MergeRange = { r1: number; c1: number; r2: number; c2: number };
+
+/** Font families offered in the toolbar (CSS stacks resolved in the UI). */
+export const FONT_FAMILIES = [
+	'Default',
+	'Sans Serif',
+	'Serif',
+	'Monospace',
+	'Geist',
+	'Inter',
+	'Georgia',
+	'Times New Roman',
+	'Courier New',
+	'Arial'
+];
+
+export const FONT_SIZES = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 36];
+export const DEFAULT_FONT_SIZE = 13;
+export const MIN_FONT_SIZE = 6;
+export const MAX_FONT_SIZE = 96;
+export const MAX_INDENT = 10;
 
 export type Cell = {
 	/** Raw user input: a literal or a formula starting with '='. */
@@ -69,6 +112,8 @@ export type Sheet = {
 	/** Count of frozen header rows / columns (kept pinned while scrolling). */
 	frozenRows: number;
 	frozenCols: number;
+	/** Merged cell blocks. */
+	merges: MergeRange[];
 };
 
 export type SheetBook = {
@@ -96,13 +141,17 @@ const NUMBER_FORMATS: NumberFormat[] = [
 	'number',
 	'integer',
 	'currency',
+	'accounting',
 	'percent',
 	'scientific',
 	'date',
 	'datetime',
 	'time',
+	'duration',
 	'text'
 ];
+
+const BORDER_STYLES: BorderStyle[] = ['thin', 'medium', 'thick', 'dashed', 'dotted', 'double'];
 
 // ----- id helper (mirrors todos/board.ts) -----
 
@@ -191,6 +240,7 @@ export function newSheet(name = 'Sheet1', rows = DEFAULT_ROWS, cols = DEFAULT_CO
 		rows,
 		cols,
 		cells: {},
+		merges: [],
 		colWidths: {},
 		rowHeights: {},
 		frozenRows: 0,
@@ -223,6 +273,41 @@ function toNumberFormat(value: unknown): NumberFormat | null {
 	return null;
 }
 
+function toBorderStyle(value: unknown): BorderStyle {
+	for (const s of BORDER_STYLES) {
+		if (s === value) {
+			return s;
+		}
+	}
+	return 'thin';
+}
+
+function normalizeBorder(raw: unknown): Border | null {
+	if (typeof raw !== 'object' || raw === null) {
+		return null;
+	}
+	const style = 'style' in raw ? toBorderStyle(raw.style) : 'thin';
+	const color =
+		'color' in raw && typeof raw.color === 'string' && raw.color ? raw.color : '#9ca3af';
+	return { style, color };
+}
+
+function normalizeBorders(raw: unknown): Borders | null {
+	if (typeof raw !== 'object' || raw === null) {
+		return null;
+	}
+	const b: Borders = {};
+	for (const [k, v] of Object.entries(raw)) {
+		if (k === 'top' || k === 'right' || k === 'bottom' || k === 'left') {
+			const border = normalizeBorder(v);
+			if (border) {
+				b[k] = border;
+			}
+		}
+	}
+	return Object.keys(b).length > 0 ? b : null;
+}
+
 function normalizeFormat(raw: unknown): CellFormat | null {
 	if (typeof raw !== 'object' || raw === null) {
 		return null;
@@ -246,16 +331,50 @@ function normalizeFormat(raw: unknown): CellFormat | null {
 	if ('align' in raw && (raw.align === 'left' || raw.align === 'center' || raw.align === 'right')) {
 		f.align = raw.align;
 	}
+	if (
+		'valign' in raw &&
+		(raw.valign === 'top' || raw.valign === 'middle' || raw.valign === 'bottom')
+	) {
+		f.valign = raw.valign;
+	}
 	if ('color' in raw && typeof raw.color === 'string' && raw.color) {
 		f.color = raw.color;
 	}
 	if ('bg' in raw && typeof raw.bg === 'string' && raw.bg) {
 		f.bg = raw.bg;
 	}
+	if ('font' in raw && typeof raw.font === 'string' && raw.font) {
+		f.font = raw.font;
+	}
+	if ('size' in raw && typeof raw.size === 'number' && Number.isFinite(raw.size)) {
+		f.size = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(raw.size)));
+	}
+	if (
+		'indent' in raw &&
+		typeof raw.indent === 'number' &&
+		Number.isFinite(raw.indent) &&
+		raw.indent > 0
+	) {
+		f.indent = Math.min(MAX_INDENT, Math.round(raw.indent));
+	}
+	if (
+		'decimals' in raw &&
+		typeof raw.decimals === 'number' &&
+		Number.isFinite(raw.decimals) &&
+		raw.decimals >= 0
+	) {
+		f.decimals = Math.min(10, Math.round(raw.decimals));
+	}
 	if ('numFmt' in raw) {
 		const nf = toNumberFormat(raw.numFmt);
 		if (nf) {
 			f.numFmt = nf;
+		}
+	}
+	if ('borders' in raw) {
+		const borders = normalizeBorders(raw.borders);
+		if (borders) {
+			f.borders = borders;
 		}
 	}
 	return Object.keys(f).length > 0 ? f : null;
@@ -344,8 +463,47 @@ function normalizeSheet(raw: unknown): Sheet | null {
 			MAX_ROW_HEIGHT
 		),
 		frozenRows: clampInt('frozenRows' in raw ? raw.frozenRows : null, 0, rows, 0),
-		frozenCols: clampInt('frozenCols' in raw ? raw.frozenCols : null, 0, cols, 0)
+		frozenCols: clampInt('frozenCols' in raw ? raw.frozenCols : null, 0, cols, 0),
+		merges: normalizeMerges('merges' in raw ? raw.merges : null, rows, cols)
 	};
+}
+
+function normalizeMerges(raw: unknown, rows: number, cols: number): MergeRange[] {
+	if (!Array.isArray(raw)) {
+		return [];
+	}
+	const out: MergeRange[] = [];
+	for (const m of raw) {
+		if (typeof m !== 'object' || m === null) {
+			continue;
+		}
+		const r1 = clampInt('r1' in m ? m.r1 : null, 0, rows - 1, -1);
+		const c1 = clampInt('c1' in m ? m.c1 : null, 0, cols - 1, -1);
+		const r2 = clampInt('r2' in m ? m.r2 : null, 0, rows - 1, -1);
+		const c2 = clampInt('c2' in m ? m.c2 : null, 0, cols - 1, -1);
+		if (r1 < 0 || c1 < 0 || r2 < 0 || c2 < 0) {
+			continue;
+		}
+		const norm = {
+			r1: Math.min(r1, r2),
+			c1: Math.min(c1, c2),
+			r2: Math.max(r1, r2),
+			c2: Math.max(c1, c2)
+		};
+		// Skip 1x1 "merges" and any that overlap an already-accepted block.
+		if (norm.r1 === norm.r2 && norm.c1 === norm.c2) {
+			continue;
+		}
+		if (out.some((e) => mergesOverlap(e, norm))) {
+			continue;
+		}
+		out.push(norm);
+	}
+	return out;
+}
+
+function mergesOverlap(a: MergeRange, b: MergeRange): boolean {
+	return a.r1 <= b.r2 && a.r2 >= b.r1 && a.c1 <= b.c2 && a.c2 >= b.c1;
 }
 
 export function normalizeBook(raw: unknown): SheetBook {
@@ -488,14 +646,40 @@ function cleanFormat(f: CellFormat): CellFormat | null {
 	if (f.align && f.align !== 'left') {
 		out.align = f.align;
 	}
+	if (f.valign && f.valign !== 'middle') {
+		out.valign = f.valign;
+	}
 	if (f.color) {
 		out.color = f.color;
 	}
 	if (f.bg) {
 		out.bg = f.bg;
 	}
+	if (f.font && f.font !== 'Default') {
+		out.font = f.font;
+	}
+	if (f.size && f.size !== DEFAULT_FONT_SIZE) {
+		out.size = f.size;
+	}
+	if (f.indent && f.indent > 0) {
+		out.indent = f.indent;
+	}
+	if (typeof f.decimals === 'number' && f.decimals >= 0) {
+		out.decimals = f.decimals;
+	}
 	if (f.numFmt && f.numFmt !== 'auto') {
 		out.numFmt = f.numFmt;
+	}
+	if (f.borders) {
+		const b: Borders = {};
+		for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+			if (f.borders[side]) {
+				b[side] = f.borders[side];
+			}
+		}
+		if (Object.keys(b).length > 0) {
+			out.borders = b;
+		}
 	}
 	return Object.keys(out).length > 0 ? out : null;
 }
@@ -565,6 +749,75 @@ function growToFit(sheet: Sheet, row: number, col: number): void {
 	if (col + 1 > sheet.cols) {
 		sheet.cols = Math.min(MAX_COLS, col + 1);
 	}
+}
+
+// ============================================================
+// merged cells
+// ============================================================
+
+export function inRange(r: number, c: number, m: MergeRange): boolean {
+	return r >= m.r1 && r <= m.r2 && c >= m.c1 && c <= m.c2;
+}
+
+/** The merge block covering (row,col), or null. */
+export function findMerge(sheet: Sheet, row: number, col: number): MergeRange | null {
+	for (const m of sheet.merges) {
+		if (inRange(row, col, m)) {
+			return m;
+		}
+	}
+	return null;
+}
+
+/** True when (row,col) is the top-left anchor of a merge. */
+export function isMergeAnchor(sheet: Sheet, row: number, col: number): boolean {
+	return sheet.merges.some((m) => m.r1 === row && m.c1 === col);
+}
+
+/** True when (row,col) is hidden under a merge (covered but not the anchor). */
+export function isCovered(sheet: Sheet, row: number, col: number): boolean {
+	const m = findMerge(sheet, row, col);
+	return m !== null && !(m.r1 === row && m.c1 === col);
+}
+
+/**
+ * Merge the inclusive range into one block. Like Sheets, only the top-left
+ * cell keeps its content; covered cells are cleared. Any merges overlapping the
+ * new range are removed first.
+ */
+export function mergeCells(sheet: Sheet, r1: number, c1: number, r2: number, c2: number): void {
+	const block: MergeRange = {
+		r1: Math.min(r1, r2),
+		c1: Math.min(c1, c2),
+		r2: Math.max(r1, r2),
+		c2: Math.max(c1, c2)
+	};
+	if (block.r1 === block.r2 && block.c1 === block.c2) {
+		return;
+	}
+	sheet.merges = sheet.merges.filter((m) => !mergesOverlap(m, block));
+	// Clear everything except the anchor.
+	for (let r = block.r1; r <= block.r2; r++) {
+		for (let c = block.c1; c <= block.c2; c++) {
+			if (r === block.r1 && c === block.c1) {
+				continue;
+			}
+			delete sheet.cells[cellKey(r, c)];
+		}
+	}
+	sheet.merges.push(block);
+	growToFit(sheet, block.r2, block.c2);
+}
+
+/** Remove any merge overlapping the given range (unmerge). */
+export function unmergeRange(sheet: Sheet, r1: number, c1: number, r2: number, c2: number): void {
+	const block: MergeRange = {
+		r1: Math.min(r1, r2),
+		c1: Math.min(c1, c2),
+		r2: Math.max(r1, r2),
+		c2: Math.max(c1, c2)
+	};
+	sheet.merges = sheet.merges.filter((m) => !mergesOverlap(m, block));
 }
 
 // ----- sheet (tab) operations -----

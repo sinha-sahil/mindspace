@@ -6,11 +6,14 @@
 		colWidth,
 		rowHeight,
 		selectSheet,
+		isCovered,
+		isMergeAnchor,
 		colToLetter,
 		HEADER_WIDTH,
 		type Sheet
 	} from '../model';
 	import { Engine } from '../engine';
+	import { formatCss } from '../style';
 
 	type Props = {
 		/** Serialized workbook JSON (same shape stored in project.scene). */
@@ -41,34 +44,39 @@
 		return w;
 	});
 
+	const GRID_HEADER_H = 26;
+	const colLefts = $derived.by(() => {
+		const a = [HEADER_WIDTH];
+		for (let c = 0; c < shown.cols; c++) {
+			a.push(a[a.length - 1] + colWidth(shown, c));
+		}
+		return a;
+	});
+	const rowTops = $derived.by(() => {
+		const a = [GRID_HEADER_H];
+		for (let r = 0; r < shown.rows; r++) {
+			a.push(a[a.length - 1] + rowHeight(shown, r));
+		}
+		return a;
+	});
+	function leftOf(c: number): number {
+		return colLefts[Math.max(0, Math.min(c, colLefts.length - 1))];
+	}
+	function topOf(r: number): number {
+		return rowTops[Math.max(0, Math.min(r, rowTops.length - 1))];
+	}
+	const mergeBlocks = $derived(
+		shown.merges.map((m) => ({
+			m,
+			left: leftOf(m.c1),
+			top: topOf(m.r1),
+			width: leftOf(m.c2 + 1) - leftOf(m.c1),
+			height: topOf(m.r2 + 1) - topOf(m.r1)
+		}))
+	);
+
 	function cellStyle(s: Sheet, r: number, c: number): string {
-		const f = getCell(s, r, c)?.f;
-		let style = `width:${colWidth(s, c)}px;`;
-		if (!f) {
-			return style;
-		}
-		if (f.bold) {
-			style += 'font-weight:600;';
-		}
-		if (f.italic) {
-			style += 'font-style:italic;';
-		}
-		if (f.underline || f.strike) {
-			style += `text-decoration:${[f.underline ? 'underline' : '', f.strike ? 'line-through' : ''].filter(Boolean).join(' ')};`;
-		}
-		if (f.align) {
-			style += `text-align:${f.align};justify-content:${f.align === 'center' ? 'center' : f.align === 'right' ? 'flex-end' : 'flex-start'};`;
-		}
-		if (f.color) {
-			style += `color:${f.color};`;
-		}
-		if (f.bg) {
-			style += `background:${f.bg};`;
-		}
-		if (f.wrap) {
-			style += 'white-space:normal;';
-		}
-		return style;
+		return `width:${colWidth(s, c)}px;` + formatCss(getCell(s, r, c)?.f ?? null);
 	}
 </script>
 
@@ -85,10 +93,24 @@
 				<div class="grid-row" style="height:{rowHeight(shown, r)}px">
 					<div class="row-head" style="width:{HEADER_WIDTH}px">{r + 1}</div>
 					{#each Array(shown.cols) as _, c (c)}
-						<div class="cell" style={cellStyle(shown, r, c)}>
-							<span class="cell-text">{engine.display(shown.id, r, c)}</span>
+						{@const merged = isCovered(shown, r, c) || isMergeAnchor(shown, r, c)}
+						<div class="cell" class:merged style={cellStyle(shown, r, c)}>
+							{#if !merged}
+								<span class="cell-text">{engine.display(shown.id, r, c)}</span>
+							{/if}
 						</div>
 					{/each}
+				</div>
+			{/each}
+
+			{#each mergeBlocks as mb (mb.m.r1 + ':' + mb.m.c1)}
+				<div
+					class="merge-cell"
+					style="left:{mb.left}px;top:{mb.top}px;width:{mb.width}px;height:{mb.height}px;{formatCss(
+						getCell(shown, mb.m.r1, mb.m.c1)?.f ?? null
+					)}"
+				>
+					<span class="cell-text">{engine.display(shown.id, mb.m.r1, mb.m.c1)}</span>
 				</div>
 			{/each}
 		</div>
@@ -194,6 +216,22 @@
 		text-overflow: ellipsis;
 		min-width: 0;
 		width: 100%;
+	}
+	.merge-cell {
+		position: absolute;
+		display: flex;
+		align-items: center;
+		padding: 0 5px;
+		font-size: 13px;
+		color: var(--geist-foreground);
+		background: var(--surface);
+		border-right: 1px solid var(--border);
+		border-bottom: 1px solid var(--border);
+		overflow: hidden;
+		white-space: nowrap;
+		box-sizing: border-box;
+		/* Below the sticky row-number gutter (z-index 2) so it doesn't paint over it. */
+		z-index: 1;
 	}
 	.tabbar {
 		display: flex;

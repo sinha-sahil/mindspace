@@ -350,4 +350,8 @@ describe('translateFormula shifts cross-sheet references', () => {
 		expect(translateFormula('=$A$1', 1, 1)).toBe('=$A$1');
 		expect(translateFormula('=A1', 1, 0)).toBe('=A2');
 	});
+	it('preserves single-quoted sheet names containing ref-like tokens', () => {
+		expect(translateFormula("='Plan B2'!A1", 1, 0)).toBe("='Plan B2'!A2");
+		expect(translateFormula("='Sheet A1'!B2+C3", 1, 0)).toBe("='Sheet A1'!B3+C4");
+	});
 });

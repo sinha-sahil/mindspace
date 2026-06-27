@@ -815,8 +815,10 @@ export class Engine {
 			return '';
 		}
 		const value = this.getValue(sheetId, row, col);
-		const fmt = sheet?.cells[cellKey(row, col)]?.f?.numFmt ?? null;
-		return formatValue(value, fmt);
+		const f = sheet?.cells[cellKey(row, col)]?.f;
+		const fmt = f?.numFmt ?? null;
+		const decimals = typeof f?.decimals === 'number' ? f.decimals : null;
+		return formatValue(value, fmt, decimals);
 	}
 }
 
@@ -1795,8 +1797,15 @@ function pad2(n: number): string {
 	return n < 10 ? '0' + n : String(n);
 }
 
-/** Render a computed value as the string the grid shows, honouring numFmt. */
-export function formatValue(value: CellValue, fmt: string | null): string {
+/**
+ * Render a computed value as the string the grid shows, honouring numFmt and an
+ * optional decimal-place override (for the increase/decrease-decimals controls).
+ */
+export function formatValue(
+	value: CellValue,
+	fmt: string | null,
+	decimals: number | null = null
+): string {
 	if (value instanceof FormulaError) {
 		return value.code;
 	}
@@ -1808,19 +1817,38 @@ export function formatValue(value: CellValue, fmt: string | null): string {
 	}
 	// number
 	const n = value;
+	const dp = (fallback: number) => (decimals === null ? fallback : decimals);
 	switch (fmt) {
 		case 'integer':
-			return groupThousands(Math.round(n).toString());
+			return groupThousands(n.toFixed(dp(0)));
 		case 'number':
-			return groupThousands(n.toFixed(2));
+			return groupThousands(n.toFixed(dp(2)));
 		case 'currency':
-			return (n < 0 ? '-$' : '$') + groupThousands(Math.abs(n).toFixed(2));
-		case 'percent':
-			return (n * 100).toFixed(2).replace(/\.00$/, '') + '%';
+			return (n < 0 ? '-$' : '$') + groupThousands(Math.abs(n).toFixed(dp(2)));
+		case 'accounting': {
+			// Accounting: currency symbol left-aligned feel, negatives in parens.
+			const body = '$' + groupThousands(Math.abs(n).toFixed(dp(2)));
+			return n < 0 ? `(${body})` : body;
+		}
+		case 'percent': {
+			const s = groupThousands((n * 100).toFixed(dp(2)));
+			// Default percent hides a trailing ".00" for a clean 50% (not 50.00%).
+			return (decimals === null ? s.replace(/\.00$/, '') : s) + '%';
+		}
 		case 'scientific':
-			return n.toExponential(2);
+			return n.toExponential(dp(2));
 		case 'text':
 			return numberToString(n);
+		case 'duration': {
+			// Elapsed time h:mm:ss from a serial fraction (days).
+			const totalSec = Math.round(n * 86400);
+			const sign = totalSec < 0 ? '-' : '';
+			const s = Math.abs(totalSec);
+			const h = Math.floor(s / 3600);
+			const m = Math.floor((s % 3600) / 60);
+			const sec = s % 60;
+			return `${sign}${h}:${pad2(m)}:${pad2(sec)}`;
+		}
 		case 'date': {
 			const d = serialToDate(n);
 			return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
@@ -1834,13 +1862,37 @@ export function formatValue(value: CellValue, fmt: string | null): string {
 			return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
 		}
 		default:
-			return numberToString(n);
+			return decimals === null ? numberToString(n) : groupThousands(n.toFixed(decimals));
 	}
 }
 
 // ============================================================
 // relative reference translation (copy / paste / fill)
 // ============================================================
+
+/**
+ * Copy a quoted literal (double- or single-quoted) verbatim from `body` starting
+ * at the opening quote `start`, treating a doubled quote as an escape. Emits each
+ * character through `emit` and returns the index just past the closing quote.
+ */
+function copyQuoted(body: string, start: number, q: string, emit: (s: string) => void): number {
+	emit(q);
+	let i = start + 1;
+	while (i < body.length) {
+		emit(body[i]);
+		if (body[i] === q && body[i + 1] === q) {
+			emit(body[i + 1]);
+			i += 2;
+			continue;
+		}
+		if (body[i] === q) {
+			i++;
+			break;
+		}
+		i++;
+	}
+	return i;
+}
 
 /**
  * Shift the relative parts of every A1 reference in a formula by (dRow, dCol).
@@ -1858,21 +1910,13 @@ export function translateFormula(formula: string, dRow: number, dCol: number): s
 		const c = body[i];
 		// skip double-quoted string literals verbatim
 		if (c === '"') {
-			out += c;
-			i++;
-			while (i < body.length) {
-				out += body[i];
-				if (body[i] === '"' && body[i + 1] === '"') {
-					out += body[i + 1];
-					i += 2;
-					continue;
-				}
-				if (body[i] === '"') {
-					i++;
-					break;
-				}
-				i++;
-			}
+			i = copyQuoted(body, i, '"', (s) => (out += s));
+			continue;
+		}
+		// skip single-quoted sheet names verbatim (e.g. 'Plan B2'!A1) so ref-like
+		// substrings inside the name aren't mistaken for cell references.
+		if (c === "'") {
+			i = copyQuoted(body, i, "'", (s) => (out += s));
 			continue;
 		}
 		// a possible A1 token (preceded by a non-identifier char). '!' is NOT an
@@ -1900,6 +1944,110 @@ export function translateFormula(formula: string, dRow: number, dCol: number): s
 			} else {
 				out += (absCol ? '$' : '') + colToLetter(newCol) + (absRow ? '$' : '') + (newRow + 1);
 			}
+			i += m[0].length;
+			continue;
+		}
+		out += c;
+		i++;
+	}
+	return out;
+}
+
+/**
+ * Rewrite every SAME-SHEET (unqualified) reference in a formula by mapping its
+ * row and column through `rowMap`/`colMap`. A map returning null means the
+ * reference's row/col was deleted → the ref becomes #REF!. Sheet-qualified
+ * refs (Sheet2!A1) and quoted strings are left untouched. Used by insert/delete
+ * row/column so formulas in the edited sheet keep pointing at the right cells.
+ */
+export function remapSameSheetRefs(
+	formula: string,
+	rowMap: (row: number) => number | null,
+	colMap: (col: number) => number | null
+): string {
+	if (!formula.startsWith('=')) {
+		return formula;
+	}
+	const single = (row: number, col: number, absRow: boolean, absCol: boolean): string => {
+		const nc = colMap(col);
+		const nr = rowMap(row);
+		if (nc === null || nr === null || nc < 0 || nr < 0) {
+			return ERR_REF;
+		}
+		return (absCol ? '$' : '') + colToLetter(nc) + (absRow ? '$' : '') + (nr + 1);
+	};
+	let out = '=';
+	const body = formula.slice(1);
+	let i = 0;
+	while (i < body.length) {
+		const c = body[i];
+		if (c === '"') {
+			i = copyQuoted(body, i, '"', (s) => (out += s));
+			continue;
+		}
+		if (c === "'") {
+			i = copyQuoted(body, i, "'", (s) => (out += s));
+			continue;
+		}
+		const m = /^(\$?)([A-Za-z]{1,3})(\$?)(\d+)/.exec(body.slice(i));
+		const prev = out.length > 0 ? out[out.length - 1] : '';
+		// '!' IS treated as an identifier char here, so refs after a sheet
+		// qualifier (other-sheet refs) are skipped — only same-sheet refs remap.
+		const prevIsIdent = /[A-Za-z0-9_$.!']/.test(prev);
+		const ref = m ? parseA1(m[0]) : null;
+		const nextCh = m ? body[i + m[0].length] : '';
+		if (m && ref && !prevIsIdent && nextCh !== '(' && nextCh !== '!') {
+			// A range `<ref>:<ref>` is remapped as a unit: deleting a band that
+			// covers one endpoint CONTRACTS the range (A2:A5 minus row 2 → A2:A4)
+			// rather than poisoning an endpoint with #REF! (which Sheets only does
+			// when the whole range is gone).
+			if (nextCh === ':') {
+				const after = body.slice(i + m[0].length + 1);
+				const m2 = /^(\$?)([A-Za-z]{1,3})(\$?)(\d+)/.exec(after);
+				const ref2 = m2 ? parseA1(m2[0]) : null;
+				const nextCh2 = m2 ? after[m2[0].length] : '';
+				if (m2 && ref2 && nextCh2 !== '(' && nextCh2 !== '!') {
+					const rowsLo = Math.min(ref.row, ref2.row);
+					const rowsHi = Math.max(ref.row, ref2.row);
+					const colsLo = Math.min(ref.col, ref2.col);
+					const colsHi = Math.max(ref.col, ref2.col);
+					const rows: number[] = [];
+					for (let r = rowsLo; r <= rowsHi; r++) {
+						const nr = rowMap(r);
+						if (nr !== null && nr >= 0) {
+							rows.push(nr);
+						}
+					}
+					const cols: number[] = [];
+					for (let cc = colsLo; cc <= colsHi; cc++) {
+						const ncc = colMap(cc);
+						if (ncc !== null && ncc >= 0) {
+							cols.push(ncc);
+						}
+					}
+					if (rows.length === 0 || cols.length === 0) {
+						out += `${ERR_REF}:${ERR_REF}`;
+					} else {
+						const nr1 = Math.min(...rows);
+						const nr2 = Math.max(...rows);
+						const nc1 = Math.min(...cols);
+						const nc2 = Math.max(...cols);
+						out +=
+							(ref.absCol ? '$' : '') +
+							colToLetter(nc1) +
+							(ref.absRow ? '$' : '') +
+							(nr1 + 1) +
+							':' +
+							(ref2.absCol ? '$' : '') +
+							colToLetter(nc2) +
+							(ref2.absRow ? '$' : '') +
+							(nr2 + 1);
+					}
+					i += m[0].length + 1 + m2[0].length;
+					continue;
+				}
+			}
+			out += single(ref.row, ref.col, ref.absRow, ref.absCol);
 			i += m[0].length;
 			continue;
 		}

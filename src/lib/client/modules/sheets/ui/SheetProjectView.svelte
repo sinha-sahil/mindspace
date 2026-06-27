@@ -12,6 +12,7 @@
 		setCellRaw,
 		updateCellFormat,
 		clearRangeContents,
+		clearRangeAll,
 		setColWidth,
 		setRowHeight,
 		colWidth,
@@ -22,15 +23,32 @@
 		removeSheet as removeSheetTab,
 		renameSheet as renameSheetTab,
 		selectSheet as selectSheetTab,
+		findMerge,
+		isCovered,
+		isMergeAnchor,
+		mergeCells,
+		unmergeRange,
+		cellKey,
+		parseKey,
 		colToLetter,
 		toA1,
 		HEADER_WIDTH,
+		DEFAULT_ROW_HEIGHT,
+		FONT_FAMILIES,
+		FONT_SIZES,
+		DEFAULT_FONT_SIZE,
+		MAX_INDENT,
 		type SheetBook,
 		type CellFormat,
 		type NumberFormat,
-		type Align
+		type Align,
+		type VAlign,
+		type BorderStyle,
+		type Border
 	} from '../model';
+	import { insertRows, deleteRows, insertCols, deleteCols, fillRange } from '../ops';
 	import { Engine, translateFormula } from '../engine';
+	import { formatCss, fontStack } from '../style';
 
 	type Props = {
 		project: Project;
@@ -121,8 +139,17 @@
 	}
 
 	function setActive(r: number, c: number, extend: boolean) {
-		const row = Math.min(sheet.rows - 1, Math.max(0, r));
-		const col = Math.min(sheet.cols - 1, Math.max(0, c));
+		let row = Math.min(sheet.rows - 1, Math.max(0, r));
+		let col = Math.min(sheet.cols - 1, Math.max(0, c));
+		// Landing inside a merge snaps the active cell to its top-left anchor so
+		// you never sit on a hidden covered cell.
+		if (!extend) {
+			const m = findMerge(sheet, row, col);
+			if (m) {
+				row = m.r1;
+				col = m.c1;
+			}
+		}
 		sel.ar = row;
 		sel.ac = col;
 		if (!extend) {
@@ -132,7 +159,24 @@
 		scrollActiveIntoView();
 	}
 	function moveActive(dr: number, dc: number, extend: boolean) {
-		setActive(sel.ar + dr, sel.ac + dc, extend);
+		// Step out from the far edge of the current merge so one keypress crosses
+		// the whole block instead of getting stuck inside it.
+		const m = findMerge(sheet, sel.ar, sel.ac);
+		let r = sel.ar + dr;
+		let c = sel.ac + dc;
+		if (m) {
+			if (dr > 0) {
+				r = m.r2 + dr;
+			} else if (dr < 0) {
+				r = m.r1 + dr;
+			}
+			if (dc > 0) {
+				c = m.c2 + dc;
+			} else if (dc < 0) {
+				c = m.c1 + dc;
+			}
+		}
+		setActive(r, c, extend);
 	}
 
 	function inRange(r: number, c: number): boolean {
@@ -154,16 +198,25 @@
 	let editValue = $state('');
 	let editSource = $state<'grid' | 'bar'>('grid');
 	let selectAllOnFocus = $state(false);
+	// The selection captured at edit-start (before it collapses), so Ctrl+Enter
+	// can fill the whole originally-selected range.
+	let editRange = $state<{ r1: number; c1: number; r2: number; c2: number } | null>(null);
 
 	function startEdit(r: number, c: number, initial: string | null = null) {
+		// Capture the multi-cell selection before setActive collapses it.
+		editRange = { r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2 };
 		setActive(r, c, false);
-		editing = { r, c };
+		// setActive may have snapped onto a merge anchor — edit the cell we landed
+		// on, never a hidden covered cell.
+		const er = sel.ar;
+		const ec = sel.ac;
+		editing = { r: er, c: ec };
 		editSource = 'grid';
 		if (initial !== null) {
 			editValue = initial;
 			selectAllOnFocus = false;
 		} else {
-			editValue = getRaw(sheet, r, c);
+			editValue = getRaw(sheet, er, ec);
 			selectAllOnFocus = true;
 		}
 	}
@@ -209,7 +262,14 @@
 	};
 
 	function onEditorKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+			// Ctrl/Cmd+Enter fills the typed entry across the whole selection.
+			e.preventDefault();
+			const value = editValue;
+			editing = null;
+			fillSelectionWith(value);
+			gridScrollEl?.focus();
+		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			commitEdit(e.shiftKey ? -1 : 1, 0);
 		} else if (e.key === 'Tab') {
@@ -266,6 +326,33 @@
 			sel.ac = sheet.cols - 1;
 			return;
 		}
+		if (mod && (k === 'd' || k === 'D')) {
+			e.preventDefault();
+			fillDown();
+			return;
+		}
+		if (mod && (k === 'r' || k === 'R')) {
+			e.preventDefault();
+			fillRight();
+			return;
+		}
+		if (mod && (k === 'f' || k === 'F')) {
+			e.preventDefault();
+			openFind();
+			return;
+		}
+		if (mod && e.shiftKey && (k === 'v' || k === 'V')) {
+			e.preventDefault();
+			pasteSpecial('values');
+			return;
+		}
+		if (mod && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+			e.preventDefault();
+			const dr = k === 'ArrowUp' ? -1 : k === 'ArrowDown' ? 1 : 0;
+			const dc = k === 'ArrowLeft' ? -1 : k === 'ArrowRight' ? 1 : 0;
+			dataEdge(dr, dc, e.shiftKey);
+			return;
+		}
 		if (mod && k === 'Home') {
 			e.preventDefault();
 			setActive(0, 0, e.shiftKey);
@@ -307,12 +394,30 @@
 				break;
 			case 'Escape':
 				e.preventDefault();
-				sel.fr = sel.ar;
-				sel.fc = sel.ac;
+				if (painter) {
+					painter = null;
+				} else if (ctx) {
+					ctx = null;
+				} else {
+					sel.fr = sel.ar;
+					sel.fc = sel.ac;
+				}
 				break;
 			case 'Home':
 				e.preventDefault();
 				setActive(sel.ar, 0, e.shiftKey);
+				break;
+			case 'End':
+				e.preventDefault();
+				setActive(sel.ar, sheet.cols - 1, e.shiftKey);
+				break;
+			case 'PageDown':
+				e.preventDefault();
+				moveActive(visibleRowCount(), 0, e.shiftKey);
+				break;
+			case 'PageUp':
+				e.preventDefault();
+				moveActive(-visibleRowCount(), 0, e.shiftKey);
 				break;
 			default:
 				// A printable key starts editing with that character.
@@ -333,6 +438,12 @@
 			commitEdit(0, 0);
 		}
 		setActive(r, c, e.shiftKey);
+		// Format painter: if armed, paint the captured format onto this cell/range.
+		if (painter && !e.shiftKey) {
+			applyPainter();
+			gridScrollEl?.focus();
+			return;
+		}
 		selecting = true;
 		gridScrollEl?.focus();
 	}
@@ -368,9 +479,9 @@
 	}
 
 	// ----- clipboard -----
-	type ClipCell = { v: string; f?: CellFormat };
-	let clipboard: { r1: number; c1: number; r2: number; c2: number; cells: ClipCell[][] } | null =
-		null;
+	type ClipCell = { v: string; f?: CellFormat; display: string };
+	type Clip = { r1: number; c1: number; r2: number; c2: number; cells: ClipCell[][] };
+	let clipboard = $state<Clip | null>(null);
 	let lastCopyText = '';
 
 	function rangeTsv(): string {
@@ -390,7 +501,7 @@
 			const line: ClipCell[] = [];
 			for (let c = range.c1; c <= range.c2; c++) {
 				const cell = getCell(sheet, r, c);
-				line.push({ v: cell?.v ?? '', f: cell?.f });
+				line.push({ v: cell?.v ?? '', f: cell?.f, display: engine.display(sheet.id, r, c) });
 			}
 			cells.push(line);
 		}
@@ -440,9 +551,8 @@
 						const destC = baseC + j;
 						const value = src.v.startsWith('=') ? translateFormula(src.v, dRow, dCol) : src.v;
 						setCellRaw(sheet, destR, destC, value);
-						if (src.f) {
-							updateCellFormat(sheet, destR, destC, src.f);
-						}
+						// Replace destination format with the source's (clear when unformatted).
+						setFullFormat(destR, destC, src.f ?? null);
 					}
 				}
 			});
@@ -492,17 +602,7 @@
 		numFmtMenuOpen = false;
 	}
 	function clearFormatting() {
-		setFmt({
-			bold: false,
-			italic: false,
-			underline: false,
-			strike: false,
-			wrap: false,
-			align: 'left',
-			color: '',
-			bg: '',
-			numFmt: 'auto'
-		});
+		mutate(() => forEachInRange((r, c) => setFullFormat(r, c, null)));
 	}
 
 	const activeFmt = $derived(getCell(sheet, sel.ar, sel.ac)?.f ?? {});
@@ -511,17 +611,24 @@
 	let numFmtMenuOpen = $state(false);
 	let textColorOpen = $state(false);
 	let fillColorOpen = $state(false);
+	let fontMenuOpen = $state(false);
+	let sizeMenuOpen = $state(false);
+	let bordersMenuOpen = $state(false);
+	let valignMenuOpen = $state(false);
+	let pasteMenuOpen = $state(false);
 
 	const NUMBER_FORMATS: { v: NumberFormat; label: string; hint: string }[] = [
 		{ v: 'auto', label: 'Automatic', hint: '' },
 		{ v: 'number', label: 'Number', hint: '1,234.50' },
 		{ v: 'integer', label: 'Integer', hint: '1,235' },
 		{ v: 'currency', label: 'Currency', hint: '$1,234.50' },
+		{ v: 'accounting', label: 'Accounting', hint: '($1,234.50)' },
 		{ v: 'percent', label: 'Percent', hint: '12.50%' },
 		{ v: 'scientific', label: 'Scientific', hint: '1.23E+3' },
 		{ v: 'date', label: 'Date', hint: 'Jun 26, 2026' },
 		{ v: 'datetime', label: 'Date time', hint: 'Jun 26, 2026 13:00' },
 		{ v: 'time', label: 'Time', hint: '13:00:00' },
+		{ v: 'duration', label: 'Duration', hint: '12:00:00' },
 		{ v: 'text', label: 'Plain text', hint: '' }
 	];
 
@@ -540,6 +647,27 @@
 		'#000000'
 	];
 
+	const BORDER_STYLE_OPTS: BorderStyle[] = [
+		'thin',
+		'medium',
+		'thick',
+		'dashed',
+		'dotted',
+		'double'
+	];
+	const BORDER_PRESETS: { key: string; label: string; glyph: string }[] = [
+		{ key: 'all', label: 'All borders', glyph: '⊞' },
+		{ key: 'inner', label: 'Inner', glyph: '田' },
+		{ key: 'innerH', label: 'Horizontal inner', glyph: '☰' },
+		{ key: 'innerV', label: 'Vertical inner', glyph: '◫' },
+		{ key: 'outer', label: 'Outer', glyph: '▢' },
+		{ key: 'top', label: 'Top', glyph: '▔' },
+		{ key: 'bottom', label: 'Bottom', glyph: '▁' },
+		{ key: 'left', label: 'Left', glyph: '▏' },
+		{ key: 'right', label: 'Right', glyph: '▕' },
+		{ key: 'none', label: 'Clear borders', glyph: '✕' }
+	];
+
 	function closeMenusOnOutside(e: MouseEvent) {
 		const t = e.target;
 		if (!(t instanceof Element)) {
@@ -553,6 +681,24 @@
 		}
 		if (!t.closest('.fill-color-wrap')) {
 			fillColorOpen = false;
+		}
+		if (!t.closest('.font-wrap')) {
+			fontMenuOpen = false;
+		}
+		if (!t.closest('.size-wrap')) {
+			sizeMenuOpen = false;
+		}
+		if (!t.closest('.borders-wrap')) {
+			bordersMenuOpen = false;
+		}
+		if (!t.closest('.valign-wrap')) {
+			valignMenuOpen = false;
+		}
+		if (!t.closest('.paste-wrap')) {
+			pasteMenuOpen = false;
+		}
+		if (ctx && !t.closest('.ctx-menu')) {
+			ctx = null;
 		}
 	}
 
@@ -573,10 +719,14 @@
 			return;
 		}
 		handle.setPointerCapture(e.pointerId);
-		// One undoable step per resize: snapshot the pre-resize state (this also
-		// invalidates the redo stack so the document and history stay in sync).
-		snapshot();
+		// Snapshot lazily on the first actual move so a bare click on the resize
+		// strip doesn't push a no-op undo entry / wipe the redo stack.
+		let changed = false;
 		const move = (ev: PointerEvent) => {
+			if (!changed) {
+				snapshot();
+				changed = true;
+			}
 			setColWidth(sheet, col, startW + (ev.clientX - startX));
 			rev++;
 		};
@@ -584,7 +734,9 @@
 			resizing = false;
 			handle.removeEventListener('pointermove', move);
 			handle.removeEventListener('pointerup', up);
-			persist();
+			if (changed) {
+				persist();
+			}
 		};
 		handle.addEventListener('pointermove', move);
 		handle.addEventListener('pointerup', up);
@@ -604,8 +756,12 @@
 			return;
 		}
 		handle.setPointerCapture(e.pointerId);
-		snapshot();
+		let changed = false;
 		const move = (ev: PointerEvent) => {
+			if (!changed) {
+				snapshot();
+				changed = true;
+			}
 			setRowHeight(sheet, row, startH + (ev.clientY - startY));
 			rev++;
 		};
@@ -613,7 +769,9 @@
 			resizing = false;
 			handle.removeEventListener('pointermove', move);
 			handle.removeEventListener('pointerup', up);
-			persist();
+			if (changed) {
+				persist();
+			}
 		};
 		handle.addEventListener('pointermove', move);
 		handle.addEventListener('pointerup', up);
@@ -731,33 +889,717 @@
 	}
 
 	function cellStyle(r: number, c: number): string {
-		const f = getCell(sheet, r, c)?.f;
-		let s = `width:${colWidth(sheet, c)}px;`;
+		return (
+			`width:${colWidth(sheet, c)}px;` +
+			frozenCss(r, c) +
+			formatCss(getCell(sheet, r, c)?.f ?? null)
+		);
+	}
+	/** Sticky positioning + opaque backing for cells inside a frozen pane. */
+	function frozenCss(r: number, c: number): string {
+		const fr = r < sheet.frozenRows;
+		const fc = c < sheet.frozenCols;
+		if (!fr && !fc) {
+			return '';
+		}
+		let s = 'position:sticky;background:var(--surface);';
+		if (fr) {
+			s += `top:${topOf(r)}px;`;
+		}
+		if (fc) {
+			s += `left:${leftOf(c)}px;`;
+		}
+		s += `z-index:${fr && fc ? 6 : fr ? 5 : 4};`;
+		return s;
+	}
+
+	// =====================================================================
+	// grid geometry (cumulative offsets) — for fill handle, merges, freeze
+	// =====================================================================
+	const GRID_HEADER_H = 26;
+	const colLefts = $derived.by(() => {
+		void rev;
+		const a = [HEADER_WIDTH];
+		for (let c = 0; c < sheet.cols; c++) {
+			a.push(a[a.length - 1] + colWidth(sheet, c));
+		}
+		return a;
+	});
+	const rowTops = $derived.by(() => {
+		void rev;
+		const a = [GRID_HEADER_H];
+		for (let r = 0; r < sheet.rows; r++) {
+			a.push(a[a.length - 1] + rowHeight(sheet, r));
+		}
+		return a;
+	});
+	function leftOf(c: number): number {
+		return colLefts[Math.max(0, Math.min(c, colLefts.length - 1))];
+	}
+	function topOf(r: number): number {
+		return rowTops[Math.max(0, Math.min(r, rowTops.length - 1))];
+	}
+	function visibleRowCount(): number {
+		const h = gridScrollEl?.clientHeight ?? 400;
+		return Math.max(1, Math.floor(h / DEFAULT_ROW_HEIGHT) - 1);
+	}
+
+	type Rect = { r1: number; c1: number; r2: number; c2: number };
+
+	// Merge blocks positioned absolutely over the grid (handles any shape).
+	const mergeBlocks = $derived.by(() => {
+		void rev;
+		return sheet.merges.map((m) => ({
+			m,
+			left: leftOf(m.c1),
+			top: topOf(m.r1),
+			width: leftOf(m.c2 + 1) - leftOf(m.c1),
+			height: topOf(m.r2 + 1) - topOf(m.r1)
+		}));
+	});
+
+	const fillHandle = $derived.by(() => {
+		void rev;
+		// Expand through a merge at the bottom-right so the handle sits at the
+		// block's outer corner, not inside a merged cell.
+		const m = findMerge(sheet, range.r2, range.c2);
+		const c2 = m ? Math.max(range.c2, m.c2) : range.c2;
+		const r2 = m ? Math.max(range.r2, m.r2) : range.r2;
+		return { left: leftOf(c2 + 1), top: topOf(r2 + 1) };
+	});
+
+	// =====================================================================
+	// fill handle (drag to copy/series) + double-click fill-to-edge
+	// =====================================================================
+	let filling = $state(false);
+	let fillDest = $state<Rect | null>(null);
+
+	function cellAtPoint(x: number, y: number): { r: number; c: number } | null {
+		const el = document.elementFromPoint(x, y);
+		const cell = el instanceof Element ? el.closest('[data-r]') : null;
+		if (cell instanceof HTMLElement && cell.dataset.r && cell.dataset.c) {
+			const r = Number(cell.dataset.r);
+			const c = Number(cell.dataset.c);
+			if (Number.isFinite(r) && Number.isFinite(c)) {
+				return { r, c };
+			}
+		}
+		return null;
+	}
+	function computeFillDest(tr: number, tc: number): Rect | null {
+		const dv = tr > range.r2 ? tr - range.r2 : tr < range.r1 ? range.r1 - tr : 0;
+		const dh = tc > range.c2 ? tc - range.c2 : tc < range.c1 ? range.c1 - tc : 0;
+		if (dv === 0 && dh === 0) {
+			return null;
+		}
+		if (dv >= dh) {
+			return { r1: Math.min(range.r1, tr), c1: range.c1, r2: Math.max(range.r2, tr), c2: range.c2 };
+		}
+		return { r1: range.r1, c1: Math.min(range.c1, tc), r2: range.r2, c2: Math.max(range.c2, tc) };
+	}
+	function startFillDrag(e: PointerEvent) {
+		if (e.button !== 0) {
+			return;
+		}
+		e.preventDefault();
+		e.stopPropagation();
+		filling = true;
+		const src: Rect = { r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2 };
+		const move = (ev: PointerEvent) => {
+			const t = cellAtPoint(ev.clientX, ev.clientY);
+			if (t) {
+				fillDest = computeFillDest(t.r, t.c);
+			}
+		};
+		const up = () => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+			filling = false;
+			const dest = fillDest;
+			fillDest = null;
+			if (dest) {
+				mutate(() => fillRange(sheet, src, dest));
+				sel.fr = dest.r1;
+				sel.fc = dest.c1;
+				sel.ar = dest.r2;
+				sel.ac = dest.c2;
+			}
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
+	}
+	function fillToEdge() {
+		const probeCol =
+			range.c1 > 0 ? range.c1 - 1 : range.c2 + 1 <= sheet.cols - 1 ? range.c2 + 1 : range.c1;
+		let edge = range.r2;
+		for (let r = range.r2 + 1; r < sheet.rows; r++) {
+			if (getRaw(sheet, r, probeCol).trim() === '') {
+				break;
+			}
+			edge = r;
+		}
+		if (edge > range.r2) {
+			const src: Rect = { r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2 };
+			mutate(() => fillRange(sheet, src, { r1: range.r1, c1: range.c1, r2: edge, c2: range.c2 }));
+			sel.fr = range.r1;
+			sel.fc = range.c1;
+			sel.ar = edge;
+			sel.ac = range.c2;
+		}
+	}
+
+	// =====================================================================
+	// extra formatting setters (fonts, size, valign, indent, decimals, borders)
+	// =====================================================================
+	function setFont(font: string) {
+		setFmt({ font });
+		fontMenuOpen = false;
+	}
+	function setSize(size: number) {
+		setFmt({ size });
+		sizeMenuOpen = false;
+	}
+	function bumpSize(delta: number) {
+		const cur = activeFmt.size ?? DEFAULT_FONT_SIZE;
+		setFmt({ size: Math.min(96, Math.max(6, cur + delta)) });
+	}
+	function setValign(valign: VAlign) {
+		setFmt({ valign });
+	}
+	function bumpIndent(delta: number) {
+		const cur = activeFmt.indent ?? 0;
+		setFmt({ indent: Math.min(MAX_INDENT, Math.max(0, cur + delta)) });
+	}
+	function currentDecimals(): number {
+		if (typeof activeFmt.decimals === 'number') {
+			return activeFmt.decimals;
+		}
+		return activeFmt.numFmt === 'integer' ? 0 : 2;
+	}
+	function bumpDecimals(delta: number) {
+		setFmt({ decimals: Math.min(10, Math.max(0, currentDecimals() + delta)) });
+	}
+
+	let borderStyle = $state<BorderStyle>('thin');
+	let borderColor = $state('#6b7280');
+	function patchCellBorders(
+		r: number,
+		c: number,
+		sides: Record<string, Border | null>,
+		clear: boolean
+	) {
+		const existing = getCell(sheet, r, c)?.f?.borders;
+		const next: Record<string, Border> = clear ? {} : { ...(existing ?? {}) };
+		for (const [side, val] of Object.entries(sides)) {
+			if (val === null) {
+				delete next[side];
+			} else {
+				next[side] = val;
+			}
+		}
+		updateCellFormat(sheet, r, c, { borders: next });
+	}
+	function sidesFor(preset: string, r: number, c: number, border: Border): Record<string, Border> {
+		const top = r === range.r1;
+		const bottom = r === range.r2;
+		const leftE = c === range.c1;
+		const rightE = c === range.c2;
+		const out: Record<string, Border> = {};
+		const set = (cond: boolean, side: string) => {
+			if (cond) {
+				out[side] = border;
+			}
+		};
+		if (preset === 'all') {
+			set(true, 'top');
+			set(true, 'right');
+			set(true, 'bottom');
+			set(true, 'left');
+		} else if (preset === 'outer') {
+			set(top, 'top');
+			set(rightE, 'right');
+			set(bottom, 'bottom');
+			set(leftE, 'left');
+		} else if (preset === 'inner') {
+			set(!rightE, 'right');
+			set(!bottom, 'bottom');
+		} else if (preset === 'innerH') {
+			set(!bottom, 'bottom');
+		} else if (preset === 'innerV') {
+			set(!rightE, 'right');
+		} else if (preset === 'top') {
+			set(top, 'top');
+		} else if (preset === 'bottom') {
+			set(bottom, 'bottom');
+		} else if (preset === 'left') {
+			set(leftE, 'left');
+		} else if (preset === 'right') {
+			set(rightE, 'right');
+		}
+		return out;
+	}
+	function applyBorders(preset: string) {
+		bordersMenuOpen = false;
+		const border: Border = { style: borderStyle, color: borderColor };
+		mutate(() => {
+			forEachInRange((r, c) => {
+				if (preset === 'none') {
+					patchCellBorders(r, c, {}, true);
+					return;
+				}
+				const sides = sidesFor(preset, r, c, border);
+				if (Object.keys(sides).length > 0) {
+					patchCellBorders(r, c, sides, false);
+				}
+			});
+		});
+	}
+
+	// =====================================================================
+	// merge / structural ops / freeze
+	// =====================================================================
+	const selectionMerged = $derived.by(() => {
+		void rev;
+		return findMerge(sheet, sel.ar, sel.ac) !== null;
+	});
+	function doMerge() {
+		if (range.r1 === range.r2 && range.c1 === range.c2) {
+			return;
+		}
+		const r1 = range.r1;
+		const c1 = range.c1;
+		mutate(() => mergeCells(sheet, range.r1, range.c1, range.r2, range.c2));
+		setActive(r1, c1, false);
+	}
+	function doUnmerge() {
+		mutate(() => unmergeRange(sheet, range.r1, range.c1, range.r2, range.c2));
+	}
+	function toggleMerge() {
+		if (selectionMerged) {
+			doUnmerge();
+		} else {
+			doMerge();
+		}
+	}
+
+	function insertRowsAbove() {
+		const count = range.r2 - range.r1 + 1;
+		mutate(() => insertRows(sheet, range.r1, count));
+		closeCtx();
+	}
+	function insertRowsBelow() {
+		const count = range.r2 - range.r1 + 1;
+		mutate(() => insertRows(sheet, range.r2 + 1, count));
+		closeCtx();
+	}
+	function deleteSelRows() {
+		const count = range.r2 - range.r1 + 1;
+		mutate(() => deleteRows(sheet, range.r1, count));
+		clampSelection();
+		closeCtx();
+	}
+	function insertColsLeft() {
+		const count = range.c2 - range.c1 + 1;
+		mutate(() => insertCols(sheet, range.c1, count));
+		closeCtx();
+	}
+	function insertColsRight() {
+		const count = range.c2 - range.c1 + 1;
+		mutate(() => insertCols(sheet, range.c2 + 1, count));
+		closeCtx();
+	}
+	function deleteSelCols() {
+		const count = range.c2 - range.c1 + 1;
+		mutate(() => deleteCols(sheet, range.c1, count));
+		clampSelection();
+		closeCtx();
+	}
+
+	function freezeRowsToSel() {
+		const n = sel.ar + 1;
+		mutate(() => {
+			sheet.frozenRows = sheet.frozenRows === n ? 0 : n;
+		});
+		closeCtx();
+	}
+	function freezeColsToSel() {
+		const n = sel.ac + 1;
+		mutate(() => {
+			sheet.frozenCols = sheet.frozenCols === n ? 0 : n;
+		});
+		closeCtx();
+	}
+	function unfreezeAll() {
+		mutate(() => {
+			sheet.frozenRows = 0;
+			sheet.frozenCols = 0;
+		});
+		closeCtx();
+	}
+
+	// =====================================================================
+	// fill down / right / selection
+	// =====================================================================
+	function fillDown() {
+		if (range.r1 === range.r2) {
+			return;
+		}
+		const src: Rect = { r1: range.r1, c1: range.c1, r2: range.r1, c2: range.c2 };
+		mutate(() => fillRange(sheet, src, { r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2 }));
+	}
+	function fillRight() {
+		if (range.c1 === range.c2) {
+			return;
+		}
+		const src: Rect = { r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c1 };
+		mutate(() => fillRange(sheet, src, { r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2 }));
+	}
+	function fillSelectionWith(value: string) {
+		const baseR = sel.ar;
+		const baseC = sel.ac;
+		const rect = editRange ?? { r1: sel.ar, c1: sel.ac, r2: sel.ar, c2: sel.ac };
+		mutate(() => {
+			for (let r = rect.r1; r <= rect.r2; r++) {
+				for (let c = rect.c1; c <= rect.c2; c++) {
+					const v = value.startsWith('=') ? translateFormula(value, r - baseR, c - baseC) : value;
+					setCellRaw(sheet, r, c, v);
+				}
+			}
+		});
+		// Re-show the filled block as the selection.
+		sel.fr = rect.r1;
+		sel.fc = rect.c1;
+		sel.ar = rect.r2;
+		sel.ac = rect.c2;
+	}
+
+	// =====================================================================
+	// full-format helpers (paste-special, painter, clear)
+	// =====================================================================
+	function cloneFmt(f: CellFormat | null): CellFormat | null {
+		return f ? JSON.parse(JSON.stringify(f)) : null;
+	}
+	function setFullFormat(r: number, c: number, f: CellFormat | null) {
+		const key = cellKey(r, c);
+		const cell = sheet.cells[key];
+		if (f) {
+			const cloned = cloneFmt(f);
+			if (cell) {
+				if (cloned) {
+					cell.f = cloned;
+				}
+			} else if (cloned) {
+				sheet.cells[key] = { v: '', f: cloned };
+			}
+		} else if (cell) {
+			delete cell.f;
+			if (cell.v === '') {
+				delete sheet.cells[key];
+			}
+		}
+	}
+
+	// =====================================================================
+	// context-menu clipboard (internal, so it works without grid focus)
+	// =====================================================================
+	function copySelection() {
+		captureClipboard();
+		const tsv = rangeTsv();
+		lastCopyText = tsv;
+		if (typeof navigator !== 'undefined' && navigator.clipboard) {
+			navigator.clipboard.writeText(tsv).catch(() => {});
+		}
+		closeCtx();
+	}
+	function cutSelection() {
+		copySelection();
+		mutate(() => clearRangeContents(sheet, range.r1, range.c1, range.r2, range.c2));
+	}
+	function pasteInternal() {
+		const clip = clipboard;
+		if (!clip) {
+			closeCtx();
+			return;
+		}
+		const baseR = sel.ar;
+		const baseC = sel.ac;
+		const dRow = baseR - clip.r1;
+		const dCol = baseC - clip.c1;
+		mutate(() => {
+			for (let i = 0; i < clip.cells.length; i++) {
+				for (let j = 0; j < clip.cells[i].length; j++) {
+					const src = clip.cells[i][j];
+					const value = src.v.startsWith('=') ? translateFormula(src.v, dRow, dCol) : src.v;
+					setCellRaw(sheet, baseR + i, baseC + j, value);
+					setFullFormat(baseR + i, baseC + j, src.f ?? null);
+				}
+			}
+		});
+		closeCtx();
+	}
+
+	// =====================================================================
+	// paste special
+	// =====================================================================
+	function pasteSpecial(mode: 'values' | 'format' | 'formulas') {
+		pasteMenuOpen = false;
+		const clip = clipboard;
+		if (!clip) {
+			return;
+		}
+		const baseR = sel.ar;
+		const baseC = sel.ac;
+		const dRow = baseR - clip.r1;
+		const dCol = baseC - clip.c1;
+		mutate(() => {
+			for (let i = 0; i < clip.cells.length; i++) {
+				for (let j = 0; j < clip.cells[i].length; j++) {
+					const src = clip.cells[i][j];
+					const destR = baseR + i;
+					const destC = baseC + j;
+					if (mode === 'format') {
+						setFullFormat(destR, destC, src.f ?? null);
+					} else if (mode === 'values') {
+						setCellRaw(sheet, destR, destC, src.display);
+					} else {
+						const v = src.v.startsWith('=') ? translateFormula(src.v, dRow, dCol) : src.v;
+						setCellRaw(sheet, destR, destC, v);
+					}
+				}
+			}
+		});
+		closeCtx();
+	}
+
+	// =====================================================================
+	// format painter
+	// =====================================================================
+	let painter = $state<CellFormat | null>(null);
+	let painterLock = $state(false);
+	function armPainter(lock: boolean) {
+		painter = cloneFmt(getCell(sheet, sel.ar, sel.ac)?.f ?? null);
+		painterLock = lock;
+	}
+	function applyPainter() {
+		const f = painter;
 		if (!f) {
+			return;
+		}
+		mutate(() => forEachInRange((r, c) => setFullFormat(r, c, f)));
+		if (!painterLock) {
+			painter = null;
+		}
+	}
+
+	// =====================================================================
+	// find & replace
+	// =====================================================================
+	let findOpen = $state(false);
+	let findText = $state('');
+	let replaceText = $state('');
+	let matchCase = $state(false);
+	let matches = $state<{ r: number; c: number }[]>([]);
+	let matchIdx = $state(-1);
+
+	function runFind() {
+		const q = findText;
+		const res: { r: number; c: number }[] = [];
+		if (q) {
+			const needle = matchCase ? q : q.toLowerCase();
+			for (const [key, cell] of Object.entries(sheet.cells)) {
+				const pos = parseKey(key);
+				if (!pos || cell.v === '') {
+					continue;
+				}
+				const hay = matchCase ? cell.v : cell.v.toLowerCase();
+				if (hay.includes(needle)) {
+					res.push({ r: pos.row, c: pos.col });
+				}
+			}
+			res.sort((a, b) => a.r - b.r || a.c - b.c);
+		}
+		matches = res;
+		matchIdx = res.length > 0 ? 0 : -1;
+		if (matchIdx >= 0) {
+			setActive(res[0].r, res[0].c, false);
+		}
+	}
+	function stepMatch(delta: number) {
+		if (matches.length === 0) {
+			return;
+		}
+		matchIdx = (matchIdx + delta + matches.length) % matches.length;
+		setActive(matches[matchIdx].r, matches[matchIdx].c, false);
+	}
+	function replaceInString(s: string, find: string, repl: string): string {
+		if (!find) {
 			return s;
 		}
-		if (f.bold) {
-			s += 'font-weight:600;';
+		if (matchCase) {
+			return s.split(find).join(repl);
 		}
-		if (f.italic) {
-			s += 'font-style:italic;';
+		const lower = s.toLowerCase();
+		const fl = find.toLowerCase();
+		let out = '';
+		let i = 0;
+		let idx = lower.indexOf(fl, i);
+		while (idx !== -1) {
+			out += s.slice(i, idx) + repl;
+			i = idx + find.length;
+			idx = lower.indexOf(fl, i);
 		}
-		if (f.underline || f.strike) {
-			s += `text-decoration:${[f.underline ? 'underline' : '', f.strike ? 'line-through' : ''].filter(Boolean).join(' ')};`;
+		return out + s.slice(i);
+	}
+	function replaceCurrent() {
+		if (matchIdx < 0 || matchIdx >= matches.length) {
+			return;
 		}
-		if (f.align) {
-			s += `text-align:${f.align};justify-content:${f.align === 'center' ? 'center' : f.align === 'right' ? 'flex-end' : 'flex-start'};`;
+		const m = matches[matchIdx];
+		const next = replaceInString(getRaw(sheet, m.r, m.c), findText, replaceText);
+		mutate(() => setCellRaw(sheet, m.r, m.c, next));
+		runFind();
+	}
+	function replaceAll() {
+		const targets = [...matches];
+		mutate(() => {
+			for (const m of targets) {
+				setCellRaw(
+					sheet,
+					m.r,
+					m.c,
+					replaceInString(getRaw(sheet, m.r, m.c), findText, replaceText)
+				);
+			}
+		});
+		runFind();
+	}
+	function openFind() {
+		findOpen = true;
+		queueMicrotask(() => findInputEl?.focus());
+	}
+	let findInputEl: HTMLInputElement | null = $state(null);
+
+	// =====================================================================
+	// data-edge (Ctrl+Arrow) navigation
+	// =====================================================================
+	function dataEdge(dr: number, dc: number, extend: boolean) {
+		const maxR = sheet.rows - 1;
+		const maxC = sheet.cols - 1;
+		const filled = (rr: number, cc: number) => getRaw(sheet, rr, cc).trim() !== '';
+		let r = sel.ar;
+		let c = sel.ac;
+		const inB = (rr: number, cc: number) => rr >= 0 && cc >= 0 && rr <= maxR && cc <= maxC;
+		if (!inB(r + dr, c + dc)) {
+			setActive(r, c, extend);
+			return;
 		}
-		if (f.color) {
-			s += `color:${f.color};`;
+		if (filled(r, c) && filled(r + dr, c + dc)) {
+			while (inB(r + dr, c + dc) && filled(r + dr, c + dc)) {
+				r += dr;
+				c += dc;
+			}
+		} else {
+			r += dr;
+			c += dc;
+			while (inB(r + dr, c + dc) && !filled(r, c)) {
+				r += dr;
+				c += dc;
+			}
 		}
-		if (f.bg) {
-			s += `background:${f.bg};`;
+		setActive(r, c, extend);
+	}
+
+	// =====================================================================
+	// right-click context menu
+	// =====================================================================
+	let ctx = $state<{ x: number; y: number; kind: 'cell' | 'col' | 'row' } | null>(null);
+	function openCellCtx(e: MouseEvent, r: number, c: number) {
+		e.preventDefault();
+		if (!inRange(r, c)) {
+			setActive(r, c, false);
 		}
-		if (f.wrap) {
-			s += 'white-space:normal;';
+		ctx = { x: e.clientX, y: e.clientY, kind: 'cell' };
+	}
+	function openColCtx(e: MouseEvent, c: number) {
+		e.preventDefault();
+		if (!(c >= range.c1 && c <= range.c2)) {
+			selectColumn(c, false);
 		}
-		return s;
+		ctx = { x: e.clientX, y: e.clientY, kind: 'col' };
+	}
+	function openRowCtx(e: MouseEvent, r: number) {
+		e.preventDefault();
+		if (!(r >= range.r1 && r <= range.r2)) {
+			selectRow(r, false);
+		}
+		ctx = { x: e.clientX, y: e.clientY, kind: 'row' };
+	}
+	function closeCtx() {
+		ctx = null;
+	}
+	function ctxClear(all: boolean) {
+		mutate(() => {
+			if (all) {
+				clearRangeAll(sheet, range.r1, range.c1, range.r2, range.c2);
+			} else {
+				clearRangeContents(sheet, range.r1, range.c1, range.r2, range.c2);
+			}
+		});
+		closeCtx();
+	}
+
+	// =====================================================================
+	// sort
+	// =====================================================================
+	function sortByActiveColumn(asc: boolean) {
+		const c1 = range.c1;
+		const c2 = range.c2;
+		const r1 = range.r1;
+		const r2 = range.r2;
+		const keyCol = sel.ac;
+		mutate(() => {
+			// Snapshot each row's raw cells (v + f) so whole rows move together.
+			type RowCells = { v: string; f: CellFormat | null }[];
+			const block: RowCells[] = [];
+			for (let r = r1; r <= r2; r++) {
+				const line: RowCells = [];
+				for (let c = c1; c <= c2; c++) {
+					const cell = getCell(sheet, r, c);
+					line.push({ v: cell?.v ?? '', f: cell?.f ? cloneFmt(cell.f) : null });
+				}
+				block.push(line);
+			}
+			const keyIdx = keyCol - c1;
+			const sortKey = (line: RowCells) => {
+				const raw = line[keyIdx]?.v ?? '';
+				const num = Number(raw);
+				return { raw, num: raw !== '' && Number.isFinite(num) ? num : null };
+			};
+			block.sort((a, b) => {
+				const ka = sortKey(a);
+				const kb = sortKey(b);
+				let cmp: number;
+				if (ka.num !== null && kb.num !== null) {
+					cmp = ka.num - kb.num;
+				} else {
+					cmp =
+						ka.raw.toLowerCase() < kb.raw.toLowerCase()
+							? -1
+							: ka.raw.toLowerCase() > kb.raw.toLowerCase()
+								? 1
+								: 0;
+				}
+				return asc ? cmp : -cmp;
+			});
+			for (let i = 0; i < block.length; i++) {
+				for (let j = 0; j < block[i].length; j++) {
+					const cellData = block[i][j];
+					setCellRaw(sheet, r1 + i, c1 + j, cellData.v);
+					setFullFormat(r1 + i, c1 + j, cellData.f);
+				}
+			}
+		});
+		closeCtx();
 	}
 
 	const activeLabel = $derived(
@@ -818,6 +1660,97 @@
 		>
 			<span class="flip"><Icon name="undo" size={14} /></span>
 		</button>
+		<button
+			type="button"
+			class="tb-btn"
+			class:on={!!painter}
+			title="Paint format — double-click to keep painting"
+			aria-label="Format painter"
+			onclick={() => armPainter(false)}
+			ondblclick={() => armPainter(true)}
+		>
+			<Icon name="copy" size={13} />
+		</button>
+		<button
+			type="button"
+			class="tb-btn"
+			title="Find & replace (⌘F)"
+			aria-label="Find"
+			onclick={openFind}
+		>
+			<Icon name="search" size={13} />
+		</button>
+		<span class="tb-sep"></span>
+
+		<!-- font family -->
+		<div class="font-wrap menu-wrap">
+			<button
+				type="button"
+				class="tb-btn font-trigger"
+				title="Font"
+				onclick={() => (fontMenuOpen = !fontMenuOpen)}
+			>
+				<span class="font-name">{activeFmt.font ?? 'Default'}</span>
+				<Icon name="chevron-down" size={10} />
+			</button>
+			{#if fontMenuOpen}
+				<div class="dropdown font-menu" role="menu">
+					{#each FONT_FAMILIES as fam (fam)}
+						<button
+							type="button"
+							class="dd-item"
+							class:active={(activeFmt.font ?? 'Default') === fam}
+							style={fam === 'Default' ? '' : `font-family:${fontStack(fam)}`}
+							onclick={() => setFont(fam)}
+						>
+							{fam}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- font size -->
+		<div class="size-group">
+			<button
+				type="button"
+				class="tb-btn mini"
+				title="Decrease font size"
+				aria-label="Decrease font size"
+				onclick={() => bumpSize(-1)}>−</button
+			>
+			<div class="size-wrap menu-wrap">
+				<button
+					type="button"
+					class="tb-btn size-trigger"
+					title="Font size"
+					onclick={() => (sizeMenuOpen = !sizeMenuOpen)}
+				>
+					{activeFmt.size ?? DEFAULT_FONT_SIZE}
+				</button>
+				{#if sizeMenuOpen}
+					<div class="dropdown size-menu" role="menu">
+						{#each FONT_SIZES as sz (sz)}
+							<button
+								type="button"
+								class="dd-item"
+								class:active={(activeFmt.size ?? DEFAULT_FONT_SIZE) === sz}
+								onclick={() => setSize(sz)}
+							>
+								{sz}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+			<button
+				type="button"
+				class="tb-btn mini"
+				title="Increase font size"
+				aria-label="Increase font size"
+				onclick={() => bumpSize(1)}>+</button
+			>
+		</div>
 		<span class="tb-sep"></span>
 
 		<button
@@ -925,6 +1858,65 @@
 			{/if}
 		</div>
 
+		<!-- borders -->
+		<div class="borders-wrap menu-wrap">
+			<button
+				type="button"
+				class="tb-btn"
+				title="Borders"
+				aria-label="Borders"
+				onclick={() => (bordersMenuOpen = !bordersMenuOpen)}
+			>
+				<span class="brd-glyph">⊞</span><Icon name="chevron-down" size={10} />
+			</button>
+			{#if bordersMenuOpen}
+				<div class="dropdown borders-menu" role="menu">
+					<div class="brd-grid">
+						{#each BORDER_PRESETS as p (p.key)}
+							<button
+								type="button"
+								class="brd-btn"
+								title={p.label}
+								aria-label={p.label}
+								onclick={() => applyBorders(p.key)}>{p.glyph}</button
+							>
+						{/each}
+					</div>
+					<div class="brd-row">
+						<span class="brd-lbl">Style</span>
+						<div class="brd-styles">
+							{#each BORDER_STYLE_OPTS as st (st)}
+								<button
+									type="button"
+									class="brd-style"
+									class:sel={borderStyle === st}
+									title={st}
+									onclick={() => (borderStyle = st)}
+								>
+									<span class="brd-style-line {st}"></span>
+								</button>
+							{/each}
+						</div>
+					</div>
+					<div class="brd-row">
+						<span class="brd-lbl">Color</span>
+						<div class="brd-colors">
+							{#each SWATCHES as sw (sw)}
+								<button
+									type="button"
+									class="swatch sm"
+									class:sel={borderColor === sw}
+									style="background:{sw}"
+									aria-label={sw}
+									onclick={() => (borderColor = sw)}
+								></button>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{/if}
+		</div>
+
 		<span class="tb-sep"></span>
 
 		<button
@@ -968,6 +1960,83 @@
 			<span class="align-glyph al-wrap"></span>
 		</button>
 
+		<!-- vertical align -->
+		<div class="valign-wrap menu-wrap">
+			<button
+				type="button"
+				class="tb-btn"
+				title="Vertical align"
+				aria-label="Vertical align"
+				onclick={() => (valignMenuOpen = !valignMenuOpen)}
+			>
+				<span class="valign-glyph {activeFmt.valign ?? 'middle'}"></span><Icon
+					name="chevron-down"
+					size={10}
+				/>
+			</button>
+			{#if valignMenuOpen}
+				<div class="dropdown valign-menu" role="menu">
+					<button
+						type="button"
+						class="dd-item"
+						class:active={activeFmt.valign === 'top'}
+						onclick={() => {
+							setValign('top');
+							valignMenuOpen = false;
+						}}>Top</button
+					>
+					<button
+						type="button"
+						class="dd-item"
+						class:active={(activeFmt.valign ?? 'middle') === 'middle'}
+						onclick={() => {
+							setValign('middle');
+							valignMenuOpen = false;
+						}}>Middle</button
+					>
+					<button
+						type="button"
+						class="dd-item"
+						class:active={activeFmt.valign === 'bottom'}
+						onclick={() => {
+							setValign('bottom');
+							valignMenuOpen = false;
+						}}>Bottom</button
+					>
+				</div>
+			{/if}
+		</div>
+
+		<button
+			type="button"
+			class="tb-btn"
+			title="Decrease indent"
+			aria-label="Decrease indent"
+			onclick={() => bumpIndent(-1)}
+		>
+			<span class="indent-glyph dec"></span>
+		</button>
+		<button
+			type="button"
+			class="tb-btn"
+			title="Increase indent"
+			aria-label="Increase indent"
+			onclick={() => bumpIndent(1)}
+		>
+			<span class="indent-glyph inc"></span>
+		</button>
+
+		<button
+			type="button"
+			class="tb-btn"
+			class:on={selectionMerged}
+			title="Merge cells"
+			aria-label="Merge cells"
+			onclick={toggleMerge}
+		>
+			<span class="merge-glyph"></span>
+		</button>
+
 		<span class="tb-sep"></span>
 
 		<button type="button" class="tb-btn wide" title="Currency" onclick={() => setNumFmt('currency')}
@@ -998,6 +2067,52 @@
 							{#if nf.hint}<span class="numfmt-hint">{nf.hint}</span>{/if}
 						</button>
 					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<button
+			type="button"
+			class="tb-btn dec-btn"
+			title="Decrease decimal places"
+			aria-label="Decrease decimals"
+			onclick={() => bumpDecimals(-1)}
+		>
+			.0<span class="dec-arrow">←</span>
+		</button>
+		<button
+			type="button"
+			class="tb-btn dec-btn"
+			title="Increase decimal places"
+			aria-label="Increase decimals"
+			onclick={() => bumpDecimals(1)}
+		>
+			.00<span class="dec-arrow">→</span>
+		</button>
+
+		<span class="tb-sep"></span>
+
+		<div class="paste-wrap menu-wrap">
+			<button
+				type="button"
+				class="tb-btn text"
+				title="Paste special"
+				disabled={!clipboard}
+				onclick={() => (pasteMenuOpen = !pasteMenuOpen)}
+			>
+				Paste <Icon name="chevron-down" size={10} />
+			</button>
+			{#if pasteMenuOpen}
+				<div class="dropdown paste-menu" role="menu">
+					<button type="button" class="dd-item" onclick={() => pasteSpecial('values')}
+						>Values only</button
+					>
+					<button type="button" class="dd-item" onclick={() => pasteSpecial('formulas')}
+						>Formulas only</button
+					>
+					<button type="button" class="dd-item" onclick={() => pasteSpecial('format')}
+						>Formatting only</button
+					>
 				</div>
 			{/if}
 		</div>
@@ -1050,12 +2165,16 @@
 					<div
 						class="col-head"
 						class:hl={c >= range.c1 && c <= range.c2}
-						style="width:{colWidth(sheet, c)}px"
+						class:frozen-edge={c === sheet.frozenCols - 1}
+						style="width:{colWidth(sheet, c)}px;{c < sheet.frozenCols
+							? `position:sticky;left:${leftOf(c)}px;z-index:5;`
+							: ''}"
 					>
 						<button
 							type="button"
 							class="col-head-label"
 							onpointerdown={(e) => selectColumn(c, e.shiftKey)}
+							oncontextmenu={(e) => openColCtx(e, c)}
 						>
 							{colToLetter(c)}
 						</button>
@@ -1075,12 +2194,16 @@
 					<div
 						class="row-head"
 						class:hl={r >= range.r1 && r <= range.r2}
-						style="width:{HEADER_WIDTH}px"
+						class:frozen-edge={r === sheet.frozenRows - 1}
+						style="width:{HEADER_WIDTH}px;{r < sheet.frozenRows
+							? `position:sticky;top:${topOf(r)}px;z-index:9;`
+							: ''}"
 					>
 						<button
 							type="button"
 							class="row-head-label"
 							onpointerdown={(e) => selectRow(r, e.shiftKey)}
+							oncontextmenu={(e) => openRowCtx(e, r)}
 						>
 							{r + 1}
 						</button>
@@ -1095,10 +2218,14 @@
 					{#each Array(sheet.cols) as _, c (c)}
 						{@const isActive = sel.ar === r && sel.ac === c}
 						{@const isEditing = editing?.r === r && editing?.c === c}
+						{@const merged = isCovered(sheet, r, c) || isMergeAnchor(sheet, r, c)}
 						<div
 							class="cell"
-							class:active={isActive}
+							class:active={isActive && !merged}
 							class:selected={inRange(r, c)}
+							class:merged
+							class:frozen-col-edge={c === sheet.frozenCols - 1}
+							class:frozen-row-edge={r === sheet.frozenRows - 1}
 							role="gridcell"
 							tabindex="-1"
 							aria-selected={inRange(r, c)}
@@ -1108,8 +2235,9 @@
 							onpointerdown={(e) => onCellPointerDown(e, r, c)}
 							onpointerenter={() => onCellPointerEnter(r, c)}
 							ondblclick={() => startEdit(r, c)}
+							oncontextmenu={(e) => openCellCtx(e, r, c)}
 						>
-							{#if isEditing}
+							{#if isEditing && !merged}
 								<input
 									class="cell-input"
 									type="text"
@@ -1119,13 +2247,75 @@
 									spellcheck="false"
 									{@attach editorAttach}
 								/>
-							{:else}
+							{:else if !merged}
 								<span class="cell-text">{engine.display(sheet.id, r, c)}</span>
 							{/if}
 						</div>
 					{/each}
 				</div>
 			{/each}
+
+			<!-- merged-cell overlays (handle content + editing for any merge shape) -->
+			{#each mergeBlocks as mb (mb.m.r1 + ':' + mb.m.c1)}
+				{@const ar = mb.m.r1}
+				{@const ac = mb.m.c1}
+				{@const isActiveM = sel.ar === ar && sel.ac === ac}
+				{@const isEditingM = editing?.r === ar && editing?.c === ac}
+				<div
+					class="merge-cell"
+					class:active={isActiveM}
+					class:selected={inRange(ar, ac)}
+					role="gridcell"
+					tabindex="-1"
+					data-r={ar}
+					data-c={ac}
+					style="left:{mb.left}px;top:{mb.top}px;width:{mb.width}px;height:{mb.height}px;{formatCss(
+						getCell(sheet, ar, ac)?.f ?? null
+					)}"
+					onpointerdown={(e) => onCellPointerDown(e, ar, ac)}
+					onpointerenter={() => onCellPointerEnter(ar, ac)}
+					ondblclick={() => startEdit(ar, ac)}
+					oncontextmenu={(e) => openCellCtx(e, ar, ac)}
+				>
+					{#if isEditingM}
+						<input
+							class="cell-input"
+							type="text"
+							bind:value={editValue}
+							onkeydown={onEditorKeydown}
+							onpointerdown={(e) => e.stopPropagation()}
+							spellcheck="false"
+							{@attach editorAttach}
+						/>
+					{:else}
+						<span class="cell-text">{engine.display(sheet.id, ar, ac)}</span>
+					{/if}
+				</div>
+			{/each}
+
+			<!-- fill preview while dragging the fill handle -->
+			{#if filling && fillDest}
+				<div
+					class="fill-preview"
+					style="left:{leftOf(fillDest.c1)}px;top:{topOf(fillDest.r1)}px;width:{leftOf(
+						fillDest.c2 + 1
+					) - leftOf(fillDest.c1)}px;height:{topOf(fillDest.r2 + 1) - topOf(fillDest.r1)}px"
+				></div>
+			{/if}
+
+			<!-- fill handle at the bottom-right of the selection -->
+			{#if !editing && !filling}
+				<div
+					class="fill-handle"
+					style="left:{fillHandle.left}px;top:{fillHandle.top}px"
+					role="button"
+					tabindex="-1"
+					aria-label="Fill handle"
+					title="Drag to fill · double-click to fill down"
+					onpointerdown={startFillDrag}
+					ondblclick={fillToEdge}
+				></div>
+			{/if}
 		</div>
 	</div>
 
@@ -1195,6 +2385,155 @@
 			</button>
 		</div>
 	</footer>
+
+	<!-- find & replace -->
+	{#if findOpen}
+		<div class="find-panel" role="dialog" aria-label="Find and replace">
+			<div class="find-row">
+				<input
+					bind:this={findInputEl}
+					class="find-input"
+					placeholder="Find in sheet"
+					bind:value={findText}
+					oninput={runFind}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							stepMatch(e.shiftKey ? -1 : 1);
+						} else if (e.key === 'Escape') {
+							e.preventDefault();
+							findOpen = false;
+							gridScrollEl?.focus();
+						}
+					}}
+				/>
+				<span class="find-count">{matches.length ? `${matchIdx + 1}/${matches.length}` : '0'}</span>
+				<button
+					type="button"
+					class="find-nav"
+					title="Previous"
+					aria-label="Previous match"
+					onclick={() => stepMatch(-1)}>‹</button
+				>
+				<button
+					type="button"
+					class="find-nav"
+					title="Next"
+					aria-label="Next match"
+					onclick={() => stepMatch(1)}>›</button
+				>
+				<button
+					type="button"
+					class="find-nav"
+					class:on={matchCase}
+					title="Match case"
+					onclick={() => {
+						matchCase = !matchCase;
+						runFind();
+					}}>Aa</button
+				>
+				<button
+					type="button"
+					class="find-nav"
+					title="Close"
+					aria-label="Close find"
+					onclick={() => {
+						findOpen = false;
+						gridScrollEl?.focus();
+					}}>✕</button
+				>
+			</div>
+			<div class="find-row">
+				<input class="find-input" placeholder="Replace with" bind:value={replaceText} />
+				<button type="button" class="find-btn" onclick={replaceCurrent} disabled={matchIdx < 0}
+					>Replace</button
+				>
+				<button type="button" class="find-btn" onclick={replaceAll} disabled={matches.length === 0}
+					>All</button
+				>
+			</div>
+		</div>
+	{/if}
+
+	<!-- right-click context menu -->
+	{#if ctx}
+		<div class="ctx-menu" role="menu" style="left:{ctx.x}px;top:{ctx.y}px">
+			<button type="button" class="ctx-item" onclick={cutSelection}>Cut</button>
+			<button type="button" class="ctx-item" onclick={copySelection}>Copy</button>
+			{#if clipboard}
+				<button type="button" class="ctx-item" onclick={pasteInternal}>Paste</button>
+				<button type="button" class="ctx-item" onclick={() => pasteSpecial('values')}
+					>Paste values only</button
+				>
+				<button type="button" class="ctx-item" onclick={() => pasteSpecial('format')}
+					>Paste format only</button
+				>
+			{/if}
+			<div class="ctx-sep"></div>
+			{#if ctx.kind !== 'col'}
+				<button type="button" class="ctx-item" onclick={insertRowsAbove}
+					>Insert row{range.r2 > range.r1 ? 's' : ''} above</button
+				>
+				<button type="button" class="ctx-item" onclick={insertRowsBelow}
+					>Insert row{range.r2 > range.r1 ? 's' : ''} below</button
+				>
+				<button type="button" class="ctx-item danger" onclick={deleteSelRows}
+					>Delete row{range.r2 > range.r1 ? 's' : ''}</button
+				>
+			{/if}
+			{#if ctx.kind !== 'row'}
+				<button type="button" class="ctx-item" onclick={insertColsLeft}
+					>Insert column{range.c2 > range.c1 ? 's' : ''} left</button
+				>
+				<button type="button" class="ctx-item" onclick={insertColsRight}
+					>Insert column{range.c2 > range.c1 ? 's' : ''} right</button
+				>
+				<button type="button" class="ctx-item danger" onclick={deleteSelCols}
+					>Delete column{range.c2 > range.c1 ? 's' : ''}</button
+				>
+			{/if}
+			<div class="ctx-sep"></div>
+			<button
+				type="button"
+				class="ctx-item"
+				onclick={() => {
+					toggleMerge();
+					closeCtx();
+				}}>{selectionMerged ? 'Unmerge cells' : 'Merge cells'}</button
+			>
+			<button
+				type="button"
+				class="ctx-item"
+				onclick={() => {
+					sortByActiveColumn(true);
+				}}>Sort range A → Z</button
+			>
+			<button
+				type="button"
+				class="ctx-item"
+				onclick={() => {
+					sortByActiveColumn(false);
+				}}>Sort range Z → A</button
+			>
+			<div class="ctx-sep"></div>
+			<button type="button" class="ctx-item" onclick={freezeRowsToSel}
+				>{sheet.frozenRows === sel.ar + 1
+					? 'Unfreeze rows'
+					: `Freeze up to row ${sel.ar + 1}`}</button
+			>
+			<button type="button" class="ctx-item" onclick={freezeColsToSel}
+				>{sheet.frozenCols === sel.ac + 1
+					? 'Unfreeze columns'
+					: `Freeze up to column ${colToLetter(sel.ac)}`}</button
+			>
+			{#if sheet.frozenRows > 0 || sheet.frozenCols > 0}
+				<button type="button" class="ctx-item" onclick={unfreezeAll}>Unfreeze all</button>
+			{/if}
+			<div class="ctx-sep"></div>
+			<button type="button" class="ctx-item" onclick={() => ctxClear(false)}>Clear contents</button>
+			<button type="button" class="ctx-item" onclick={() => ctxClear(true)}>Clear all</button>
+		</div>
+	{/if}
 </section>
 
 <style>
@@ -1541,6 +2880,14 @@
 		outline: none;
 		background: var(--bg);
 		position: relative;
+		/* Drag selects cells, not the text inside them. The cell editor <input>
+		   re-enables text selection for itself. */
+		user-select: none;
+		-webkit-user-select: none;
+	}
+	.cell-input {
+		user-select: text;
+		-webkit-user-select: text;
 	}
 	.grid-scroll.resizing {
 		user-select: none;
@@ -1550,17 +2897,446 @@
 		position: relative;
 		min-width: 100%;
 	}
+
+	/* ---- toolbar additions ---- */
+	.tb-btn.mini {
+		min-width: 18px;
+		padding: 0 3px;
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.size-group {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
+	}
+	.font-trigger {
+		gap: 4px;
+		min-width: 78px;
+		justify-content: space-between;
+		padding: 0 6px;
+	}
+	.font-name {
+		max-width: 64px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 12px;
+	}
+	.size-trigger {
+		min-width: 30px;
+		font-variant-numeric: tabular-nums;
+		font-size: 12px;
+	}
+	.dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		z-index: 60;
+		min-width: 140px;
+		max-height: 280px;
+		overflow-y: auto;
+		padding: 4px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		box-shadow: var(--shadow-medium);
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.size-menu {
+		min-width: 56px;
+	}
+	.dd-item {
+		display: flex;
+		align-items: center;
+		padding: 6px 10px;
+		font: inherit;
+		font-size: 13px;
+		color: var(--geist-foreground);
+		background: transparent;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.dd-item:hover {
+		background: var(--accents-1);
+	}
+	.dd-item.active {
+		background: var(--accent-soft, var(--accents-2));
+	}
+
+	.brd-glyph {
+		font-size: 14px;
+		line-height: 1;
+	}
+	.borders-menu {
+		min-width: 160px;
+		padding: 8px;
+		gap: 8px;
+	}
+	.brd-grid {
+		display: grid;
+		grid-template-columns: repeat(5, 1fr);
+		gap: 3px;
+	}
+	.brd-btn {
+		width: 28px;
+		height: 26px;
+		font-size: 14px;
+		color: var(--accents-7);
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.brd-btn:hover {
+		background: var(--surface);
+		border-color: var(--accents-3);
+	}
+	.brd-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.brd-lbl {
+		font-size: 11px;
+		color: var(--accents-5);
+		min-width: 36px;
+	}
+	.brd-styles {
+		display: flex;
+		gap: 2px;
+	}
+	.brd-style {
+		width: 26px;
+		height: 22px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		cursor: pointer;
+	}
+	.brd-style.sel {
+		border-color: var(--accent, var(--geist-foreground));
+		background: var(--accent-soft, var(--accents-2));
+	}
+	.brd-style-line {
+		width: 18px;
+		height: 0;
+		border-top: 2px solid var(--fg);
+	}
+	.brd-style-line.thin {
+		border-top-width: 1px;
+	}
+	.brd-style-line.medium {
+		border-top-width: 2px;
+	}
+	.brd-style-line.thick {
+		border-top-width: 3px;
+	}
+	.brd-style-line.dashed {
+		border-top-style: dashed;
+	}
+	.brd-style-line.dotted {
+		border-top-style: dotted;
+	}
+	.brd-style-line.double {
+		border-top-style: double;
+		border-top-width: 3px;
+	}
+	.brd-colors {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 3px;
+	}
+	.swatch.sm {
+		width: 16px;
+		height: 16px;
+	}
+	.swatch.sel {
+		outline: 2px solid var(--accent, var(--geist-foreground));
+		outline-offset: 1px;
+	}
+
+	.valign-glyph {
+		position: relative;
+		display: inline-block;
+		width: 13px;
+		height: 13px;
+		border: 1.5px solid currentColor;
+		border-radius: 2px;
+	}
+	.valign-glyph::after {
+		content: '';
+		position: absolute;
+		left: 2px;
+		right: 2px;
+		height: 1.6px;
+		background: currentColor;
+	}
+	.valign-glyph.top::after {
+		top: 2px;
+	}
+	.valign-glyph.middle::after {
+		top: 50%;
+		transform: translateY(-50%);
+	}
+	.valign-glyph.bottom::after {
+		bottom: 2px;
+	}
+	.indent-glyph {
+		position: relative;
+		display: inline-block;
+		width: 15px;
+		height: 11px;
+	}
+	.indent-glyph::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 1.6px;
+		background: currentColor;
+	}
+	.indent-glyph.dec::before {
+		right: 0;
+	}
+	.indent-glyph.inc::before {
+		left: 0;
+	}
+	.indent-glyph::after {
+		content: '▸';
+		position: absolute;
+		top: 50%;
+		left: 4px;
+		transform: translateY(-50%);
+		font-size: 8px;
+	}
+	.indent-glyph.dec::after {
+		content: '◂';
+	}
+	.merge-glyph {
+		position: relative;
+		display: inline-block;
+		width: 14px;
+		height: 12px;
+		border: 1.5px solid currentColor;
+		border-radius: 2px;
+	}
+	.merge-glyph::after {
+		content: '';
+		position: absolute;
+		top: 1px;
+		bottom: 1px;
+		left: 50%;
+		width: 1.5px;
+		background: var(--surface);
+	}
+	.dec-btn {
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		gap: 0;
+	}
+	.dec-arrow {
+		font-size: 9px;
+		margin-left: 1px;
+	}
+
+	/* ---- fill handle + preview ---- */
+	.fill-handle {
+		position: absolute;
+		width: 8px;
+		height: 8px;
+		transform: translate(-50%, -50%);
+		background: var(--accent, #3b82f6);
+		border: 1px solid var(--surface);
+		border-radius: 1px;
+		cursor: crosshair;
+		z-index: 8;
+	}
+	.fill-preview {
+		position: absolute;
+		pointer-events: none;
+		border: 2px dashed var(--accent, #3b82f6);
+		background: color-mix(in srgb, var(--accent, #3b82f6) 6%, transparent);
+		z-index: 7;
+		box-sizing: border-box;
+	}
+
+	/* ---- merged cell overlay ---- */
+	.merge-cell {
+		position: absolute;
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		padding: 0 5px;
+		font-size: 13px;
+		color: var(--geist-foreground);
+		background: var(--surface);
+		border-right: 1px solid var(--border);
+		border-bottom: 1px solid var(--border);
+		overflow: hidden;
+		white-space: nowrap;
+		cursor: cell;
+		box-sizing: border-box;
+		/* Above normal cells (0) but below the sticky header gutters (8–11). */
+		z-index: 1;
+	}
+	.merge-cell.selected {
+		background: color-mix(in srgb, var(--accent, #3b82f6) 12%, var(--surface));
+	}
+	.merge-cell.active {
+		box-shadow: inset 0 0 0 2px var(--accent, #3b82f6);
+		z-index: 3;
+	}
+
+	/* ---- frozen pane edges ---- */
+	.col-head.frozen-edge,
+	.cell.frozen-col-edge {
+		border-right: 1.5px solid var(--accents-4);
+	}
+	.row-head.frozen-edge,
+	.cell.frozen-row-edge {
+		border-bottom: 1.5px solid var(--accents-4);
+	}
+
+	/* ---- find & replace ---- */
+	.find-panel {
+		position: absolute;
+		top: 96px;
+		right: 18px;
+		z-index: 70;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 10px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		box-shadow: var(--shadow-medium);
+	}
+	.find-row {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.find-input {
+		width: 180px;
+		padding: 5px 8px;
+		font: inherit;
+		font-size: 13px;
+		color: var(--geist-foreground);
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		outline: none;
+	}
+	.find-input:focus {
+		border-color: var(--accent, var(--border-strong));
+	}
+	.find-count {
+		min-width: 34px;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		color: var(--accents-5);
+		text-align: center;
+	}
+	.find-nav {
+		min-width: 26px;
+		height: 26px;
+		font: inherit;
+		font-size: 13px;
+		color: var(--accents-6);
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		cursor: pointer;
+	}
+	.find-nav:hover {
+		background: var(--accents-1);
+	}
+	.find-nav.on {
+		background: var(--accent-soft, var(--accents-2));
+		color: var(--accent, var(--geist-foreground));
+	}
+	.find-btn {
+		padding: 5px 10px;
+		font: inherit;
+		font-size: 12px;
+		color: var(--geist-foreground);
+		background: var(--accents-1);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		cursor: pointer;
+	}
+	.find-btn:hover:not(:disabled) {
+		background: var(--surface);
+	}
+	.find-btn:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	/* ---- context menu ---- */
+	.ctx-menu {
+		position: fixed;
+		z-index: 80;
+		min-width: 190px;
+		max-height: 88vh;
+		overflow-y: auto;
+		padding: 4px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		box-shadow: var(--shadow-medium);
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.ctx-item {
+		display: flex;
+		align-items: center;
+		padding: 7px 10px;
+		font: inherit;
+		font-size: 13px;
+		color: var(--geist-foreground);
+		background: transparent;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.ctx-item:hover {
+		background: var(--accents-1);
+	}
+	.ctx-item.danger:hover {
+		color: var(--geist-error);
+		background: rgba(238, 0, 0, 0.08);
+	}
+	.ctx-sep {
+		height: 1px;
+		margin: 4px 2px;
+		background: var(--border);
+	}
 	.col-headers {
 		display: flex;
 		position: sticky;
 		top: 0;
-		z-index: 3;
+		/* Above every frozen data cell (max 6) and the row gutter (8/9). */
+		z-index: 10;
 		height: 26px;
 	}
 	.corner {
 		position: sticky;
 		left: 0;
-		z-index: 4;
+		z-index: 11;
 		flex-shrink: 0;
 		padding: 0;
 		background: var(--accents-2);
@@ -1616,7 +3392,8 @@
 	.row-head {
 		position: sticky;
 		left: 0;
-		z-index: 2;
+		/* Above frozen data cells (max 6) and merge overlays (1); below headers. */
+		z-index: 8;
 		flex-shrink: 0;
 		display: flex;
 		align-items: stretch;
