@@ -2,11 +2,17 @@
 	import { onMount } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import { EditorView } from '@codemirror/view';
-	import { EditorState } from '@codemirror/state';
+	import { EditorState, EditorSelection } from '@codemirror/state';
 	import Icon, { type IconName } from '$lib/client/components/Icon.svelte';
-	import { renderMarkdown, enhanceRendered, countWords, readingTimeMinutes } from '../markdown';
+	import { toasts } from '$lib/client/modules/toasts';
+	import { comments } from '../comments.svelte';
+	import { countWords, readingTimeMinutes, locateAnchorInText, type Anchor } from '../markdown';
+	import { livePreview } from '../livemd';
 	import {
 		buildExtensions,
+		commentHighlights,
+		refreshCommentsEffect,
+		outlineFromSource,
 		formatStateAt,
 		toggleBold,
 		toggleItalic,
@@ -24,26 +30,28 @@
 		undo,
 		redo,
 		openSearchPanel,
-		type FormatState
+		type FormatState,
+		type SourceOutlineItem
 	} from '../editor';
 
 	type Props = {
+		/** Document id — used for comment threads. Omit to disable commenting. */
+		documentId?: string | null;
 		content: string;
 		/** Fired on every keystroke with the full source (debounced upstream). */
 		onChange: (source: string) => void;
 		/** Cmd/Ctrl+S — flush the pending save. */
 		onSave?: () => void;
+		/** A comment highlight was clicked — focus its thread in the panel. */
+		onSelectThread?: (commentId: string) => void;
 	};
-	let { content, onChange, onSave }: Props = $props();
-
-	const LAYOUT_KEY = 'ms-doc-editor-layout';
+	let { documentId = null, content, onChange, onSave, onSelectThread }: Props = $props();
 
 	let host: HTMLDivElement | null = null;
+	let mainEl: HTMLDivElement | null = $state(null);
 	let view: EditorView | null = null;
-	let previewEl: HTMLDivElement | null = $state(null);
 	let scrollerEl: HTMLElement | null = null;
 
-	let layout = $state<'write' | 'split'>('write');
 	let fmt = $state<FormatState>({
 		bold: false,
 		italic: false,
@@ -68,6 +76,15 @@
 	// would clip absolutely-positioned children) — anchored at open time.
 	let menuPos = $state({ x: 0, y: 0 });
 
+	let statsTimer: ReturnType<typeof setTimeout> | null = null;
+	let outlineTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearTimer(t: ReturnType<typeof setTimeout> | null) {
+		if (t !== null) {
+			clearTimeout(t);
+		}
+	}
+
 	function openMenuAt(e: MouseEvent, which: 'block' | 'insert') {
 		const btn = e.currentTarget;
 		if (btn instanceof HTMLElement) {
@@ -78,24 +95,187 @@
 		insertMenuOpen = which === 'insert' ? !insertMenuOpen : false;
 	}
 
-	// Preview source trails the doc by a beat so marked doesn't run per keystroke.
-	let previewSrc = $state('');
-	let previewTimer: ReturnType<typeof setTimeout> | null = null;
-	let statsTimer: ReturnType<typeof setTimeout> | null = null;
-	const previewHtml = $derived(layout === 'split' ? renderMarkdown(previewSrc) : '');
-
-	function clearTimer(t: ReturnType<typeof setTimeout> | null) {
-		if (t !== null) {
-			clearTimeout(t);
-		}
-	}
-
 	const isMac =
 		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent ?? '');
 	const mod = isMac ? '⌘' : 'Ctrl+';
 	const alt = isMac ? '⌥' : 'Alt+';
 	const shift = isMac ? '⇧' : 'Shift+';
 
+	/* ---------------- outline ---------------- */
+	const OUTLINE_KEY = 'ms-doc-outline';
+	let outline = $state<SourceOutlineItem[]>([]);
+	let outlineHidden = $state(false);
+	let activeOutlineFrom = $state<number>(-1);
+
+	function setOutlineHidden(hidden: boolean) {
+		outlineHidden = hidden;
+		localStorage.setItem(OUTLINE_KEY, hidden ? 'hidden' : 'shown');
+	}
+
+	function refreshOutline(source: string) {
+		clearTimer(outlineTimer);
+		outlineTimer = setTimeout(() => {
+			outline = outlineFromSource(source);
+			refreshSpy();
+		}, 250);
+	}
+
+	function refreshSpy() {
+		if (!view || !scrollerEl || outline.length === 0) {
+			return;
+		}
+		const rect = scrollerEl.getBoundingClientRect();
+		const probe = view.posAtCoords({ x: rect.left + 24, y: rect.top + 90 }, false);
+		let active = outline[0]?.from ?? -1;
+		for (const item of outline) {
+			if (item.from <= probe) {
+				active = item.from;
+			} else {
+				break;
+			}
+		}
+		activeOutlineFrom = active;
+	}
+
+	function jumpToHeading(from: number) {
+		if (!view) {
+			return;
+		}
+		const pos = Math.min(from, view.state.doc.length);
+		activeOutlineFrom = from;
+		view.dispatch({
+			selection: EditorSelection.cursor(pos),
+			effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 24 })
+		});
+		view.focus();
+	}
+
+	/* ---------------- comments (dblclick → thread) ---------------- */
+	let pendingRange = $state<{ from: number; to: number; quote: string } | null>(null);
+	let popupX = $state(0);
+	let popupY = $state(0);
+	let showForm = $state(false);
+	let commentDraft = $state('');
+	let saving = $state(false);
+
+	const commentAnchors = () => {
+		if (!documentId) {
+			return [];
+		}
+		const out: ({ id: string } & Anchor)[] = [];
+		for (const c of comments.items) {
+			if (c.documentId !== documentId) {
+				continue;
+			}
+			if (c.anchorQuote === null || c.anchorStart === null || c.anchorEnd === null) {
+				continue;
+			}
+			out.push({
+				id: c.id,
+				quote: c.anchorQuote,
+				prefix: c.anchorPrefix,
+				suffix: c.anchorSuffix,
+				start: c.anchorStart,
+				end: c.anchorEnd
+			});
+		}
+		return out;
+	};
+
+	function dismissPopup() {
+		pendingRange = null;
+		showForm = false;
+		commentDraft = '';
+	}
+
+	function onDblClick() {
+		if (!documentId || !view || !mainEl) {
+			return;
+		}
+		// Let CodeMirror finish its word-selection first.
+		queueMicrotask(() => {
+			if (!view || !mainEl) {
+				return;
+			}
+			const sel = view.state.selection.main;
+			if (sel.empty) {
+				dismissPopup();
+				return;
+			}
+			const start = view.coordsAtPos(sel.from);
+			const end = view.coordsAtPos(sel.to);
+			if (!start || !end) {
+				return;
+			}
+			const hostRect = mainEl.getBoundingClientRect();
+			const rawX = (start.left + end.right) / 2 - hostRect.left;
+			const POPUP_HALF = 160;
+			const PAD = 12;
+			popupX = Math.max(POPUP_HALF + PAD, Math.min(mainEl.clientWidth - POPUP_HALF - PAD, rawX));
+			popupY = start.top - hostRect.top - 8;
+			pendingRange = {
+				from: sel.from,
+				to: sel.to,
+				quote: view.state.doc.sliceString(sel.from, sel.to)
+			};
+			showForm = false;
+			commentDraft = '';
+		});
+	}
+
+	function openForm() {
+		showForm = true;
+		queueMicrotask(() => {
+			const t = document.querySelector<HTMLTextAreaElement>('.cmt-popup textarea');
+			t?.focus();
+		});
+	}
+
+	async function submitComment() {
+		if (!documentId || !view || !pendingRange || !commentDraft.trim() || saving) {
+			return;
+		}
+		const doc = view.state.doc;
+		const { from, to } = pendingRange;
+		const CONTEXT = 32;
+		saving = true;
+		const result = await comments.startThread(documentId, {
+			body: commentDraft.trim(),
+			quote: doc.sliceString(from, to),
+			prefix: doc.sliceString(Math.max(0, from - CONTEXT), from),
+			suffix: doc.sliceString(to, Math.min(doc.length, to + CONTEXT)),
+			start: from,
+			end: to
+		});
+		saving = false;
+		if (result) {
+			toasts.success('Comment added');
+			dismissPopup();
+			view.dispatch({ effects: refreshCommentsEffect.of(null) });
+		}
+	}
+
+	/** Scroll the editor to a thread's anchored text and select it. */
+	export function scrollToThread(commentId: string) {
+		if (!view) {
+			return;
+		}
+		const anchor = commentAnchors().find((a) => a.id === commentId);
+		if (!anchor) {
+			return;
+		}
+		const hit = locateAnchorInText(view.state.doc.toString(), anchor);
+		if (!hit) {
+			return;
+		}
+		view.dispatch({
+			selection: EditorSelection.range(hit.start, hit.end),
+			effects: EditorView.scrollIntoView(hit.start, { y: 'center' })
+		});
+		view.focus();
+	}
+
+	/* ---------------- stats + view updates ---------------- */
 	function refreshStats(source: string) {
 		clearTimer(statsTimer);
 		statsTimer = setTimeout(() => {
@@ -117,40 +297,53 @@
 	function handleChange(source: string) {
 		onChange(source);
 		refreshStats(source);
-		clearTimer(previewTimer);
-		previewTimer = setTimeout(() => {
-			previewSrc = source;
-		}, 250);
+		refreshOutline(source);
+		dismissPopup();
 	}
 
 	onMount(() => {
-		layout = localStorage.getItem(LAYOUT_KEY) === 'split' ? 'split' : 'write';
-		previewSrc = content;
+		outlineHidden = localStorage.getItem(OUTLINE_KEY) === 'hidden';
 		words = countWords(content);
 		chars = content.length;
+		outline = outlineFromSource(content);
 
 		view = new EditorView({
 			parent: host!,
 			state: EditorState.create({
 				doc: content,
-				extensions: buildExtensions(
-					{
-						onChange: handleChange,
-						onViewUpdate: handleViewUpdate,
-						onSave: () => onSave?.()
-					},
-					'Start writing… Markdown, ⌘B bold, ⌘K links — it all works.'
-				)
+				extensions: [
+					...buildExtensions(
+						{
+							onChange: handleChange,
+							onViewUpdate: handleViewUpdate,
+							onSave: () => onSave?.()
+						},
+						'Start writing… Markdown renders as you type — ⌘B bold, ⌘K links.'
+					),
+					livePreview(),
+					commentHighlights({
+						getAnchors: commentAnchors,
+						onOrphans: (ids) => {
+							if (documentId) {
+								comments.setOrphans(ids);
+							}
+						},
+						onSelect: (id) => onSelectThread?.(id)
+					})
+				]
 			})
 		});
 		scrollerEl = view.scrollDOM;
 		scrollerEl.addEventListener('scroll', onEditorScroll, { passive: true });
+		view.contentDOM.addEventListener('dblclick', onDblClick);
 		handleViewUpdate(view);
+		refreshSpy();
 		view.focus();
 
 		return () => {
-			clearTimer(previewTimer);
 			clearTimer(statsTimer);
+			clearTimer(outlineTimer);
+			view?.contentDOM.removeEventListener('dblclick', onDblClick);
 			scrollerEl?.removeEventListener('scroll', onEditorScroll);
 			view?.destroy();
 			view = null;
@@ -171,53 +364,24 @@
 		}
 	};
 
-	function setLayout(next: 'write' | 'split') {
-		// The width change makes CodeMirror re-measure; pin the scroll position
-		// through it and refocus without letting focus() scroll on stale
-		// geometry (that race sent the editor to the document's end).
-		const scrollTop = scrollerEl?.scrollTop ?? 0;
-		layout = next;
-		localStorage.setItem(LAYOUT_KEY, next);
-		if (next === 'split' && view) {
-			previewSrc = view.state.doc.toString();
+	// Rebuild comment highlights when the thread set changes (loads async).
+	const syncCommentDecos: Attachment<HTMLDivElement> = () => {
+		void comments.items.length;
+		if (view) {
+			view.dispatch({ effects: refreshCommentsEffect.of(null) });
 		}
-		requestAnimationFrame(() => {
-			if (scrollerEl) {
-				scrollerEl.scrollTop = scrollTop;
-			}
-			view?.contentDOM.focus({ preventScroll: true });
-			if (next === 'split' && scrollerEl && previewEl) {
-				syncFrom(scrollerEl, previewEl);
-			}
-		});
-	}
+	};
 
-	/* ---- synced scrolling (percentage-based, active-pane guarded) ---- */
-	let activePane: 'editor' | 'preview' = 'editor';
-	let syncRaf = 0;
-
-	function syncFrom(source: HTMLElement, target: HTMLElement) {
-		cancelAnimationFrame(syncRaf);
-		syncRaf = requestAnimationFrame(() => {
-			const max = source.scrollHeight - source.clientHeight;
-			const ratio = max > 0 ? source.scrollTop / max : 0;
-			target.scrollTop = ratio * (target.scrollHeight - target.clientHeight);
-		});
-	}
 	function onEditorScroll() {
 		// Fixed-position menus would float detached from their anchor.
 		if (blockMenuOpen || insertMenuOpen) {
 			blockMenuOpen = false;
 			insertMenuOpen = false;
 		}
-		if (layout === 'split' && activePane === 'editor' && scrollerEl && previewEl) {
-			syncFrom(scrollerEl, previewEl);
+		if (pendingRange) {
+			dismissPopup();
 		}
-	}
-	function onPreviewScroll() {
-		if (activePane === 'preview' && scrollerEl && previewEl) {
-			syncFrom(previewEl, scrollerEl);
-		}
+		refreshSpy();
 	}
 
 	/* ---- toolbar actions ---- */
@@ -239,7 +403,7 @@
 
 	const blockLabel = $derived(fmt.heading === 0 ? 'Text' : `Heading ${fmt.heading}`);
 
-	// Close menus on any outside press.
+	// Close menus/popups on any outside press.
 	function onDocMouseDown(e: MouseEvent) {
 		const t = e.target;
 		if (!(t instanceof Element)) {
@@ -249,28 +413,14 @@
 			blockMenuOpen = false;
 			insertMenuOpen = false;
 		}
+		if (!t.closest('.cmt-popup') && !t.closest('.cmt-trigger') && !t.closest('.cm-editor')) {
+			dismissPopup();
+		}
 	}
 	onMount(() => {
 		document.addEventListener('mousedown', onDocMouseDown);
 		return () => document.removeEventListener('mousedown', onDocMouseDown);
 	});
-
-	const enhancePreview: Attachment<HTMLDivElement> = (node) => {
-		// Reading previewHtml makes this attachment re-run per preview render.
-		void previewHtml;
-		queueMicrotask(() => enhanceRendered(node));
-	};
-
-	// Track which pane the pointer is over (drives one-way scroll sync).
-	// Attachments instead of onpointerenter= — these divs aren't interactive,
-	// and the a11y lint rightly flags handler attributes on them.
-	const markActivePane = (pane: 'editor' | 'preview'): Attachment<HTMLDivElement> => {
-		return (node) => {
-			const enter = () => (activePane = pane);
-			node.addEventListener('pointerenter', enter);
-			return () => node.removeEventListener('pointerenter', enter);
-		};
-	};
 
 	type Tool = {
 		icon: IconName;
@@ -506,55 +656,111 @@
 				<Icon name="search" size={15} />
 			</button>
 		</div>
-
-		<span class="tb-sep"></span>
-
-		<div class="tb-layout" role="tablist" aria-label="Editor layout">
-			<button
-				type="button"
-				class="tb-layout-btn"
-				class:active={layout === 'write'}
-				role="tab"
-				aria-selected={layout === 'write'}
-				title="Source only"
-				aria-label="Source only"
-				onclick={() => setLayout('write')}
-			>
-				<Icon name="file-text" size={14} />
-			</button>
-			<button
-				type="button"
-				class="tb-layout-btn"
-				class:active={layout === 'split'}
-				role="tab"
-				aria-selected={layout === 'split'}
-				title="Live preview"
-				aria-label="Split with live preview"
-				onclick={() => setLayout('split')}
-			>
-				<Icon name="columns-2" size={14} />
-			</button>
-		</div>
 	</div>
 
-	<div class="ed-main" class:split={layout === 'split'}>
+	<div class="ed-main" bind:this={mainEl}>
+		{#if outline.length >= 2}
+			<nav class="outline" class:collapsed={outlineHidden} aria-label="Document outline">
+				{#if outlineHidden}
+					<button
+						type="button"
+						class="outline-reveal"
+						title="Show outline"
+						aria-label="Show document outline"
+						onclick={() => setOutlineHidden(false)}
+					>
+						<Icon name="list" size={14} />
+					</button>
+				{:else}
+					<div class="outline-head">
+						<span class="outline-title">Outline</span>
+						<button
+							type="button"
+							class="outline-hide"
+							title="Hide outline"
+							aria-label="Hide document outline"
+							onclick={() => setOutlineHidden(true)}
+						>
+							<Icon name="chevron-left" size={12} />
+						</button>
+					</div>
+					<ul class="outline-list">
+						{#each outline as item (item.from + item.text)}
+							<li>
+								<button
+									type="button"
+									class="outline-item lv{item.level}"
+									class:active={activeOutlineFrom === item.from}
+									onclick={() => jumpToHeading(item.from)}
+								>
+									{item.text}
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</nav>
+		{/if}
+
 		<div
 			class="ed-editor"
 			bind:this={host}
-			{@attach markActivePane('editor')}
 			{@attach syncExternalContent}
+			{@attach syncCommentDecos}
 		></div>
-		{#if layout === 'split'}
-			<div
-				class="ed-preview"
-				bind:this={previewEl}
-				{@attach markActivePane('preview')}
-				onscroll={onPreviewScroll}
-				aria-label="Live preview"
+
+		{#if pendingRange && !showForm}
+			<button
+				type="button"
+				class="cmt-trigger"
+				style="left: {popupX}px; top: {popupY}px;"
+				onmousedown={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+				}}
+				onclick={openForm}
+				title="Comment on selection"
 			>
-				<div class="ed-preview-body md-body" {@attach enhancePreview}>
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized by renderMarkdown -->
-					{@html previewHtml}
+				<Icon name="plus" size={11} />
+				<span>Comment</span>
+			</button>
+		{/if}
+
+		{#if pendingRange && showForm}
+			<div
+				class="cmt-popup"
+				style="left: {popupX}px; top: {popupY + 12}px;"
+				role="dialog"
+				aria-label="Add comment"
+				tabindex="-1"
+				onmousedown={(e) => e.stopPropagation()}
+			>
+				<div class="cmt-quote">"{pendingRange.quote}"</div>
+				<textarea
+					class="cmt-input"
+					bind:value={commentDraft}
+					placeholder="Write a comment…"
+					rows="3"
+					onkeydown={(e) => {
+						if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+							e.preventDefault();
+							submitComment();
+						} else if (e.key === 'Escape') {
+							e.preventDefault();
+							dismissPopup();
+						}
+					}}
+				></textarea>
+				<div class="cmt-actions">
+					<button type="button" class="btn ghost" onclick={dismissPopup}>Cancel</button>
+					<button
+						type="button"
+						class="btn primary"
+						disabled={!commentDraft.trim() || saving}
+						onclick={submitComment}
+					>
+						{saving ? 'Saving…' : 'Comment'}
+					</button>
 				</div>
 			</div>
 		{/if}
@@ -580,6 +786,7 @@
 <style>
 	.ed-root {
 		flex: 1;
+		min-width: 0;
 		min-height: 0;
 		display: flex;
 		flex-direction: column;
@@ -742,41 +949,129 @@
 		color: var(--muted);
 	}
 
-	.tb-layout {
-		display: inline-flex;
-		gap: 1px;
-		flex-shrink: 0;
+	/* ---------- main: outline + editor ---------- */
+	.ed-main {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		display: flex;
 	}
-	.tb-layout-btn {
+
+	.outline {
+		flex: 0 0 216px;
+		min-height: 0;
+		padding: 22px 8px 20px 18px;
+		overflow-y: auto;
+		background: var(--surface);
+	}
+	.outline.collapsed {
+		flex: 0 0 44px;
+		padding: 16px 6px;
+		display: flex;
+		justify-content: center;
+		align-items: flex-start;
+	}
+	.outline-reveal {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 30px;
-		height: 30px;
+		width: 28px;
+		height: 28px;
 		padding: 0;
-		font: inherit;
 		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 6px;
 		cursor: pointer;
 	}
-	.tb-layout-btn:hover {
+	.outline-reveal:hover {
 		color: var(--fg);
 		background: var(--bg-2);
 	}
-	.tb-layout-btn.active {
+	.outline-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 8px 8px 10px;
+	}
+	.outline-title {
+		font-size: 11px;
+		font-weight: 650;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.outline-hide {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		color: var(--muted-2);
+		background: transparent;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity var(--duration-fast) var(--ease-out);
+	}
+	.outline:hover .outline-hide,
+	.outline-hide:focus-visible {
+		opacity: 1;
+	}
+	.outline-hide:hover {
+		color: var(--fg);
+		background: var(--bg-2);
+	}
+	.outline-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.outline-item {
+		display: block;
+		width: 100%;
+		padding: 4px 8px 4px 10px;
+		font: inherit;
+		font-size: 12.5px;
+		font-weight: 450;
+		line-height: 1.45;
+		color: var(--fg-2);
+		background: transparent;
+		border: none;
+		border-left: 2px solid transparent;
+		border-radius: 0 6px 6px 0;
+		cursor: pointer;
+		text-align: left;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		transition:
+			color var(--duration-fast) var(--ease-out),
+			background var(--duration-fast) var(--ease-out);
+	}
+	.outline-item:hover {
+		color: var(--fg);
+		background: var(--bg-2);
+	}
+	.outline-item.active {
 		color: var(--accent);
-		background: var(--accent-soft);
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+		border-left-color: var(--accent);
+		font-weight: 560;
+	}
+	.outline-item.lv2 {
+		padding-left: 22px;
+	}
+	.outline-item.lv3 {
+		padding-left: 34px;
+		font-size: 12px;
 	}
 
-	/* ---------- editor + preview ---------- */
-	.ed-main {
-		flex: 1;
-		min-height: 0;
-		display: flex;
-	}
 	.ed-editor {
 		flex: 1;
 		min-width: 0;
@@ -789,20 +1084,251 @@
 		min-height: 0;
 	}
 
-	.ed-main.split .ed-editor {
-		flex: 1 1 50%;
-		border-right: 1px solid var(--border);
+	/* ---------- live-preview decorations ---------- */
+	.ed-editor :global(.livemd-bullet) {
+		display: inline-block;
+		color: var(--muted-2);
+		font-weight: 700;
 	}
-	.ed-preview {
-		flex: 1 1 50%;
-		min-width: 0;
+	.ed-editor :global(.livemd-task) {
+		display: inline-flex;
+		align-items: center;
+	}
+	.ed-editor :global(.livemd-task input) {
+		appearance: none;
+		-webkit-appearance: none;
+		width: 15px;
+		height: 15px;
+		margin: 0 2px 0 0;
+		vertical-align: -2.5px;
+		border: 1.5px solid var(--border-strong);
+		border-radius: 4.5px;
+		background: var(--surface);
+		cursor: pointer;
+		position: relative;
+		transition:
+			background var(--duration-fast) var(--ease-out),
+			border-color var(--duration-fast) var(--ease-out);
+	}
+	.ed-editor :global(.livemd-task input:hover) {
+		border-color: var(--accent);
+	}
+	.ed-editor :global(.livemd-task input:checked) {
+		background: var(--accent);
+		border-color: var(--accent);
+	}
+	.ed-editor :global(.livemd-task input:checked::after) {
+		content: '';
+		position: absolute;
+		left: 4px;
+		top: 1px;
+		width: 4px;
+		height: 8px;
+		border: solid var(--bg);
+		border-width: 0 1.8px 1.8px 0;
+		transform: rotate(45deg);
+	}
+	.ed-editor :global(.livemd-task-done) {
+		color: var(--muted);
+	}
+	.ed-editor :global(.livemd-hr) {
+		display: inline-block;
+		width: 100%;
+		height: 0.5em;
+		border-bottom: 1px solid var(--border);
+		vertical-align: middle;
+	}
+	.ed-editor :global(.livemd-quote) {
+		border-left: 2px solid var(--soft);
+		padding-left: 14px !important;
+	}
+	.ed-editor :global(.livemd-codeline) {
+		background: var(--bg-2);
+	}
+	.ed-editor :global(.livemd-fence) {
+		color: var(--muted-2);
+	}
+	.ed-editor :global(.livemd-code) {
+		background: var(--bg-2);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		padding: 1px 4px;
+	}
+	.ed-editor :global(.livemd-link) {
+		color: var(--accent);
+		text-decoration: underline;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+	.ed-editor :global(.livemd-callout) {
+		font-size: 0.82em;
+		font-weight: 650;
+		letter-spacing: 0.05em;
+		color: var(--callout-hue, var(--accent));
+		background: color-mix(in srgb, var(--callout-hue, var(--accent)) 12%, transparent);
+		border-radius: 5px;
+		padding: 1px 6px;
+	}
+	.ed-editor :global(.livemd-callout-tip) {
+		--callout-hue: var(--sage);
+	}
+	.ed-editor :global(.livemd-callout-important) {
+		--callout-hue: var(--code-kw);
+	}
+	.ed-editor :global(.livemd-callout-warning) {
+		--callout-hue: var(--saffron);
+	}
+	.ed-editor :global(.livemd-callout-caution) {
+		--callout-hue: var(--rose);
+	}
+	.ed-editor :global(.livemd-mermaid) {
+		padding: 6px 0;
+		text-align: center;
+		cursor: default;
+	}
+	.ed-editor :global(.livemd-mermaid pre.mermaid-diagram) {
+		position: relative;
+		margin: 0;
+		padding: 0;
+		background: transparent;
+		border: none;
+		font-family: var(--font-mono);
+		white-space: pre-wrap;
+		color: var(--muted);
+	}
+	.ed-editor :global(.livemd-mermaid svg) {
+		max-width: 100%;
+		height: auto;
+	}
+	.ed-editor :global(.livemd-mermaid .mermaid-fullscreen-btn) {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		color: var(--muted);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity var(--duration-fast) var(--ease-out);
+	}
+	.ed-editor :global(.livemd-mermaid:hover .mermaid-fullscreen-btn) {
+		opacity: 1;
+	}
+	.ed-editor :global(.livemd-mermaid .mermaid-fullscreen-btn svg) {
+		width: 15px;
+		height: 15px;
+	}
+
+	/* ---------- comment anchors ---------- */
+	.ed-editor :global(.cm-comment-anchor) {
+		background: color-mix(in srgb, var(--saffron) 14%, transparent);
+		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--saffron) 55%, transparent);
+		border-radius: 2px;
+		cursor: pointer;
+	}
+	.ed-editor :global(.cm-comment-anchor:hover) {
+		background: color-mix(in srgb, var(--saffron) 26%, transparent);
+	}
+
+	/* ---------- comment trigger + popup ---------- */
+	.cmt-trigger {
+		position: absolute;
+		transform: translate(-50%, -100%);
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 5px 9px;
+		font: inherit;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--bg);
+		background: var(--fg);
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		box-shadow: var(--shadow-md);
+		z-index: 5;
+	}
+	.cmt-trigger:hover {
+		opacity: 0.92;
+	}
+	.cmt-popup {
+		position: absolute;
+		transform: translate(-50%, 0);
+		width: 320px;
+		padding: 10px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		box-shadow: var(--shadow-md);
+		z-index: 6;
+	}
+	.cmt-quote {
+		font-size: 12px;
+		color: var(--fg-2);
+		background: var(--bg-2);
+		padding: 6px 8px;
+		border-radius: 5px;
+		margin-bottom: 8px;
+		max-height: 60px;
 		overflow-y: auto;
-		background: var(--bg);
+		font-style: italic;
 	}
-	.ed-preview-body {
-		max-width: 720px;
-		margin: 0 auto;
-		padding: 32px 40px 45vh;
+	.cmt-input {
+		width: 100%;
+		padding: 8px 10px;
+		font: inherit;
+		font-size: 13px;
+		color: var(--fg);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		outline: none;
+		resize: vertical;
+		min-height: 60px;
+	}
+	.cmt-input:focus {
+		border-color: var(--accent);
+	}
+	.cmt-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 6px;
+		margin-top: 8px;
+	}
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 28px;
+		padding: 0 12px;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 500;
+		border-radius: 6px;
+		border: 1px solid;
+		cursor: pointer;
+	}
+	.btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.btn.ghost {
+		color: var(--fg-2);
+		background: transparent;
+		border-color: var(--border);
+	}
+	.btn.primary {
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 	}
 
 	/* ---------- CodeMirror search panel, restyled ---------- */
@@ -908,14 +1434,12 @@
 		font-weight: 500;
 	}
 
+	@media (max-width: 1080px) {
+		.outline {
+			display: none;
+		}
+	}
 	@media (max-width: 860px) {
-		.ed-main.split {
-			flex-direction: column;
-		}
-		.ed-main.split .ed-editor {
-			border-right: none;
-			border-bottom: 1px solid var(--border);
-		}
 		.st-item:nth-last-child(3),
 		.st-dot:nth-last-child(2) {
 			display: none;

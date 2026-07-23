@@ -644,8 +644,17 @@
 
 /* ==========================================================================
    Print — a document prints like a document: just the rendered markdown,
-   black on white, no app chrome. Triggered from the Export menu.
+   black on white, no app chrome. Triggered from the Export menu, which
+   mounts the rendered doc into a .print-surface (hidden on screen).
    ========================================================================== */
+.print-surface {
+	display: none;
+}
+@media print {
+	.print-surface {
+		display: block;
+	}
+}
 @media print {
 	body {
 		background: #fff !important;

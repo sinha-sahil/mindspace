@@ -19,11 +19,22 @@ function createSidebarStore() {
 		}
 	}
 
+	/**
+	 * Collapse without persisting — used when a width-hungry view (the doc
+	 * editor) opens. The user's stored preference is untouched, so the rail
+	 * comes back on the next app load, and the toggle still works to
+	 * re-expand right away.
+	 */
+	function collapseForView() {
+		state.collapsed = true;
+	}
+
 	return {
 		get collapsed() {
 			return state.collapsed;
 		},
-		toggle
+		toggle,
+		collapseForView
 	};
 }
 

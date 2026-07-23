@@ -4,10 +4,10 @@
 	import { Button, Tooltip } from 'polymorph-ui-components';
 	import Icon, { type IconName } from '$lib/client/components/Icon.svelte';
 	import { toasts } from '$lib/client/modules/toasts';
+	import { sidebar } from '$lib/client/modules/sidebar';
 	import { documents } from '../store.svelte';
 	import { comments } from '../comments.svelte';
-	import { countWords, readingTimeMinutes } from '../markdown';
-	import MarkdownView from './MarkdownView.svelte';
+	import { countWords, readingTimeMinutes, renderMarkdown, enhanceRendered } from '../markdown';
 	import MarkdownEditor from './MarkdownEditor.svelte';
 	import CommentsPanel from './CommentsPanel.svelte';
 	import MermaidFullscreen from './MermaidFullscreen.svelte';
@@ -19,17 +19,19 @@
 	};
 	let { projectId, supabase }: Props = $props();
 
-	let mode = $state<'view' | 'edit'>('view');
 	let focusedThreadId = $state<string | null>(null);
 	let exportOpen = $state(false);
-	let sectionEl: HTMLElement | null = $state(null);
-
-	const isMac =
-		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent ?? '');
-	const modKey = isMac ? '⌘' : 'Ctrl+';
+	let editorRef: { scrollToThread: (id: string) => void } | null = $state(null);
 
 	const fmtNum = new Intl.NumberFormat();
 	const docWords = $derived(documents.active ? countWords(documents.active.content) : 0);
+
+	// The doc editor is the width-hungriest view in the app — tuck the app
+	// rail away when it opens. Non-persistent: the user's stored preference
+	// survives, and the rail toggle brings it right back.
+	onMount(() => {
+		sidebar.collapseForView();
+	});
 
 	function saveActive(source: string) {
 		const id = documents.activeId;
@@ -78,31 +80,28 @@
 		}
 	}
 
+	// Print renders the document into a hidden print-only surface (the live
+	// editor is not a printable artifact — the reader typography is).
+	let printing = $state(false);
+	const printHtml = $derived(
+		printing && documents.active ? renderMarkdown(documents.active.content) : ''
+	);
+
+	const enhancePrintSurface: Attachment<HTMLDivElement> = (node) => {
+		void printHtml;
+		queueMicrotask(() => enhanceRendered(node));
+	};
+
 	async function printDoc() {
 		exportOpen = false;
-		if (mode === 'edit') {
-			mode = 'view';
-			await tick();
-		}
+		printing = true;
+		await tick();
 		// Give the async render upgrades (highlighting, diagrams) a beat.
-		setTimeout(() => window.print(), 350);
+		setTimeout(() => window.print(), 400);
 	}
 
-	// Cmd/Ctrl+E toggles Read ↔ Edit — scoped to the pane the user is
-	// actually in (hover or focus), since split view can host two projects.
-	function onGlobalKeydown(e: KeyboardEvent) {
-		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'e' || e.shiftKey || e.altKey) {
-			return;
-		}
-		if (!sectionEl || !documents.active) {
-			return;
-		}
-		const within = sectionEl.contains(document.activeElement) || sectionEl.matches(':hover');
-		if (!within) {
-			return;
-		}
-		e.preventDefault();
-		mode = mode === 'view' ? 'edit' : 'view';
+	function onAfterPrint() {
+		printing = false;
 	}
 
 	function onGlobalMouseDown(e: MouseEvent) {
@@ -113,11 +112,11 @@
 	}
 
 	onMount(() => {
-		window.addEventListener('keydown', onGlobalKeydown);
 		document.addEventListener('mousedown', onGlobalMouseDown);
+		window.addEventListener('afterprint', onAfterPrint);
 		return () => {
-			window.removeEventListener('keydown', onGlobalKeydown);
 			document.removeEventListener('mousedown', onGlobalMouseDown);
+			window.removeEventListener('afterprint', onAfterPrint);
 		};
 	});
 
@@ -174,7 +173,6 @@
 		const created = await documents.add();
 		if (created) {
 			toasts.success('Document created', { description: created.name });
-			mode = 'edit';
 		}
 	}
 
@@ -251,13 +249,10 @@
 	}
 
 	function jumpToComment(commentId: string) {
-		// Both: scroll the rendered view to the highlighted span, AND focus
-		// the thread in the side panel for visual emphasis.
+		// Both: scroll the editor to the anchored text, AND focus the thread
+		// in the side panel for visual emphasis.
 		focusedThreadId = commentId;
-		const mark = document.querySelector(`mark.comment-mark[data-comment-id="${commentId}"]`);
-		if (mark instanceof HTMLElement) {
-			mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-		}
+		editorRef?.scrollToThread(commentId);
 	}
 
 	function onMarkClick(commentId: string) {
@@ -289,7 +284,7 @@
 	}
 </script>
 
-<section class="layout" bind:this={sectionEl} {@attach loadDocs}>
+<section class="layout" {@attach loadDocs}>
 	<aside class="files">
 		<header class="files-head">
 			<span class="files-title">Documents</span>
@@ -354,7 +349,6 @@
 								class="file-btn"
 								onclick={() => {
 									documents.select(doc.id);
-									mode = 'view';
 									titleEditing = false;
 								}}
 							>
@@ -438,50 +432,30 @@
 							</div>
 						{/if}
 					</div>
-					<div class="mode-toggle" role="tablist" aria-label="View mode">
-						<button
-							type="button"
-							class="mode-btn"
-							class:active={mode === 'view'}
-							role="tab"
-							aria-selected={mode === 'view'}
-							title="Read ({modKey}E)"
-							onclick={() => (mode = 'view')}
-						>
-							<Icon name="eye" size={12} />
-							<span>Read</span>
-						</button>
-						<button
-							type="button"
-							class="mode-btn"
-							class:active={mode === 'edit'}
-							role="tab"
-							aria-selected={mode === 'edit'}
-							title="Edit ({modKey}E)"
-							onclick={() => (mode = 'edit')}
-						>
-							<Icon name="pencil" size={12} />
-							<span>Edit</span>
-						</button>
-					</div>
 				</div>
 			</header>
 
 			<div class="doc-body">
-				{#key doc.id + ':' + mode}
-					{#if mode === 'view'}
-						<MarkdownView
-							documentId={doc.id}
-							content={doc.content}
-							onSelectThread={onMarkClick}
-							onChange={saveActive}
-							onRequestEdit={() => (mode = 'edit')}
-						/>
-					{:else}
-						<MarkdownEditor content={doc.content} onChange={saveActive} onSave={flushActiveSave} />
-					{/if}
+				{#key doc.id}
+					<MarkdownEditor
+						bind:this={editorRef}
+						documentId={doc.id}
+						content={doc.content}
+						onChange={saveActive}
+						onSave={flushActiveSave}
+						onSelectThread={onMarkClick}
+					/>
 				{/key}
 			</div>
+
+			{#if printing}
+				<div class="print-surface">
+					<div class="print-root md-body" {@attach enhancePrintSurface}>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized by renderMarkdown -->
+						{@html printHtml}
+					</div>
+				</div>
+			{/if}
 		{:else}
 			<div class="empty">
 				<p>No document selected.</p>
@@ -807,33 +781,6 @@
 		50% {
 			opacity: 0.4;
 		}
-	}
-
-	.mode-toggle {
-		display: inline-flex;
-		padding: 2px;
-		background: var(--accents-1);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.mode-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		padding: 3px 10px;
-		font: inherit;
-		font-size: 11.5px;
-		font-weight: 500;
-		color: var(--accents-6);
-		background: transparent;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-	}
-	.mode-btn.active {
-		color: var(--geist-foreground);
-		background: var(--surface);
-		box-shadow: var(--shadow-sm);
 	}
 
 	.doc-body {

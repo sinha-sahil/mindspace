@@ -10,7 +10,6 @@
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import MarkdownEditor from '$lib/client/modules/documents/ui/MarkdownEditor.svelte';
-	import MarkdownView from '$lib/client/modules/documents/ui/MarkdownView.svelte';
 	import MermaidFullscreen from '$lib/client/modules/documents/ui/MermaidFullscreen.svelte';
 	import { theme } from '$lib/client/modules/theme';
 
@@ -98,7 +97,6 @@ Footnotes, a divider above, and a horizontal-scroll table live here for renderin
 `;
 
 	let content = $state(SAMPLE);
-	let mode = $state<'view' | 'edit'>('edit');
 	let saved = $state(true);
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -137,46 +135,11 @@ Footnotes, a divider above, and a horizontal-scroll table live here for renderin
 			<span class="save-pill" class:saving={!saved}>
 				<span class="dot"></span>{saved ? 'Saved' : 'Saving'}
 			</span>
-			<div class="mode-toggle" role="tablist" aria-label="View mode">
-				<button
-					type="button"
-					class="mode-btn"
-					class:active={mode === 'view'}
-					role="tab"
-					aria-selected={mode === 'view'}
-					onclick={() => (mode = 'view')}
-				>
-					<Icon name="eye" size={12} />
-					<span>Read</span>
-				</button>
-				<button
-					type="button"
-					class="mode-btn"
-					class:active={mode === 'edit'}
-					role="tab"
-					aria-selected={mode === 'edit'}
-					onclick={() => (mode = 'edit')}
-				>
-					<Icon name="pencil" size={12} />
-					<span>Edit</span>
-				</button>
-			</div>
 		</div>
 	</header>
 
 	<div class="body">
-		{#key mode}
-			{#if mode === 'view'}
-				<MarkdownView
-					documentId="dev-doc"
-					{content}
-					{onChange}
-					onRequestEdit={() => (mode = 'edit')}
-				/>
-			{:else}
-				<MarkdownEditor {content} {onChange} onSave={() => (saved = true)} />
-			{/if}
-		{/key}
+		<MarkdownEditor documentId={null} {content} {onChange} onSave={() => (saved = true)} />
 	</div>
 </div>
 
@@ -248,32 +211,6 @@ Footnotes, a divider above, and a horizontal-scroll table live here for renderin
 	}
 	.save-pill.saving .dot {
 		background: var(--saffron);
-	}
-	.mode-toggle {
-		display: inline-flex;
-		padding: 2px;
-		background: var(--bg-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.mode-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		padding: 3px 10px;
-		font: inherit;
-		font-size: 11.5px;
-		font-weight: 500;
-		color: var(--fg-2);
-		background: transparent;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-	}
-	.mode-btn.active {
-		color: var(--fg);
-		background: var(--surface);
-		box-shadow: var(--shadow-sm);
 	}
 	.body {
 		flex: 1;

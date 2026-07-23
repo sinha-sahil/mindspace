@@ -11,9 +11,21 @@ import {
 	keymap,
 	placeholder as cmPlaceholder,
 	drawSelection,
-	dropCursor
+	dropCursor,
+	Decoration,
+	ViewPlugin,
+	type DecorationSet,
+	type ViewUpdate
 } from '@codemirror/view';
-import { EditorState, EditorSelection, Prec, type Extension } from '@codemirror/state';
+import {
+	EditorState,
+	EditorSelection,
+	Prec,
+	StateEffect,
+	type Extension,
+	type Range
+} from '@codemirror/state';
+import { locateAnchorInText, type Anchor } from './markdown';
 import {
 	defaultKeymap,
 	history,
@@ -552,6 +564,115 @@ const mdHighlight = HighlightStyle.define([
 	{ tag: tags.propertyName, color: 'var(--code-attr)' },
 	{ tag: [tags.bool, tags.null], color: 'var(--code-num)' }
 ]);
+
+/* ==========================================================================
+   Comment anchors — saffron highlights over the markdown source, resolved
+   with the same quote-matching fallbacks as the rendered view.
+   ========================================================================== */
+
+export type CommentAnchorSpec = { id: string } & Anchor;
+
+/** Dispatch this effect after the comment set changes so highlights rebuild. */
+export const refreshCommentsEffect = StateEffect.define<null>();
+
+export function commentHighlights(opts: {
+	getAnchors: () => CommentAnchorSpec[];
+	onOrphans?: (ids: Set<string>) => void;
+	onSelect?: (id: string) => void;
+}): Extension {
+	function build(state: EditorState): DecorationSet {
+		const text = state.doc.toString();
+		const ranges: Range<Decoration>[] = [];
+		const orphans = new Set<string>();
+		for (const a of opts.getAnchors()) {
+			const hit = locateAnchorInText(text, a);
+			if (hit && hit.end > hit.start) {
+				ranges.push(
+					Decoration.mark({
+						class: 'cm-comment-anchor',
+						attributes: { 'data-comment-id': a.id }
+					}).range(hit.start, hit.end)
+				);
+			} else {
+				orphans.add(a.id);
+			}
+		}
+		opts.onOrphans?.(orphans);
+		return Decoration.set(ranges, true);
+	}
+
+	return ViewPlugin.fromClass(
+		class {
+			decorations: DecorationSet;
+			constructor(view: EditorView) {
+				this.decorations = build(view.state);
+			}
+			update(u: ViewUpdate) {
+				const refreshed = u.transactions.some((tr) =>
+					tr.effects.some((e) => e.is(refreshCommentsEffect))
+				);
+				if (u.docChanged || refreshed) {
+					this.decorations = build(u.state);
+				}
+			}
+		},
+		{
+			decorations: (v) => v.decorations,
+			eventHandlers: {
+				mousedown(event) {
+					const t = event.target;
+					if (t instanceof Element) {
+						const mark = t.closest('.cm-comment-anchor');
+						if (mark instanceof HTMLElement && mark.dataset.commentId) {
+							opts.onSelect?.(mark.dataset.commentId);
+						}
+					}
+					return false; // never swallow — the click still places the cursor
+				}
+			}
+		}
+	);
+}
+
+/* ==========================================================================
+   Outline over raw markdown source (h1-h3, fenced code skipped).
+   ========================================================================== */
+
+export type SourceOutlineItem = {
+	level: number;
+	text: string;
+	/** Doc offset of the heading line start. */
+	from: number;
+};
+
+export function outlineFromSource(source: string): SourceOutlineItem[] {
+	const items: SourceOutlineItem[] = [];
+	const lines = source.split('\n');
+	let inFence = false;
+	let fenceMark = '';
+	let pos = 0;
+	for (const line of lines) {
+		const fence = line.match(/^\s*(```|~~~)/);
+		if (fence) {
+			if (!inFence) {
+				inFence = true;
+				fenceMark = fence[1];
+			} else if (fence[1] === fenceMark) {
+				inFence = false;
+			}
+		} else if (!inFence) {
+			const m = line.match(/^(#{1,3})\s+(.+?)\s*#*\s*$/);
+			if (m) {
+				const text = m[2].replace(/[*_~`[\]]/g, '').trim();
+				if (text) {
+					items.push({ level: m[1].length, text, from: pos });
+				}
+			}
+		}
+		pos += line.length + 1;
+	}
+	return items;
+}
 
 export type EditorCallbacks = {
 	/** Fired on every document change with the full new source. */

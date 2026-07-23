@@ -574,7 +574,24 @@ const MAX_PARTIAL_TRIM_WORDS = 4;
  * Returns null only when no usable substring of the quote can be found.
  */
 export function rangeFromAnchor(container: HTMLElement, anchor: Anchor): Range | null {
-	const text = container.textContent ?? '';
+	const located = locateAnchorInText(container.textContent ?? '', anchor);
+	if (!located) {
+		return null;
+	}
+	return rangeFromOffsets(container, located.start, located.end);
+}
+
+/**
+ * The pure-text half of anchor resolution — find the anchor's quote inside
+ * `text` (which may be rendered plain text OR raw markdown source; the
+ * fallbacks tolerate whitespace drift either way). Used by rangeFromAnchor
+ * for the DOM path and by the live editor to place comment highlights over
+ * the markdown source.
+ */
+export function locateAnchorInText(
+	text: string,
+	anchor: Anchor
+): { start: number; end: number } | null {
 	if (!text) {
 		return null;
 	}
@@ -614,7 +631,7 @@ export function rangeFromAnchor(container: HTMLElement, anchor: Anchor): Range |
 		}
 	}
 
-	return rangeFromOffsets(container, start, end);
+	return { start, end };
 }
 
 const REGEX_META = /[.*+?^${}()|[\]\\]/g;

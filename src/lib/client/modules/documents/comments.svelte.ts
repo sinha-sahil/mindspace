@@ -64,7 +64,7 @@ function createCommentsStore() {
 		loading: boolean;
 		error: string | null;
 		/** Comment ids whose anchor couldn't be located in the rendered text.
-		 *  Written by MarkdownView after each highlight pass, read by
+		 *  Written by the editor after each highlight pass, read by
 		 *  CommentsPanel to badge orphaned threads. */
 		orphanIds: Set<string>;
 	}>({
