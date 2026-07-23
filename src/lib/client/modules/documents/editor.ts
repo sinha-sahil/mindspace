@@ -517,7 +517,7 @@ const editorTheme = EditorView.theme({
 			background: 'color-mix(in srgb, var(--accent) 16%, transparent) !important'
 		},
 	'.cm-selectionMatch': {
-		background: 'color-mix(in srgb, var(--saffron) 16%, transparent)',
+		background: 'color-mix(in srgb, var(--fg) 9%, transparent)',
 		borderRadius: '2px'
 	},
 	'.cm-searchMatch': {
@@ -531,18 +531,33 @@ const editorTheme = EditorView.theme({
 	'.cm-placeholder': { color: 'var(--muted-2)' }
 });
 
-/** Markdown source highlighting — editorial: structure pops, marks recede. */
+/** Markdown source highlighting — editorial: structure pops, marks recede.
+ *  H1/H2 borrow the reader's Fraunces display voice so the live view feels
+ *  like the document, not a code buffer. */
 const mdHighlight = HighlightStyle.define([
-	{ tag: tags.heading1, fontSize: '1.55em', fontWeight: '700', lineHeight: '1.3' },
-	{ tag: tags.heading2, fontSize: '1.3em', fontWeight: '700', lineHeight: '1.3' },
-	{ tag: tags.heading3, fontSize: '1.12em', fontWeight: '650', lineHeight: '1.3' },
+	{
+		tag: tags.heading1,
+		fontFamily: 'var(--font-display)',
+		fontSize: '1.9em',
+		fontWeight: '550',
+		letterSpacing: '-0.02em',
+		lineHeight: '1.25'
+	},
+	{
+		tag: tags.heading2,
+		fontFamily: 'var(--font-display)',
+		fontSize: '1.5em',
+		fontWeight: '560',
+		letterSpacing: '-0.015em',
+		lineHeight: '1.3'
+	},
+	{ tag: tags.heading3, fontSize: '1.15em', fontWeight: '650', lineHeight: '1.3' },
 	{ tag: tags.heading4, fontWeight: '650' },
 	{ tag: tags.heading5, fontWeight: '650' },
 	{ tag: tags.heading6, fontWeight: '650', color: 'var(--fg-2)' },
 	{ tag: tags.strong, fontWeight: '680' },
 	{ tag: tags.emphasis, fontStyle: 'italic' },
 	{ tag: tags.strikethrough, textDecoration: 'line-through', color: 'var(--muted)' },
-	{ tag: tags.monospace, color: 'var(--code-fn)' },
 	{ tag: tags.link, color: 'var(--accent)' },
 	{ tag: tags.url, color: 'var(--muted)', textDecoration: 'underline' },
 	{ tag: tags.labelName, color: 'var(--accent)' },
@@ -753,10 +768,12 @@ export function buildExtensions(cb: EditorCallbacks, placeholderText: string): E
 		syntaxHighlighting(mdHighlight),
 		EditorView.lineWrapping,
 		cmPlaceholder(placeholderText),
+		// Spellcheck off: technical docs are dense with identifiers and paths,
+		// and the browser's red squiggles turn the live view into noise.
 		EditorView.contentAttributes.of({
-			spellcheck: 'true',
-			autocorrect: 'on',
-			autocapitalize: 'on',
+			spellcheck: 'false',
+			autocorrect: 'off',
+			autocapitalize: 'off',
 			'aria-label': 'Markdown source'
 		}),
 		editorTheme,

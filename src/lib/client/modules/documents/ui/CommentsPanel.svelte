@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { colorForKey, initialFor } from '$lib/client/utils/color';
 	import { comments, type Comment } from '../comments.svelte';
@@ -15,6 +17,23 @@
 	let { documentId, onJump, focusThreadId = null }: Props = $props();
 
 	const threads = $derived(comments.threads.filter((t) => t.documentId === documentId));
+
+	// Collapsible — the panel is 320px of width a reader often wants back.
+	// Persisted globally (not per doc); focusing a thread auto-expands.
+	const PANEL_KEY = 'ms-doc-threads';
+	let collapsed = $state(false);
+	onMount(() => {
+		collapsed = localStorage.getItem(PANEL_KEY) === 'collapsed';
+	});
+	function setCollapsed(next: boolean) {
+		collapsed = next;
+		localStorage.setItem(PANEL_KEY, next ? 'collapsed' : 'open');
+	}
+	const autoExpand: Attachment = () => {
+		if (focusThreadId && collapsed) {
+			setCollapsed(false);
+		}
+	};
 
 	const replyDrafts = $state<Record<string, string>>({});
 	const sending = $state<Record<string, boolean>>({});
@@ -81,11 +100,39 @@
 	};
 </script>
 
-<aside class="panel">
+<aside class="panel" class:collapsed {@attach autoExpand}>
+	{#if collapsed}
+		<button
+			type="button"
+			class="reopen"
+			title="Show threads"
+			aria-label="Show comment threads"
+			onclick={() => setCollapsed(false)}
+		>
+			<Icon name="mail" size={15} />
+			{#if threads.length > 0}
+				<span class="reopen-count">{threads.length}</span>
+			{/if}
+		</button>
+	{:else}
+		{@render panelBody()}
+	{/if}
+</aside>
+
+{#snippet panelBody()}
 	<header class="head">
 		<Icon name="mail" size={13} />
 		<span class="title">Threads</span>
 		<span class="count">{threads.length}</span>
+		<button
+			type="button"
+			class="collapse-btn"
+			title="Hide threads"
+			aria-label="Hide comment threads"
+			onclick={() => setCollapsed(true)}
+		>
+			<Icon name="chevron-right" size={12} />
+		</button>
 	</header>
 
 	{#if comments.loading}
@@ -159,7 +206,7 @@
 			{/each}
 		</div>
 	{/if}
-</aside>
+{/snippet}
 
 {#snippet messageItem(msg: Comment)}
 	{@const color = colorForKey(msg.createdBy ?? msg.id)}
@@ -196,12 +243,53 @@
 		flex-direction: column;
 		min-height: 0;
 		overflow: hidden;
+		transition: flex-basis var(--duration) var(--ease-out);
+	}
+	.panel.collapsed {
+		width: 46px;
+		flex: 0 0 46px;
+		align-items: center;
+		padding-top: 10px;
+	}
+	.reopen {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		padding: 0;
+		color: var(--accents-5);
+		background: transparent;
+		border: none;
+		border-radius: 7px;
+		cursor: pointer;
+	}
+	.reopen:hover {
+		color: var(--geist-foreground);
+		background: var(--surface);
+	}
+	.reopen-count {
+		position: absolute;
+		top: -3px;
+		right: -3px;
+		min-width: 15px;
+		height: 15px;
+		padding: 0 4px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 9.5px;
+		font-weight: 650;
+		color: var(--bg);
+		background: var(--accent);
+		border-radius: 999px;
 	}
 	.head {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 12px 16px;
+		padding: 12px 12px 12px 16px;
 		border-bottom: 1px solid var(--border);
 		font-size: 13px;
 		font-weight: 600;
@@ -212,6 +300,23 @@
 		font-size: 11px;
 		font-weight: 500;
 		color: var(--accents-5);
+	}
+	.collapse-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		padding: 0;
+		color: var(--accents-5);
+		background: transparent;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.collapse-btn:hover {
+		color: var(--geist-foreground);
+		background: var(--surface);
 	}
 	.muted {
 		padding: 16px;
