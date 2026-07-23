@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Modal, Button } from '@juspay/svelte-ui-components';
+	import { Modal, Button } from 'polymorph-ui-components';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { whatsNew } from '../store.svelte';
 </script>
@@ -9,7 +9,7 @@
 		classes="ms-modal"
 		size="fit-content"
 		header={{ text: "What's new" }}
-		onoverlayClick={() => whatsNew.dismiss()}
+		onoverlayclick={() => whatsNew.dismiss()}
 	>
 		{#snippet content()}
 			<div class="whats-new">

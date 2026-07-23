@@ -786,7 +786,7 @@ samp {
 }
 
 /* ==========================================================================
-   @juspay/svelte-ui-components — overrides for the new palette
+   polymorph-ui-components — overrides for the new palette
    ========================================================================== */
 
 :root {
@@ -916,13 +916,13 @@ samp {
 
 /* ==========================================================================
    Modal / CommandMenu / Toast — palette overrides for the library overlays.
-   Scoped via each component's `classes` prop so generic var names (notably
-   --background-color) never leak past the component's own subtree.
+   Scoped via each component's `classes` prop so the overrides never leak
+   past the component's own subtree.
    ========================================================================== */
 
 .ms-modal {
 	--modal-z-index: 200;
-	--background-color: color-mix(in srgb, var(--geist-foreground) 24%, transparent);
+	--modal-overlay-background-color: color-mix(in srgb, var(--geist-foreground) 24%, transparent);
 	--modal-content-background-color: var(--surface);
 	--modal-border-radius: var(--radius-lg);
 	--modal-content-overflow: hidden;
@@ -931,7 +931,7 @@ samp {
 	--modal-header-background-color: var(--surface);
 	--modal-header-padding: 16px 20px;
 	--modal-header-border-bottom: 1px solid var(--border);
-	--header-text-size: 15px;
+	--modal-header-text-size: 15px;
 	--modal-header-text-weight: 600;
 	--modal-header-text-letter-spacing: -0.01em;
 
@@ -991,15 +991,23 @@ samp {
 	--toast-subtext-color: rgba(255, 255, 255, 0.78);
 	--toast-subtext-margin: 3px 0 0 0;
 
-	/* Desaturated editorial fills — deep enough to keep white text AA, never
-	   fire-engine. Info is a dark ink chip in both modes (the "exhibition label"). */
-	--toast-success-background-color: #1f6b46;
-	--toast-error-background-color: #b51e3a;
-	--toast-info-background-color: #2a2c34;
-
 	box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
 	border-radius: var(--radius);
 	pointer-events: auto;
+}
+
+/* Toast variants — polymorph's Toast has no `type` prop; per-kind classes set
+   the background instead. Desaturated editorial fills — deep enough to keep
+   white text AA, never fire-engine. Info is a dark ink chip in both modes
+   (the "exhibition label"). */
+.ms-toast-success {
+	--toast-background-color: #1f6b46;
+}
+.ms-toast-error {
+	--toast-background-color: #b51e3a;
+}
+.ms-toast-info {
+	--toast-background-color: #2a2c34;
 }
 
 /* ==========================================================================

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
-	import { Modal, Button } from '@juspay/svelte-ui-components';
+	import { Modal, Button } from 'polymorph-ui-components';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { workspaces, type Workspace } from '$lib/client/modules/workspaces';
 	import { toasts } from '$lib/client/modules/toasts';
@@ -253,7 +253,7 @@
 		classes="ms-modal"
 		size="fit-content"
 		header={{ text: 'Workspace settings' }}
-		onoverlayClick={onClose}
+		onoverlayclick={onClose}
 	>
 		{#snippet content()}
 			{#if workspace}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Modal, Button } from '@juspay/svelte-ui-components';
+	import { Modal, Button } from 'polymorph-ui-components';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { toasts } from '$lib/client/modules/toasts';
 
@@ -110,7 +110,7 @@
 		classes="ms-modal"
 		size="fit-content"
 		header={{ text: 'Use mindspace from Claude Code' }}
-		onoverlayClick={handleClose}
+		onoverlayclick={handleClose}
 	>
 		{#snippet content()}
 			<div class="mcp-install">

@@ -27,7 +27,7 @@ function createStore() {
 	const state: StoreState = $state({ items: [] });
 
 	// Auto-dismiss is owned by the library Toast component (its `duration` prop
-	// drives the slide-out and fires onToastHide → dismiss). The store only
+	// drives the slide-out and fires ontoasthide → dismiss). The store only
 	// holds the queue; it never schedules its own timers.
 	function dismiss(id: string) {
 		state.items = state.items.filter((t) => t.id !== id);

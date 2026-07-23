@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ContextMenu, Modal, Button, Tooltip } from '@juspay/svelte-ui-components';
+	import { ContextMenu, Modal, Button, Tooltip } from 'polymorph-ui-components';
 	import Logo from '$lib/client/components/Logo.svelte';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import WorkspaceSettingsModal from './WorkspaceSettingsModal.svelte';
@@ -419,9 +419,39 @@
 		}
 	}
 
-	async function handleDeleteProject(id: string, name: string) {
-		await projects.remove(id);
-		toasts.info('Project deleted', { description: name });
+	// Project deletion is confirmed through a modal so an item is never removed
+	// from a workspace by a single stray click.
+	let deleteTarget = $state<{ id: string; name: string } | null>(null);
+	let deleteBusy = $state(false);
+
+	function handleDeleteProject(id: string, name: string) {
+		deleteTarget = { id, name };
+	}
+
+	function cancelDeleteProject() {
+		if (deleteBusy) {
+			return;
+		}
+		deleteTarget = null;
+	}
+
+	async function confirmDeleteProject() {
+		if (!deleteTarget || deleteBusy) {
+			return;
+		}
+		const { id, name } = deleteTarget;
+		deleteBusy = true;
+		try {
+			await projects.remove(id);
+			toasts.info('Project deleted', { description: name });
+			deleteTarget = null;
+		} catch (e) {
+			toasts.error('Could not delete project', {
+				description: e instanceof Error ? e.message : 'Unknown error'
+			});
+		} finally {
+			deleteBusy = false;
+		}
 	}
 
 	/**
@@ -1044,7 +1074,7 @@
 		classes="ms-modal"
 		size="fit-content"
 		header={{ text: 'Create a workspace' }}
-		onoverlayClick={closeCreateWs}
+		onoverlayclick={closeCreateWs}
 	>
 		{#snippet content()}
 			<form onsubmit={submitNewWorkspace} class="modal-form">
@@ -1075,6 +1105,36 @@
 	</Modal>
 {/if}
 
+{#if deleteTarget}
+	<Modal
+		classes="ms-modal"
+		size="fit-content"
+		header={{ text: 'Delete project' }}
+		onoverlayclick={cancelDeleteProject}
+	>
+		{#snippet content()}
+			<p class="modal-intro">
+				Delete <strong>{deleteTarget?.name || 'Untitled'}</strong> from this workspace? This can't be
+				undone.
+			</p>
+		{/snippet}
+		{#snippet footerSnippet()}
+			<Button
+				text="Cancel"
+				classes="btn-secondary"
+				disabled={deleteBusy}
+				onclick={cancelDeleteProject}
+			/>
+			<Button
+				text={deleteBusy ? 'Deleting…' : 'Delete project'}
+				classes="btn-danger"
+				disabled={deleteBusy}
+				onclick={() => confirmDeleteProject()}
+			/>
+		{/snippet}
+	</Modal>
+{/if}
+
 <WorkspaceSettingsModal
 	workspace={settingsWorkspace}
 	isOwner={settingsWorkspace?.ownerId === userId}
@@ -1098,7 +1158,7 @@
 		width: 60px;
 	}
 
-	/* Theme the @juspay/svelte-ui-components ContextMenu used on project rows.
+	/* Theme the polymorph-ui-components ContextMenu used on project rows.
 	   Set globally because the floating menu is portaled outside the trigger. */
 	:global(:root) {
 		--context-menu-background-color: var(--surface);

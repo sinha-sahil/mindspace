@@ -1,19 +1,18 @@
 <script lang="ts">
-	import { Toast } from '@juspay/svelte-ui-components';
+	import { Toast } from 'polymorph-ui-components';
 	import { toasts } from '../store.svelte';
 </script>
 
 <div class="toaster" aria-live="polite">
 	{#each toasts.items as toast (toast.id)}
 		<Toast
-			classes="ms-toast"
+			classes="ms-toast ms-toast-{toast.kind}"
 			message={toast.title}
 			subtext={toast.description}
-			type={toast.kind}
 			duration={toast.duration}
 			direction="bottom-to-top"
 			overlapPage={false}
-			onToastHide={() => toasts.dismiss(toast.id)}
+			ontoasthide={() => toasts.dismiss(toast.id)}
 		>
 			{#snippet bottomContent()}
 				{#if toast.action}

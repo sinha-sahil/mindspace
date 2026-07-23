@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CommandMenu } from '@juspay/svelte-ui-components';
+	import { CommandMenu } from 'polymorph-ui-components';
 	import { goto } from '$app/navigation';
 	import Icon, { type IconName } from '$lib/client/components/Icon.svelte';
 	import { commandPalette } from '../store.svelte';
