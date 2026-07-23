@@ -17,7 +17,11 @@
 		goto('/');
 	}
 
-	const SAMPLE = `# Meridian — Q3 Product Brief
+	const SAMPLE = `# Step 1: Types (\`src/services/onboarding/long/path/that/used/to/blow/out/types.rs\`)
+
+Width regression guard: the heading above and \`#[serde(default, skip_serializing_if = "Option::is_none")]\` in this line are long inline-code chips — they must wrap, never widen the pane.
+
+# Meridian — Q3 Product Brief
 
 Meridian is our **offline-first** sync engine for teams that live in spreadsheets but think in documents. This brief covers the *why*, the architecture, and the launch checklist — including \`inline code\`, [links](https://example.com), and footnotes[^1].
 

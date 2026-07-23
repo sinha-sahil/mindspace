@@ -261,7 +261,10 @@
 	background: var(--bg-2);
 	border: 1px solid var(--border);
 	border-radius: 5px;
-	white-space: nowrap;
+	/* Inline code MUST stay wrappable (GitHub behavior). nowrap here gives
+	   long path/identifier chips an unbreakable intrinsic width that blows
+	   the whole document pane past the viewport on real-world docs. */
+	overflow-wrap: break-word;
 }
 .md-body pre {
 	position: relative;
