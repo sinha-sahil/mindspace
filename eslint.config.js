@@ -83,6 +83,14 @@ export default defineConfig(
 		}
 	},
 	{
+		// Dev-only harness routes (guarded by `dev` and excluded from auth):
+		// mocking a client requires asserting a narrow stub to the real type.
+		files: ['src/routes/dev/**'],
+		rules: {
+			'@typescript-eslint/consistent-type-assertions': 'off'
+		}
+	},
+	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: {
 			parserOptions: {

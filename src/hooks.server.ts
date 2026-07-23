@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { env } from '$env/dynamic/public';
+import { dev } from '$app/environment';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import type { Database } from '$lib/database.types';
@@ -149,7 +150,11 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	const path = event.url.pathname;
 	const isAuthRoute = path.startsWith('/auth');
-	const isPublicRoute = path.startsWith('/p/') || path.startsWith('/invite/');
+	// `/dev/*` harness pages exist only under `vite dev` (the pages themselves
+	// also self-guard) — exempt them like public routes so component iteration
+	// doesn't require a session.
+	const isPublicRoute =
+		path.startsWith('/p/') || path.startsWith('/invite/') || (dev && path.startsWith('/dev/'));
 	// API-shaped paths must never redirect to /auth/login — a 303 to HTML is
 	// useless to a JSON-RPC or fetch client. Return a clean 401 instead.
 	const isApiShaped = path.startsWith('/api/') || path === '/mcp';

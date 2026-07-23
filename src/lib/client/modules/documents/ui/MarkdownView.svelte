@@ -6,10 +6,14 @@
 	import { comments } from '../comments.svelte';
 	import {
 		renderMarkdown,
-		renderMermaidDiagrams,
+		enhanceRendered,
+		outlineFrom,
+		toggleTaskInSource,
 		anchorFromSelection,
 		applyHighlights,
-		type Anchor
+		type Anchor,
+		type EnhanceOptions,
+		type OutlineItem
 	} from '../markdown';
 
 	type Props = {
@@ -17,17 +21,91 @@
 		content: string;
 		/** Fired when the user clicks an existing comment highlight. */
 		onSelectThread?: (commentId: string) => void;
+		/** Present when the doc is editable — enables live task checkboxes. */
+		onChange?: (source: string) => void;
+		/** "Start writing" CTA for empty documents. */
+		onRequestEdit?: () => void;
 	};
-	let { documentId, content, onSelectThread }: Props = $props();
+	let { documentId, content, onSelectThread, onChange, onRequestEdit }: Props = $props();
 
 	const html = $derived(renderMarkdown(content));
+	const isEmpty = $derived(content.trim() === '');
+
+	// Cheap content hash (djb2) — content.length alone misses same-length
+	// edits like a task toggling between "[ ]" and "[x]".
+	function hash(s: string): number {
+		let h = 5381;
+		for (let i = 0; i < s.length; i++) {
+			h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+		}
+		return h;
+	}
 
 	// A version key that changes when content OR comment set changes — used
 	// by {#key} below to throw away the DOM (and any previously-applied
 	// <mark> wrappers) so highlights re-apply against a clean slate.
-	const version = $derived(`${content.length}::${comments.items.map((c) => c.id).join(',')}`);
+	const version = $derived(`${hash(content)}::${comments.items.map((c) => c.id).join(',')}`);
 
-	// Floating add-comment popup state.
+	/* ---------------- outline ---------------- */
+	const OUTLINE_KEY = 'ms-doc-outline';
+	let outline = $state<OutlineItem[]>([]);
+	let outlineHidden = $state(false);
+	let activeHeadingId = $state<string | null>(null);
+	let hostEl: HTMLDivElement | null = $state(null);
+	let headingEls: HTMLElement[] = [];
+	let spyRaf = 0;
+
+	onMount(() => {
+		outlineHidden = localStorage.getItem(OUTLINE_KEY) === 'hidden';
+	});
+
+	function setOutlineHidden(hidden: boolean) {
+		outlineHidden = hidden;
+		localStorage.setItem(OUTLINE_KEY, hidden ? 'hidden' : 'shown');
+	}
+
+	function refreshSpy() {
+		cancelAnimationFrame(spyRaf);
+		spyRaf = requestAnimationFrame(() => {
+			if (!hostEl || headingEls.length === 0) {
+				return;
+			}
+			const hostTop = hostEl.getBoundingClientRect().top;
+			let current: string | null = headingEls[0]?.id ?? null;
+			for (const el of headingEls) {
+				if (el.getBoundingClientRect().top - hostTop <= 96) {
+					current = el.id;
+				} else {
+					break;
+				}
+			}
+			activeHeadingId = current;
+		});
+	}
+
+	function jumpToHeading(id: string) {
+		const el = headingEls.find((h) => h.id === id);
+		if (el) {
+			activeHeadingId = id;
+			el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
+	}
+
+	/* ---------------- image lightbox ---------------- */
+	let lightbox = $state<{ src: string; alt: string } | null>(null);
+
+	/* ---------------- task toggles ---------------- */
+	function handleTaskToggle(index: number, checked: boolean) {
+		if (!onChange) {
+			return;
+		}
+		const next = toggleTaskInSource(content, index, checked);
+		if (next !== null) {
+			onChange(next);
+		}
+	}
+
+	/* ---------------- comment popup (selection → thread) ---------------- */
 	let containerEl: HTMLDivElement | null = $state(null);
 	let pendingAnchor = $state<Anchor | null>(null);
 	let popupX = $state(0);
@@ -63,27 +141,26 @@
 			commentDraft = '';
 
 			// Position the trigger above the selection's bounding rect, relative
-			// to the container. Clamp X so the popup (320px wide, centered via
+			// to the host. Clamp X so the popup (320px wide, centered via
 			// translate(-50%)) stays inside the host even when the selection is
-			// near the left or right edge — otherwise the popup spills under the
-			// file tree or off the comments panel.
+			// near the left or right edge.
 			const sel = window.getSelection();
-			if (!sel || sel.rangeCount === 0) {
+			if (!sel || sel.rangeCount === 0 || !hostEl) {
 				return;
 			}
 			const rect = sel.getRangeAt(0).getBoundingClientRect();
-			const cRect = containerEl.getBoundingClientRect();
+			const cRect = hostEl.getBoundingClientRect();
 			const rawX = rect.left - cRect.left + rect.width / 2;
 			const POPUP_HALF_WIDTH = 160; // matches .cmt-popup width 320 / 2
 			const EDGE_PAD = 12;
-			const hostWidth = containerEl.clientWidth;
+			const hostWidth = hostEl.clientWidth;
 			popupX = Math.max(
 				POPUP_HALF_WIDTH + EDGE_PAD,
 				Math.min(hostWidth - POPUP_HALF_WIDTH - EDGE_PAD, rawX)
 			);
-			// Y: keep the trigger above the selection. The form will appear
-			// just below the selection (popupY + 12).
-			popupY = rect.top - cRect.top - 8;
+			// Y: keep the trigger above the selection (popup opens below it),
+			// in host-content coordinates (account for the host's scroll).
+			popupY = rect.top - cRect.top + hostEl.scrollTop - 8;
 		});
 	}
 
@@ -138,39 +215,20 @@
 
 	// Attach the mouseup handler via an attachment instead of an `onmouseup=`
 	// attribute — the host div isn't semantically interactive, and the Svelte
-	// a11y lint correctly flags handler attributes on plain <div>s. Listening
-	// imperatively keeps the listener without the false-positive warning.
+	// a11y lint correctly flags handler attributes on plain <div>s.
 	const captureSelection: Attachment<HTMLDivElement> = (node) => {
 		node.addEventListener('mouseup', onMouseUp);
 		return () => node.removeEventListener('mouseup', onMouseUp);
 	};
 
-	// Click delegation on the rendered container: a click on a saved
-	// highlight fires onSelectThread with its thread (root) id.
-	const captureMarkClicks: Attachment<HTMLDivElement> = (node) => {
-		function handle(e: MouseEvent) {
-			const target = e.target;
-			if (!(target instanceof Element)) {
-				return;
-			}
-			const mark = target.closest<HTMLElement>('mark.comment-mark');
-			if (!mark) {
-				return;
-			}
-			const id = mark.dataset.commentId;
-			if (id) {
-				onSelectThread?.(id);
-			}
-		}
-		node.addEventListener('click', handle);
-		return () => node.removeEventListener('click', handle);
-	};
-
-	// Highlight saved comments on the rendered DOM. Re-runs when `version`
-	// changes (the {#key} block remounts the container, which re-runs this).
-	// Only thread roots carry an anchor (replies inherit context from the
-	// root), so reply rows with null anchor fields are skipped.
-	const highlightSaved: Attachment<HTMLDivElement> = (node) => {
+	/**
+	 * Everything that runs against a freshly rendered container, in order:
+	 * comment highlights first (they operate on pristine text offsets), then
+	 * click delegation for marks, then the enhancement pass (anchors, copy
+	 * buttons, tasks, tables, images, hljs, mermaid), then outline extraction.
+	 */
+	const setupRendered: Attachment<HTMLDivElement> = (node) => {
+		// 1. Saved-comment highlights (thread roots only; replies carry none).
 		const anchors: Array<{ id: string } & Anchor> = [];
 		for (const c of comments.items) {
 			if (c.documentId !== documentId) {
@@ -189,259 +247,400 @@
 			});
 		}
 		const orphans = applyHighlights(node, anchors);
-		// Publish to the store so CommentsPanel can badge orphaned threads.
 		comments.setOrphans(orphans);
-	};
 
-	// Upgrade mermaid placeholders to SVG after the markdown is rendered. Runs
-	// when the container is (re)created by the {#key} block — i.e. on every
-	// content change — so edited diagrams re-render against a clean DOM.
-	const renderDiagrams: Attachment<HTMLDivElement> = (node) => {
-		renderMermaidDiagrams(node);
+		// 2. Click delegation: a click on a saved highlight opens its thread.
+		function onClick(e: MouseEvent) {
+			const target = e.target;
+			if (!(target instanceof Element)) {
+				return;
+			}
+			const mark = target.closest<HTMLElement>('mark.comment-mark');
+			if (!mark) {
+				return;
+			}
+			const id = mark.dataset.commentId;
+			if (id) {
+				onSelectThread?.(id);
+			}
+		}
+		node.addEventListener('click', onClick);
+
+		// 3. Interactive upgrades.
+		const enhanceOpts: EnhanceOptions = {
+			onImageZoom: (src, alt) => (lightbox = { src, alt })
+		};
+		if (onChange) {
+			enhanceOpts.onTaskToggle = handleTaskToggle;
+		}
+		enhanceRendered(node, enhanceOpts);
+
+		// 4. Outline.
+		outline = outlineFrom(node);
+		headingEls = Array.from(node.querySelectorAll<HTMLElement>('h1[id], h2[id], h3[id]')).filter(
+			(h) => !h.closest('.footnotes')
+		);
+		refreshSpy();
+
+		return () => {
+			node.removeEventListener('click', onClick);
+			cancelAnimationFrame(spyRaf);
+		};
 	};
 
 	onMount(() => {
-		// onMount runs browser-only; the returned cleanup runs on unmount.
-		// Using this pattern instead of a separate onDestroy avoids reaching
-		// for `document` during SSR.
 		document.addEventListener('mousedown', onDocMouseDown);
 		return () => document.removeEventListener('mousedown', onDocMouseDown);
 	});
 </script>
 
-<div class="md-host" {@attach captureSelection}>
-	{#key version}
-		<div
-			bind:this={containerEl}
-			class="md-render"
-			role="article"
-			{@attach highlightSaved}
-			{@attach captureMarkClicks}
-			{@attach renderDiagrams}
-		>
-			{@html html}
-		</div>
-	{/key}
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape' && lightbox) {
+			e.preventDefault();
+			lightbox = null;
+		}
+	}}
+/>
 
-	{#if pendingAnchor && !showForm}
-		<button
-			type="button"
-			class="cmt-trigger"
-			style="left: {popupX}px; top: {popupY}px;"
-			onmousedown={(e) => {
-				// Prevent text deselection AND prevent the doc handler from
-				// dismissing the trigger before our onclick runs.
-				e.preventDefault();
-				e.stopPropagation();
-			}}
-			onclick={openForm}
-			title="Add comment on selection"
-		>
-			<Icon name="plus" size={11} />
-			<span>Comment</span>
-		</button>
-	{/if}
-
-	{#if pendingAnchor && showForm}
-		<div
-			class="cmt-popup"
-			style="left: {popupX}px; top: {popupY + 12}px;"
-			role="dialog"
-			aria-label="Add comment"
-			tabindex="-1"
-			onmousedown={(e) => e.stopPropagation()}
-		>
-			<div class="cmt-quote">"{pendingAnchor.quote}"</div>
-			<textarea
-				class="cmt-input"
-				bind:value={commentDraft}
-				placeholder="Write a comment…"
-				rows="3"
-				onkeydown={(e) => {
-					if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-						e.preventDefault();
-						submit();
-					} else if (e.key === 'Escape') {
-						e.preventDefault();
-						dismissPopup();
-					}
-				}}
-			></textarea>
-			<div class="cmt-actions">
-				<button type="button" class="btn ghost" onclick={dismissPopup}>Cancel</button>
+<div class="view-root">
+	{#if outline.length >= 2}
+		<nav class="outline" class:collapsed={outlineHidden} aria-label="Document outline">
+			{#if outlineHidden}
 				<button
 					type="button"
-					class="btn primary"
-					disabled={!commentDraft.trim() || saving}
-					onclick={submit}
+					class="outline-reveal"
+					title="Show outline"
+					aria-label="Show document outline"
+					onclick={() => setOutlineHidden(false)}
 				>
-					{saving ? 'Saving…' : 'Comment'}
+					<Icon name="list" size={14} />
 				</button>
-			</div>
-		</div>
+			{:else}
+				<div class="outline-head">
+					<span class="outline-title">Outline</span>
+					<button
+						type="button"
+						class="outline-hide"
+						title="Hide outline"
+						aria-label="Hide document outline"
+						onclick={() => setOutlineHidden(true)}
+					>
+						<Icon name="chevron-left" size={12} />
+					</button>
+				</div>
+				<ul class="outline-list">
+					{#each outline as item (item.id + item.text)}
+						<li>
+							<button
+								type="button"
+								class="outline-item lv{item.level}"
+								class:active={activeHeadingId === item.id}
+								onclick={() => jumpToHeading(item.id)}
+							>
+								{item.text}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</nav>
 	{/if}
+
+	<div class="md-host" bind:this={hostEl} {@attach captureSelection} onscroll={refreshSpy}>
+		{#if isEmpty}
+			<div class="md-empty">
+				<Icon name="file-text" size={26} class="md-empty-icon" />
+				<p>This document is empty.</p>
+				{#if onRequestEdit}
+					<button type="button" class="md-empty-cta" onclick={onRequestEdit}>
+						<Icon name="pencil" size={12} />
+						<span>Start writing</span>
+					</button>
+				{/if}
+			</div>
+		{:else}
+			{#key version}
+				<div
+					bind:this={containerEl}
+					class="md-render md-body print-root"
+					role="article"
+					{@attach setupRendered}
+				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized by renderMarkdown -->
+					{@html html}
+				</div>
+			{/key}
+		{/if}
+
+		{#if pendingAnchor && !showForm}
+			<button
+				type="button"
+				class="cmt-trigger"
+				style="left: {popupX}px; top: {popupY}px;"
+				onmousedown={(e) => {
+					// Prevent text deselection AND prevent the doc handler from
+					// dismissing the trigger before our onclick runs.
+					e.preventDefault();
+					e.stopPropagation();
+				}}
+				onclick={openForm}
+				title="Add comment on selection"
+			>
+				<Icon name="plus" size={11} />
+				<span>Comment</span>
+			</button>
+		{/if}
+
+		{#if pendingAnchor && showForm}
+			<div
+				class="cmt-popup"
+				style="left: {popupX}px; top: {popupY + 12}px;"
+				role="dialog"
+				aria-label="Add comment"
+				tabindex="-1"
+				onmousedown={(e) => e.stopPropagation()}
+			>
+				<div class="cmt-quote">"{pendingAnchor.quote}"</div>
+				<textarea
+					class="cmt-input"
+					bind:value={commentDraft}
+					placeholder="Write a comment…"
+					rows="3"
+					onkeydown={(e) => {
+						if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+							e.preventDefault();
+							submit();
+						} else if (e.key === 'Escape') {
+							e.preventDefault();
+							dismissPopup();
+						}
+					}}
+				></textarea>
+				<div class="cmt-actions">
+					<button type="button" class="btn ghost" onclick={dismissPopup}>Cancel</button>
+					<button
+						type="button"
+						class="btn primary"
+						disabled={!commentDraft.trim() || saving}
+						onclick={submit}
+					>
+						{saving ? 'Saving…' : 'Comment'}
+					</button>
+				</div>
+			</div>
+		{/if}
+	</div>
 </div>
 
+{#if lightbox}
+	<div
+		class="lightbox"
+		role="dialog"
+		aria-modal="true"
+		aria-label={lightbox.alt || 'Image preview'}
+	>
+		<button
+			type="button"
+			class="lightbox-backdrop"
+			aria-label="Close image preview"
+			onclick={() => (lightbox = null)}
+		></button>
+		<figure class="lightbox-figure">
+			<img src={lightbox.src} alt={lightbox.alt} />
+			{#if lightbox.alt}
+				<figcaption>{lightbox.alt}</figcaption>
+			{/if}
+		</figure>
+		<button
+			type="button"
+			class="lightbox-close"
+			aria-label="Close"
+			onclick={() => (lightbox = null)}
+		>
+			<Icon name="x" size={16} />
+		</button>
+	</div>
+{/if}
+
 <style>
-	.md-host {
+	.view-root {
 		position: relative;
 		flex: 1;
 		min-height: 0;
-		overflow-y: auto;
-		padding: 24px 32px 64px;
+		display: flex;
+		background: var(--surface);
 	}
 
-	.md-render {
-		max-width: 720px;
-		margin: 0 auto;
-		font-size: 14px;
-		line-height: 1.65;
-		color: var(--geist-foreground);
+	/* ---------- outline rail ----------
+	   Borderless — whitespace separates it from the reading column; the rail
+	   should read as part of the page, not app chrome. */
+	.outline {
+		flex: 0 0 216px;
+		min-height: 0;
+		padding: 22px 8px 20px 18px;
+		overflow-y: auto;
+		background: var(--surface);
 	}
-	.md-render :global(h1),
-	.md-render :global(h2),
-	.md-render :global(h3),
-	.md-render :global(h4) {
-		font-weight: 600;
-		letter-spacing: -0.01em;
-		margin: 1.8em 0 0.6em;
-		line-height: 1.25;
+	.outline.collapsed {
+		flex: 0 0 44px;
+		padding: 16px 6px;
+		display: flex;
+		justify-content: center;
+		align-items: flex-start;
 	}
-	.md-render :global(h1) {
-		font-size: 1.7em;
-		margin-top: 0;
-	}
-	.md-render :global(h2) {
-		font-size: 1.3em;
-	}
-	.md-render :global(h3) {
-		font-size: 1.1em;
-	}
-	.md-render :global(p) {
-		margin: 0.75em 0;
-	}
-	.md-render :global(ul),
-	.md-render :global(ol) {
-		padding-left: 1.5em;
-		margin: 0.75em 0;
-	}
-	.md-render :global(li) {
-		margin: 0.25em 0;
-	}
-	.md-render :global(code) {
-		font-family: var(--font-mono);
-		font-size: 0.88em;
-		padding: 1px 5px;
-		background: var(--accents-1);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-	}
-	.md-render :global(pre) {
-		font-family: var(--font-mono);
-		font-size: 12.5px;
-		padding: 14px 16px;
-		background: var(--accents-1);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		overflow-x: auto;
-		margin: 1em 0;
-	}
-	.md-render :global(pre code) {
-		padding: 0;
-		background: transparent;
-		border: none;
-	}
-	/* Mermaid: drop the code-block chrome and center the rendered SVG. */
-	.md-render :global(pre.mermaid-diagram) {
-		position: relative;
-		padding: 0;
-		background: transparent;
-		border: none;
-		text-align: center;
-	}
-	.md-render :global(pre.mermaid-diagram svg) {
-		max-width: 100%;
-		height: auto;
-	}
-	/* Fullscreen trigger — fades in on diagram hover, top-right corner. */
-	.md-render :global(.mermaid-fullscreen-btn) {
-		position: absolute;
-		top: 8px;
-		right: 8px;
+	.outline-reveal {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		width: 28px;
 		height: 28px;
 		padding: 0;
-		color: var(--accents-6);
-		background: var(--surface);
-		border: 1px solid var(--border);
+		color: var(--muted);
+		background: transparent;
+		border: none;
 		border-radius: 6px;
 		cursor: pointer;
-		opacity: 0;
-		transition: opacity var(--duration-fast, 120ms) var(--ease-out, ease);
 	}
-	.md-render :global(pre.mermaid-diagram:hover .mermaid-fullscreen-btn),
-	.md-render :global(.mermaid-fullscreen-btn:focus-visible) {
+	.outline-reveal:hover {
+		color: var(--fg);
+		background: var(--bg-2);
+	}
+	.outline-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 8px 8px 10px;
+	}
+	.outline-title {
+		font-size: 11px;
+		font-weight: 650;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.outline-hide {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		color: var(--muted-2);
+		background: transparent;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity var(--duration-fast) var(--ease-out);
+	}
+	.outline:hover .outline-hide,
+	.outline-hide:focus-visible {
 		opacity: 1;
 	}
-	.md-render :global(.mermaid-fullscreen-btn:hover) {
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+	.outline-hide:hover {
+		color: var(--fg);
+		background: var(--bg-2);
 	}
-	.md-render :global(.mermaid-fullscreen-btn svg) {
-		width: 15px;
-		height: 15px;
+	.outline-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
 	}
-	.md-render :global(pre.mermaid-error) {
-		text-align: left;
-		color: var(--geist-error, #e00);
-		white-space: pre-wrap;
-	}
-	.md-render :global(blockquote) {
-		margin: 1em 0;
-		padding: 0 1em;
-		border-left: 3px solid var(--accents-3);
-		color: var(--accents-6);
-	}
-	.md-render :global(a) {
-		color: var(--accent, var(--geist-foreground));
-		text-decoration: underline;
-		text-underline-offset: 2px;
-	}
-	.md-render :global(hr) {
+	.outline-item {
+		display: block;
+		width: 100%;
+		padding: 4px 8px 4px 10px;
+		font: inherit;
+		font-size: 12.5px;
+		font-weight: 450;
+		line-height: 1.45;
+		color: var(--fg-2);
+		background: transparent;
 		border: none;
-		border-top: 1px solid var(--border);
-		margin: 2em 0;
-	}
-	.md-render :global(table) {
-		border-collapse: collapse;
-		margin: 1em 0;
-	}
-	.md-render :global(th),
-	.md-render :global(td) {
-		padding: 6px 12px;
-		border: 1px solid var(--border);
-		text-align: left;
-	}
-	/* Comment highlights — theme-aware via color-mix on the --saffron token.
-	   Dark mode auto-uses #fbbf24, light mode #f5a524, so we never hardcode
-	   an rgba that's too hot in one theme and too dim in the other. Underline
-	   instead of a thick border so multi-line and inline-code-containing
-	   spans don't get a boxy outline. */
-	.md-render :global(.comment-mark) {
-		background: color-mix(in srgb, var(--saffron) 14%, transparent);
-		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--saffron) 55%, transparent);
-		padding: 0 1px;
-		border-radius: 2px;
+		border-left: 2px solid transparent;
+		border-radius: 0 6px 6px 0;
 		cursor: pointer;
-		transition: background var(--duration-fast, 120ms) var(--ease-out, ease);
+		text-align: left;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		transition:
+			color var(--duration-fast) var(--ease-out),
+			background var(--duration-fast) var(--ease-out);
 	}
-	.md-render :global(.comment-mark:hover) {
-		background: color-mix(in srgb, var(--saffron) 26%, transparent);
+	.outline-item:hover {
+		color: var(--fg);
+		background: var(--bg-2);
+	}
+	.outline-item.active {
+		color: var(--accent);
+		border-left-color: var(--accent);
+		font-weight: 560;
+	}
+	.outline-item.lv2 {
+		padding-left: 22px;
+	}
+	.outline-item.lv3 {
+		padding-left: 34px;
+		font-size: 12px;
 	}
 
+	/* ---------- document ---------- */
+	.md-host {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		overflow-y: auto;
+		padding: 36px 40px 96px;
+		scroll-behavior: smooth;
+	}
+
+	.md-render {
+		max-width: 740px;
+		margin: 0 auto;
+	}
+
+	.md-empty {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		color: var(--muted);
+		font-size: 13.5px;
+	}
+	.md-empty p {
+		margin: 0;
+	}
+	:global(.md-empty-icon) {
+		color: var(--soft);
+	}
+	.md-empty-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 4px;
+		padding: 7px 14px;
+		font: inherit;
+		font-size: 12.5px;
+		font-weight: 500;
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+	}
+	.md-empty-cta:hover {
+		opacity: 0.92;
+	}
+
+	/* ---------- comment trigger + popup ---------- */
 	.cmt-trigger {
 		position: absolute;
 		transform: translate(-50%, -100%);
@@ -452,12 +651,12 @@
 		font: inherit;
 		font-size: 11px;
 		font-weight: 600;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
 		border: none;
 		border-radius: 6px;
 		cursor: pointer;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		z-index: 5;
 	}
 	.cmt-trigger:hover {
@@ -472,13 +671,13 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		z-index: 6;
 	}
 	.cmt-quote {
 		font-size: 12px;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		padding: 6px 8px;
 		border-radius: 5px;
 		margin-bottom: 8px;
@@ -491,7 +690,7 @@
 		padding: 8px 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 6px;
@@ -500,7 +699,7 @@
 		min-height: 60px;
 	}
 	.cmt-input:focus {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent);
 	}
 	.cmt-actions {
 		display: flex;
@@ -526,13 +725,82 @@
 		cursor: not-allowed;
 	}
 	.btn.ghost {
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border-color: var(--border);
 	}
 	.btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
+	}
+
+	/* ---------- lightbox ---------- */
+	.lightbox {
+		position: fixed;
+		inset: 0;
+		z-index: 220;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.lightbox-backdrop {
+		position: absolute;
+		inset: 0;
+		background: color-mix(in srgb, #05060a 78%, transparent);
+		border: none;
+		cursor: zoom-out;
+		backdrop-filter: blur(6px);
+	}
+	.lightbox-figure {
+		position: relative;
+		margin: 0;
+		max-width: min(1100px, 92vw);
+		max-height: 90vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		pointer-events: none;
+	}
+	.lightbox-figure img {
+		max-width: 100%;
+		max-height: 84vh;
+		border-radius: 10px;
+		box-shadow: var(--shadow-lg);
+	}
+	.lightbox-figure figcaption {
+		font-size: 12.5px;
+		color: rgba(255, 255, 255, 0.82);
+	}
+	.lightbox-close {
+		position: absolute;
+		top: 18px;
+		right: 20px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		color: rgba(255, 255, 255, 0.9);
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.16);
+		border-radius: 9px;
+		cursor: pointer;
+	}
+	.lightbox-close:hover {
+		background: rgba(255, 255, 255, 0.16);
+	}
+
+	@media (max-width: 1080px) {
+		.outline {
+			display: none;
+		}
+	}
+	@media (max-width: 720px) {
+		.md-host {
+			padding: 24px 20px 80px;
+		}
 	}
 </style>

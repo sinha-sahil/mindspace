@@ -1,4 +1,6 @@
 import { marked } from 'marked';
+import markedAlert from 'marked-alert';
+import markedFootnote from 'marked-footnote';
 import { browser } from '$app/environment';
 
 const ANCHOR_CONTEXT = 32;
@@ -6,6 +8,40 @@ const ANCHOR_CONTEXT = 32;
 marked.setOptions({
 	gfm: true,
 	breaks: true
+});
+
+// GitHub-style callouts (> [!NOTE] …) and footnotes ([^1]).
+marked.use(markedAlert());
+marked.use(markedFootnote());
+
+/**
+ * GitHub-compatible heading slugs so rendered headings carry stable `id`s —
+ * the document outline and hover-anchors hang off these. Duplicate slugs get
+ * `-1`, `-2`… suffixes; the counter map resets on every renderMarkdown call.
+ */
+const slugCounts = new Map<string, number>();
+
+function slugify(raw: string): string {
+	const base = raw
+		.toLowerCase()
+		.trim()
+		// Strip inline-markdown noise so "**Bold** title" and "Bold title" agree.
+		.replace(/[`*_~[\]()]/g, '')
+		.replace(/<[^>]*>/g, '')
+		.replace(/[^\p{L}\p{N}\s-]/gu, '')
+		.replace(/\s+/g, '-');
+	const n = slugCounts.get(base) ?? 0;
+	slugCounts.set(base, n + 1);
+	return n === 0 ? base : `${base}-${n}`;
+}
+
+marked.use({
+	renderer: {
+		heading({ tokens, depth, text }) {
+			const inline = this.parser.parseInline(tokens);
+			return `<h${depth} id="${slugify(text)}">${inline}</h${depth}>\n`;
+		}
+	}
 });
 
 /** CSS class marking a rendered placeholder that holds Mermaid source. */
@@ -26,10 +62,7 @@ export const MERMAID_FULLSCREEN_BTN_CLASS = 'mermaid-fullscreen-btn';
  *  element's text content so DOMPurify keeps it intact; `renderMermaidDiagrams`
  *  later reads it back via `textContent`, which un-escapes these entities. */
 function escapeHtml(text: string): string {
-	return text
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;');
+	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // Intercept fenced code blocks tagged `mermaid` and emit a placeholder that
@@ -71,6 +104,7 @@ export function renderMarkdown(source: string): string {
 	if (!DOMPurify) {
 		return '';
 	}
+	slugCounts.clear();
 	const html = marked.parse(source, { async: false });
 	if (typeof html !== 'string') {
 		return '';
@@ -84,13 +118,25 @@ export function renderMarkdown(source: string): string {
  * Mermaid is heavy (~1MB) and browser-only, so it's lazy-loaded the first time
  * a diagram actually needs rendering and cached thereafter. `null` until then.
  */
-type MermaidApi = {
-	initialize: (config: Record<string, unknown>) => void;
-	render: (id: string, src: string) => Promise<{ svg: string }>;
-};
-let mermaid: MermaidApi | null = null;
+let mermaid: (typeof import('mermaid'))['default'] | null = null;
 let mermaidTheme: 'dark' | 'default' | null = null;
 let diagramSeq = 0;
+
+/** Rendered-SVG cache keyed by `theme::source`. Makes the editor's live
+ *  preview flicker-free: unchanged diagrams re-attach instantly instead of
+ *  going through a full async mermaid render on every keystroke. */
+const mermaidCache = new Map<string, string>();
+const MERMAID_CACHE_MAX = 60;
+
+function cacheMermaid(key: string, svg: string) {
+	if (mermaidCache.size >= MERMAID_CACHE_MAX) {
+		const oldest = mermaidCache.keys().next().value ?? null;
+		if (oldest !== null) {
+			mermaidCache.delete(oldest);
+		}
+	}
+	mermaidCache.set(key, svg);
+}
 
 /** Resolve the app's active theme to a Mermaid theme name. The app sets
  *  `data-theme` on <html>; absent means "follow system preference". */
@@ -123,9 +169,27 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
 	}
 
 	const theme = currentMermaidTheme();
+
+	// Serve cache hits synchronously (no mermaid import needed) so unchanged
+	// diagrams in a re-rendered preview never flash.
+	const misses: HTMLElement[] = [];
+	for (const node of nodes) {
+		const src = node.textContent ?? '';
+		const cached = mermaidCache.get(`${theme}::${src}`);
+		if (cached) {
+			node.setAttribute('data-processed', 'true');
+			upgradeDiagramNode(node, cached);
+		} else {
+			misses.push(node);
+		}
+	}
+	if (misses.length === 0) {
+		return;
+	}
+
 	if (!mermaid || mermaidTheme !== theme) {
 		const mod = await import('mermaid');
-		mermaid = mod.default as unknown as MermaidApi;
+		mermaid = mod.default;
 		// `securityLevel: 'strict'` makes Mermaid sanitize diagram labels and
 		// strip any embedded HTML/scripts — the rendered SVG bypasses our
 		// DOMPurify pass, so Mermaid must do its own sanitization.
@@ -133,29 +197,285 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
 		mermaidTheme = theme;
 	}
 
-	for (const node of nodes) {
+	for (const node of misses) {
 		const src = node.textContent ?? '';
 		// Mark first so a thrown render never leaves a node to be retried forever.
 		node.setAttribute('data-processed', 'true');
 		try {
 			const { svg } = await mermaid.render(`mermaid-${diagramSeq++}`, src);
-			node.innerHTML = svg;
-			node.classList.add('mermaid-rendered');
-			// Overlay a fullscreen trigger. Built in plain DOM since this runs
-			// after sanitization; MermaidFullscreen.svelte handles the click.
-			const btn = document.createElement('button');
-			btn.type = 'button';
-			btn.className = MERMAID_FULLSCREEN_BTN_CLASS;
-			btn.setAttribute('aria-label', 'View diagram fullscreen');
-			btn.title = 'View fullscreen';
-			btn.innerHTML = MAXIMIZE_ICON;
-			node.appendChild(btn);
+			cacheMermaid(`${theme}::${src}`, svg);
+			upgradeDiagramNode(node, svg);
 		} catch (err) {
 			node.classList.add('mermaid-error');
 			node.textContent =
 				err instanceof Error ? `Diagram error: ${err.message}` : 'Failed to render diagram.';
 		}
 	}
+}
+
+/** Swap a placeholder's source text for the rendered SVG + fullscreen button.
+ *  Built in plain DOM since this runs after sanitization; the fullscreen UI
+ *  (MermaidFullscreen.svelte) listens for clicks on the button class. */
+function upgradeDiagramNode(node: HTMLElement, svg: string) {
+	node.innerHTML = svg;
+	node.classList.add('mermaid-rendered');
+	const btn = document.createElement('button');
+	btn.type = 'button';
+	btn.className = MERMAID_FULLSCREEN_BTN_CLASS;
+	btn.setAttribute('aria-label', 'View diagram fullscreen');
+	btn.title = 'View fullscreen';
+	btn.innerHTML = MAXIMIZE_ICON;
+	node.appendChild(btn);
+}
+
+/* ==========================================================================
+   Post-render enhancement — everything that upgrades the sanitized HTML into
+   the interactive reading experience: syntax highlighting, code copy buttons,
+   heading anchors, live task checkboxes, wrapped tables, zoomable images.
+   ========================================================================== */
+
+/** Lucide "copy" and "check" glyphs for the injected code-copy button. */
+const COPY_ICON =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+const CHECK_ICON =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+/** highlight.js is lazy-loaded (like mermaid) the first time a code block
+ *  needs coloring. The "common" build covers ~35 mainstream languages. */
+let hljs: (typeof import('highlight.js/lib/common'))['default'] | null = null;
+
+async function highlightCodeIn(container: HTMLElement): Promise<void> {
+	const blocks = Array.from(
+		container.querySelectorAll<HTMLElement>('pre > code[class*="language-"]:not([data-hl])')
+	);
+	if (blocks.length === 0) {
+		return;
+	}
+	if (!hljs) {
+		const mod = await import('highlight.js/lib/common');
+		hljs = mod.default;
+	}
+	for (const block of blocks) {
+		block.setAttribute('data-hl', 'true');
+		// A comment highlight inside this block would be wiped by the innerHTML
+		// swap — the anchored comment wins over syntax colors.
+		if (block.querySelector('.comment-mark')) {
+			continue;
+		}
+		const lang = (block.className.match(/language-([\w#+-]+)/)?.[1] ?? '').toLowerCase();
+		if (!lang || !hljs.getLanguage(lang)) {
+			continue;
+		}
+		try {
+			// hljs output is trusted-by-construction: it HTML-escapes the code and
+			// only injects its own <span class="hljs-…"> wrappers.
+			block.innerHTML = hljs.highlight(block.textContent ?? '', {
+				language: lang,
+				ignoreIllegals: true
+			}).value;
+		} catch {
+			// Leave the block as plain escaped text.
+		}
+	}
+}
+
+export type EnhanceOptions = {
+	/** Enable task checkboxes; called with the task's document-order index. */
+	onTaskToggle?: (taskIndex: number, checked: boolean) => void;
+	/** Enable click-to-zoom on images. */
+	onImageZoom?: (src: string, alt: string) => void;
+};
+
+/**
+ * Upgrade a container that just received `renderMarkdown` output. Sync work
+ * (anchors, copy buttons, tables, links, tasks) happens immediately; syntax
+ * highlighting and mermaid rendering are kicked off async. Safe to call once
+ * per rendered container (the {#key}/remount patterns guarantee that).
+ */
+export function enhanceRendered(container: HTMLElement, opts: EnhanceOptions = {}): void {
+	// Heading anchors — quiet # links for h1-h4 that already carry slugs. The
+	// glyph is a CSS ::before so it never enters textContent: comment anchors
+	// are plain-text offsets over this container and must not shift.
+	// (All steps are idempotent — some hosts re-run this on the same DOM.)
+	for (const h of container.querySelectorAll('h1[id], h2[id], h3[id], h4[id]')) {
+		if (h.querySelector(':scope > .h-anchor')) {
+			continue;
+		}
+		const a = document.createElement('a');
+		a.className = 'h-anchor';
+		a.href = `#${h.id}`;
+		a.setAttribute('aria-label', 'Link to this section');
+		h.prepend(a);
+	}
+
+	// Tables → horizontal-scroll wrappers with rounded chrome.
+	for (const table of container.querySelectorAll(':scope table')) {
+		if (table.parentElement?.classList.contains('table-wrap')) {
+			continue;
+		}
+		const wrap = document.createElement('div');
+		wrap.className = 'table-wrap';
+		table.before(wrap);
+		wrap.appendChild(table);
+	}
+
+	// External links open in a new tab.
+	for (const a of container.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+		if (a.classList.contains('h-anchor')) {
+			continue;
+		}
+		const href = a.getAttribute('href') ?? '';
+		if (/^https?:\/\//i.test(href)) {
+			a.target = '_blank';
+			a.rel = 'noopener noreferrer';
+		}
+	}
+
+	// Task-list checkboxes — style hooks always; interactivity only when the
+	// caller can write the toggle back to the markdown source.
+	const taskInputs = container.querySelectorAll<HTMLInputElement>('li > input[type="checkbox"]');
+	taskInputs.forEach((input, index) => {
+		const li = input.closest('li');
+		if (!li) {
+			return;
+		}
+		li.classList.add('task-item');
+		li.classList.toggle('task-done', input.checked);
+		if (opts.onTaskToggle && !input.dataset.taskBound) {
+			input.dataset.taskBound = 'true';
+			input.disabled = false;
+			input.addEventListener('change', () => {
+				li.classList.toggle('task-done', input.checked);
+				opts.onTaskToggle?.(index, input.checked);
+			});
+		}
+	});
+
+	// Code blocks: language chip + copy button (skip mermaid placeholders).
+	for (const pre of container.querySelectorAll<HTMLElement>('pre:not(.mermaid-diagram)')) {
+		const code = pre.querySelector('code');
+		if (!code || pre.querySelector(':scope > .code-copy')) {
+			continue;
+		}
+		const lang = code.className.match(/language-([\w#+-]+)/)?.[1];
+		if (lang) {
+			// Label carried in a data attribute + CSS ::before so it stays out of
+			// textContent (see the comment-anchor note above).
+			const chip = document.createElement('span');
+			chip.className = 'code-lang';
+			chip.dataset.lang = lang;
+			pre.appendChild(chip);
+		}
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'code-copy';
+		btn.title = 'Copy code';
+		btn.setAttribute('aria-label', 'Copy code');
+		btn.innerHTML = COPY_ICON;
+		btn.addEventListener('click', async () => {
+			try {
+				await navigator.clipboard.writeText(code.textContent ?? '');
+				btn.innerHTML = CHECK_ICON;
+				btn.classList.add('copied');
+				setTimeout(() => {
+					btn.innerHTML = COPY_ICON;
+					btn.classList.remove('copied');
+				}, 1400);
+			} catch {
+				// Clipboard unavailable (permissions/insecure context) — no-op.
+			}
+		});
+		pre.appendChild(btn);
+	}
+
+	// Images: lazy-load; click-to-zoom when a handler is provided.
+	for (const img of container.querySelectorAll<HTMLImageElement>('img')) {
+		img.loading = 'lazy';
+		if (opts.onImageZoom && !img.dataset.zoomable) {
+			img.dataset.zoomable = 'true';
+			img.addEventListener('click', () => {
+				opts.onImageZoom?.(img.currentSrc || img.src, img.alt);
+			});
+		}
+	}
+
+	// Async upgrades — fire and forget.
+	void highlightCodeIn(container);
+	void renderMermaidDiagrams(container);
+}
+
+/** One outline entry per h1-h3 in the rendered document. */
+export type OutlineItem = {
+	id: string;
+	text: string;
+	level: number;
+};
+
+/** Extract the document outline from a rendered container. */
+export function outlineFrom(container: HTMLElement): OutlineItem[] {
+	const items: OutlineItem[] = [];
+	for (const h of container.querySelectorAll<HTMLElement>('h1[id], h2[id], h3[id]')) {
+		// Skip generated section headings (e.g. marked-footnote's "Footnotes").
+		if (h.closest('.footnotes')) {
+			continue;
+		}
+		const text = (h.textContent ?? '').replace(/^#\s*/, '').trim();
+		if (!text) {
+			continue;
+		}
+		items.push({ id: h.id, text, level: Number(h.tagName[1]) });
+	}
+	return items;
+}
+
+/**
+ * Toggle the Nth task checkbox in markdown `source` (N = document-order index
+ * among rendered checkboxes). Lines inside fenced code blocks are skipped so
+ * the DOM index and the source scan stay aligned. Returns the new source, or
+ * null when the index can't be located (source drifted — caller should no-op).
+ */
+export function toggleTaskInSource(
+	source: string,
+	taskIndex: number,
+	checked: boolean
+): string | null {
+	const TASK_RE = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])/;
+	const FENCE_RE = /^\s*(```|~~~)/;
+	const lines = source.split('\n');
+	let inFence = false;
+	let fenceMark = '';
+	let seen = -1;
+	for (let i = 0; i < lines.length; i++) {
+		const fence = lines[i].match(FENCE_RE);
+		if (fence) {
+			if (!inFence) {
+				inFence = true;
+				fenceMark = fence[1];
+			} else if (fence[1] === fenceMark) {
+				inFence = false;
+			}
+			continue;
+		}
+		if (inFence || !TASK_RE.test(lines[i])) {
+			continue;
+		}
+		seen++;
+		if (seen === taskIndex) {
+			lines[i] = lines[i].replace(TASK_RE, `$1${checked ? 'x' : ' '}$3`);
+			return lines.join('\n');
+		}
+	}
+	return null;
+}
+
+/** Word count over the raw markdown source (code and prose alike). */
+export function countWords(source: string): number {
+	return (source.match(/[\p{L}\p{N}][\p{L}\p{N}'’‑-]*/gu) ?? []).length;
+}
+
+/** Estimated reading time in whole minutes (~220 wpm), minimum 1. */
+export function readingTimeMinutes(words: number): number {
+	return Math.max(1, Math.round(words / 220));
 }
 
 /** A W3C-style text anchor: the quoted text plus disambiguating context. */
@@ -438,13 +758,14 @@ function wrapRangeWithMark(range: Range, id: string): boolean {
 	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	let n: Node | null = walker.nextNode();
 	while (n) {
-		const t = n as Text;
-		if (range.intersectsNode(t)) {
-			const start = t === range.startContainer ? range.startOffset : 0;
-			const end = t === range.endContainer ? range.endOffset : t.length;
+		// SHOW_TEXT walkers only yield Text nodes; instanceof narrows without
+		// an assertion (which the lint config bans).
+		if (n instanceof Text && range.intersectsNode(n)) {
+			const start = n === range.startContainer ? range.startOffset : 0;
+			const end = n === range.endContainer ? range.endOffset : n.length;
 			// Skip zero-length touches at a boundary (intersectsNode is inclusive).
 			if (end > start) {
-				segments.push({ node: t, start, end });
+				segments.push({ node: n, start, end });
 			}
 		}
 		n = walker.nextNode();

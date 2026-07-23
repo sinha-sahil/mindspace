@@ -33,8 +33,9 @@ function readInitialSkin(): ThemeSkin {
 		return DEFAULT_SKIN;
 	}
 	const v = localStorage.getItem(SKIN_KEY);
-	if (v && SKINS.some((s) => s.id === v)) {
-		return v as ThemeSkin;
+	const found = v ? SKINS.find((s) => s.id === v) : null;
+	if (found) {
+		return found.id;
 	}
 	return DEFAULT_SKIN;
 }

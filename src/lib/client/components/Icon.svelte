@@ -44,6 +44,19 @@
 	import star from '$lib/assets/icons/star.svg?raw';
 	import image from '$lib/assets/icons/image.svg?raw';
 	import layout from '$lib/assets/icons/layout.svg?raw';
+	import bold from '$lib/assets/icons/bold.svg?raw';
+	import italic from '$lib/assets/icons/italic.svg?raw';
+	import strikethrough from '$lib/assets/icons/strikethrough.svg?raw';
+	import listOrdered from '$lib/assets/icons/list-ordered.svg?raw';
+	import listChecks from '$lib/assets/icons/list-checks.svg?raw';
+	import textQuote from '$lib/assets/icons/text-quote.svg?raw';
+	import minus from '$lib/assets/icons/minus.svg?raw';
+	import redo from '$lib/assets/icons/redo.svg?raw';
+	import eye from '$lib/assets/icons/eye.svg?raw';
+	import columns2 from '$lib/assets/icons/columns-2.svg?raw';
+	import download from '$lib/assets/icons/download.svg?raw';
+	import printer from '$lib/assets/icons/printer.svg?raw';
+	import heading from '$lib/assets/icons/heading.svg?raw';
 
 	export const ICONS = {
 		plus: plus,
@@ -90,7 +103,20 @@
 		table: table,
 		star: star,
 		image: image,
-		layout: layout
+		layout: layout,
+		bold: bold,
+		italic: italic,
+		strikethrough: strikethrough,
+		'list-ordered': listOrdered,
+		'list-checks': listChecks,
+		'text-quote': textQuote,
+		minus: minus,
+		redo: redo,
+		eye: eye,
+		'columns-2': columns2,
+		download: download,
+		printer: printer,
+		heading: heading
 	};
 
 	export type IconName = keyof typeof ICONS;

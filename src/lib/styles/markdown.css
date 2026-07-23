@@ -1,0 +1,684 @@
+/* ==========================================================================
+   mindspace · rendered-markdown typography — shared by the document viewer,
+   the editor's live preview, and the public share page. Apply `.md-body` to
+   any container that receives `renderMarkdown()` output.
+
+   Voice: Editorial Luxe — Fraunces display for h1/h2, crisp Geist body,
+   indigo accent as punctuation. Sized for long-form reading (15.5px body).
+   ========================================================================== */
+
+/* ---------- code syntax palette (theme-aware) ----------
+   Restrained, 4-hue editorial set derived from the app palette. Same triple
+   declaration pattern as theme.css: light default → explicit dark → system
+   dark fallback. */
+:root {
+	--code-kw: #7048b7; /* keywords · violet-indigo */
+	--code-str: #2b7a52; /* strings · sage */
+	--code-num: #b07112; /* numbers/constants · saffron-deep */
+	--code-fn: #3d55c5; /* fn & class names · ink indigo */
+	--code-type: #0f7285; /* types/tags · teal-ink */
+	--code-com: #8b8d96; /* comments · muted */
+	--code-attr: #3a3c46; /* props/attrs · fg-2 */
+	--code-add-bg: rgba(43, 122, 82, 0.12);
+	--code-del-bg: rgba(204, 36, 67, 0.1);
+}
+:root[data-theme='dark'] {
+	--code-kw: #b8a3f6;
+	--code-str: #7fce9f;
+	--code-num: #e5b567;
+	--code-fn: #9fb0ff;
+	--code-type: #6cc7d8;
+	--code-com: #767986;
+	--code-attr: #ced0d7;
+	--code-add-bg: rgba(93, 194, 145, 0.14);
+	--code-del-bg: rgba(248, 117, 130, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme]) {
+		--code-kw: #b8a3f6;
+		--code-str: #7fce9f;
+		--code-num: #e5b567;
+		--code-fn: #9fb0ff;
+		--code-type: #6cc7d8;
+		--code-com: #767986;
+		--code-attr: #ced0d7;
+		--code-add-bg: rgba(93, 194, 145, 0.14);
+		--code-del-bg: rgba(248, 117, 130, 0.12);
+	}
+}
+
+/* ---------- base measure ---------- */
+.md-body {
+	font-family: var(--font-sans);
+	font-size: 15.5px;
+	line-height: 1.75;
+	color: var(--fg);
+	overflow-wrap: break-word;
+}
+
+/* ---------- headings ---------- */
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+	position: relative;
+	margin: 1.9em 0 0.55em;
+	line-height: 1.22;
+	color: var(--fg);
+	scroll-margin-top: 24px;
+}
+.md-body h1 {
+	font-family: var(--font-display);
+	font-weight: 520;
+	font-variation-settings:
+		'opsz' 88,
+		'wght' 520,
+		'SOFT' 0,
+		'WONK' 0;
+	letter-spacing: -0.02em;
+	font-size: 2.05em;
+	margin-top: 0.2em;
+}
+.md-body > h1:first-child {
+	margin-top: 0;
+}
+.md-body h2 {
+	font-family: var(--font-display);
+	font-weight: 530;
+	font-variation-settings:
+		'opsz' 64,
+		'wght' 530,
+		'SOFT' 0,
+		'WONK' 0;
+	letter-spacing: -0.015em;
+	font-size: 1.58em;
+}
+.md-body h3 {
+	font-size: 1.22em;
+	font-weight: 600;
+	letter-spacing: -0.012em;
+}
+.md-body h4 {
+	font-size: 1.02em;
+	font-weight: 600;
+	letter-spacing: -0.008em;
+}
+.md-body h5,
+.md-body h6 {
+	font-size: 0.8em;
+	font-weight: 650;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--fg-2);
+}
+
+/* Hover anchor — a quiet # to the left of each heading, added post-render. */
+.md-body .h-anchor {
+	position: absolute;
+	left: -0.95em;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 0.85em;
+	font-family: var(--font-mono);
+	font-size: 0.72em;
+	font-weight: 500;
+	line-height: 1;
+	text-align: center;
+	color: var(--accent);
+	text-decoration: none;
+	opacity: 0;
+	transition: opacity var(--duration-fast) var(--ease-out);
+}
+.md-body .h-anchor::before {
+	/* Glyph lives in CSS, not textContent — comment-anchor offsets over the
+	   rendered text must not shift when enhancement runs. */
+	content: '#';
+}
+.md-body h1:hover .h-anchor,
+.md-body h2:hover .h-anchor,
+.md-body h3:hover .h-anchor,
+.md-body h4:hover .h-anchor,
+.md-body .h-anchor:focus-visible {
+	opacity: 1;
+}
+
+/* ---------- flow ---------- */
+.md-body p {
+	margin: 0.85em 0;
+}
+.md-body strong {
+	font-weight: 620;
+}
+.md-body a {
+	color: var(--accent);
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-decoration-color: color-mix(in srgb, var(--accent) 42%, transparent);
+	text-underline-offset: 3px;
+	transition:
+		text-decoration-color var(--duration-fast) var(--ease-out),
+		opacity var(--duration-fast) var(--ease-out);
+}
+.md-body a:hover {
+	opacity: 1;
+	text-decoration-color: var(--accent);
+}
+.md-body mark {
+	background: color-mix(in srgb, var(--saffron) 24%, transparent);
+	color: inherit;
+	border-radius: 3px;
+	padding: 0 2px;
+}
+
+/* ---------- lists ---------- */
+.md-body ul,
+.md-body ol {
+	margin: 0.85em 0;
+	padding-left: 1.55em;
+}
+.md-body li {
+	margin: 0.3em 0;
+}
+.md-body li > ul,
+.md-body li > ol {
+	margin: 0.3em 0;
+}
+.md-body ul > li::marker {
+	color: var(--muted-2);
+}
+/* Nested bullets: hollow circles read as a rendering glitch at small sizes —
+   keep solid discs at every depth, differentiated by the indent alone. */
+.md-body ul ul,
+.md-body ul ul ul {
+	list-style-type: disc;
+}
+.md-body ol > li::marker {
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+	font-size: 0.92em;
+	font-weight: 500;
+}
+
+/* Task lists — custom accent checkboxes, GitHub semantics. */
+.md-body li.task-item {
+	list-style: none;
+	margin-left: -1.55em;
+	padding-left: 0;
+	display: block;
+}
+.md-body li.task-item > input[type='checkbox'] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 15px;
+	height: 15px;
+	margin: 0 8px 0 0;
+	vertical-align: -2.5px;
+	border: 1.5px solid var(--border-strong);
+	border-radius: 4.5px;
+	background: var(--surface);
+	cursor: default;
+	position: relative;
+	transition:
+		background var(--duration-fast) var(--ease-out),
+		border-color var(--duration-fast) var(--ease-out);
+}
+.md-body li.task-item > input[type='checkbox']:not(:disabled) {
+	cursor: pointer;
+}
+.md-body li.task-item > input[type='checkbox']:not(:disabled):hover {
+	border-color: var(--accent);
+}
+.md-body li.task-item > input[type='checkbox']:checked {
+	background: var(--accent);
+	border-color: var(--accent);
+}
+.md-body li.task-item > input[type='checkbox']:checked::after {
+	content: '';
+	position: absolute;
+	left: 4px;
+	top: 1px;
+	width: 4px;
+	height: 8px;
+	border: solid var(--bg);
+	border-width: 0 1.8px 1.8px 0;
+	transform: rotate(45deg);
+}
+.md-body li.task-item.task-done {
+	color: var(--muted);
+}
+.md-body li.task-item.task-done > del,
+.md-body li.task-item.task-done {
+	text-decoration: none;
+}
+
+/* ---------- inline & block code ---------- */
+.md-body code {
+	font-family: var(--font-mono);
+	font-size: 0.855em;
+	padding: 2px 6px;
+	background: var(--bg-2);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	white-space: nowrap;
+}
+.md-body pre {
+	position: relative;
+	font-family: var(--font-mono);
+	font-size: 13px;
+	line-height: 1.68;
+	padding: 15px 18px;
+	margin: 1.1em 0;
+	background: var(--bg-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	overflow-x: auto;
+	tab-size: 2;
+}
+.md-body pre code {
+	display: block;
+	padding: 0;
+	background: transparent;
+	border: none;
+	font-size: inherit;
+	white-space: pre;
+}
+
+/* Language chip + copy button — injected post-render, revealed on hover. */
+.md-body .code-lang {
+	position: absolute;
+	top: 9px;
+	right: 42px;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted-2);
+	pointer-events: none;
+	user-select: none;
+	transition: opacity var(--duration-fast) var(--ease-out);
+}
+.md-body .code-lang::before {
+	/* Same textContent-neutrality trick as .h-anchor. */
+	content: attr(data-lang);
+}
+.md-body .code-copy {
+	position: absolute;
+	top: 7px;
+	right: 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	color: var(--muted);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity var(--duration-fast) var(--ease-out),
+		color var(--duration-fast) var(--ease-out);
+}
+.md-body pre:hover .code-copy,
+.md-body .code-copy:focus-visible {
+	opacity: 1;
+}
+.md-body .code-copy:hover {
+	color: var(--fg);
+	border-color: var(--border-strong);
+}
+.md-body .code-copy svg {
+	width: 13px;
+	height: 13px;
+}
+.md-body .code-copy.copied {
+	color: var(--sage);
+	opacity: 1;
+}
+
+/* ---------- syntax highlighting (highlight.js class map) ---------- */
+.md-body .hljs-keyword,
+.md-body .hljs-selector-tag,
+.md-body .hljs-literal,
+.md-body .hljs-built_in,
+.md-body .hljs-doctag {
+	color: var(--code-kw);
+}
+.md-body .hljs-string,
+.md-body .hljs-regexp,
+.md-body .hljs-selector-attr,
+.md-body .hljs-selector-pseudo {
+	color: var(--code-str);
+}
+.md-body .hljs-number,
+.md-body .hljs-symbol,
+.md-body .hljs-variable.constant_ {
+	color: var(--code-num);
+}
+.md-body .hljs-title,
+.md-body .hljs-title.function_,
+.md-body .hljs-title.class_,
+.md-body .hljs-title.class_.inherited__ {
+	color: var(--code-fn);
+}
+.md-body .hljs-type,
+.md-body .hljs-name,
+.md-body .hljs-selector-class,
+.md-body .hljs-selector-id,
+.md-body .hljs-template-tag {
+	color: var(--code-type);
+}
+.md-body .hljs-comment,
+.md-body .hljs-quote {
+	color: var(--code-com);
+	font-style: italic;
+}
+.md-body .hljs-attr,
+.md-body .hljs-attribute,
+.md-body .hljs-property,
+.md-body .hljs-variable,
+.md-body .hljs-template-variable {
+	color: var(--code-attr);
+}
+.md-body .hljs-meta,
+.md-body .hljs-params {
+	color: var(--muted);
+}
+.md-body .hljs-section {
+	color: var(--code-fn);
+	font-weight: 600;
+}
+.md-body .hljs-bullet,
+.md-body .hljs-link {
+	color: var(--code-kw);
+}
+.md-body .hljs-emphasis {
+	font-style: italic;
+}
+.md-body .hljs-strong {
+	font-weight: 650;
+}
+.md-body .hljs-addition {
+	color: var(--sage);
+	background: var(--code-add-bg);
+}
+.md-body .hljs-deletion {
+	color: var(--rose);
+	background: var(--code-del-bg);
+}
+
+/* ---------- blockquote ---------- */
+.md-body blockquote {
+	margin: 1.1em 0;
+	padding: 0.1em 0 0.1em 1.15em;
+	border-left: 2px solid var(--soft);
+	color: var(--fg-2);
+}
+.md-body blockquote p {
+	margin: 0.5em 0;
+}
+
+/* ---------- GitHub-style alerts (marked-alert) ---------- */
+.md-body .markdown-alert {
+	--alert-tint: 6%;
+	margin: 1.15em 0;
+	padding: 12px 16px 12px 14px;
+	border-left: 2.5px solid var(--alert-hue, var(--accent));
+	border-radius: 6px 10px 10px 6px;
+	background: color-mix(in srgb, var(--alert-hue, var(--accent)) var(--alert-tint), transparent);
+	color: var(--fg-2);
+}
+/* Dark surfaces swallow low-alpha tints — give callouts more presence. */
+:root[data-theme='dark'] .md-body .markdown-alert {
+	--alert-tint: 10%;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme]) .md-body .markdown-alert {
+		--alert-tint: 10%;
+	}
+}
+.md-body .markdown-alert > :last-child {
+	margin-bottom: 0;
+}
+.md-body .markdown-alert .markdown-alert-title {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	margin: 0 0 4px;
+	font-size: 0.82em;
+	font-weight: 650;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--alert-hue, var(--accent));
+}
+.md-body .markdown-alert .markdown-alert-title svg {
+	width: 14px;
+	height: 14px;
+	fill: currentColor;
+}
+.md-body .markdown-alert-note {
+	--alert-hue: var(--accent);
+}
+.md-body .markdown-alert-tip {
+	--alert-hue: var(--sage);
+}
+.md-body .markdown-alert-important {
+	--alert-hue: var(--code-kw);
+}
+.md-body .markdown-alert-warning {
+	--alert-hue: var(--saffron);
+}
+.md-body .markdown-alert-caution {
+	--alert-hue: var(--rose);
+}
+
+/* ---------- tables ---------- */
+.md-body .table-wrap {
+	margin: 1.15em 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	overflow-x: auto;
+	background: var(--surface);
+	box-shadow: var(--shadow-sm);
+}
+.md-body table {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 0.92em;
+	line-height: 1.55;
+}
+.md-body th,
+.md-body td {
+	padding: 9px 16px;
+	text-align: left;
+	vertical-align: top;
+}
+.md-body thead th {
+	font-size: 0.86em;
+	font-weight: 620;
+	letter-spacing: 0.02em;
+	color: var(--fg-2);
+	background: var(--surface-2);
+	border-bottom: 1px solid var(--border-strong);
+	white-space: nowrap;
+}
+.md-body tbody td {
+	border-top: 1px solid var(--border);
+}
+.md-body tbody tr:first-child td {
+	border-top: none;
+}
+.md-body tbody tr:hover td {
+	background: color-mix(in srgb, var(--bg-2) 55%, transparent);
+}
+/* A bare table (outside .table-wrap, e.g. legacy render paths) still looks OK */
+.md-body > table {
+	border: 1px solid var(--border);
+}
+
+/* ---------- media ---------- */
+.md-body img {
+	max-width: 100%;
+	height: auto;
+	border-radius: var(--radius-md);
+	margin: 0.35em 0;
+	box-shadow: var(--shadow-sm);
+}
+.md-body img[data-zoomable] {
+	cursor: zoom-in;
+}
+
+/* ---------- rules ---------- */
+.md-body hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 2.6em 0;
+}
+
+/* ---------- footnotes (marked-footnote) ---------- */
+.md-body .footnotes {
+	margin-top: 2.5em;
+	padding-top: 1em;
+	border-top: 1px solid var(--border);
+	font-size: 0.85em;
+	color: var(--fg-2);
+}
+.md-body .footnotes h2 {
+	/* the generated "Footnotes" heading — keep it whisper-quiet */
+	font-family: var(--font-sans);
+	font-size: 0.82em;
+	font-weight: 650;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+	margin: 0 0 0.6em;
+}
+.md-body .footnotes li {
+	margin: 0.35em 0;
+}
+.md-body [data-footnote-ref] {
+	text-decoration: none;
+	font-weight: 550;
+	padding: 0 2px;
+}
+.md-body [data-footnote-backref] {
+	text-decoration: none;
+}
+
+/* ---------- mermaid diagrams ---------- */
+.md-body pre.mermaid-diagram {
+	padding: 0;
+	background: transparent;
+	border: none;
+	text-align: center;
+	overflow: visible;
+}
+.md-body pre.mermaid-diagram svg {
+	max-width: 100%;
+	height: auto;
+}
+.md-body .mermaid-fullscreen-btn {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	color: var(--muted);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity var(--duration-fast) var(--ease-out);
+}
+.md-body pre.mermaid-diagram:hover .mermaid-fullscreen-btn,
+.md-body .mermaid-fullscreen-btn:focus-visible {
+	opacity: 1;
+}
+.md-body .mermaid-fullscreen-btn:hover {
+	color: var(--fg);
+	background: var(--bg-2);
+}
+.md-body .mermaid-fullscreen-btn svg {
+	width: 15px;
+	height: 15px;
+}
+.md-body pre.mermaid-error {
+	text-align: left;
+	color: var(--rose);
+	white-space: pre-wrap;
+}
+
+/* ---------- comment highlights (viewer only, harmless elsewhere) ---------- */
+.md-body .comment-mark {
+	background: color-mix(in srgb, var(--saffron) 14%, transparent);
+	box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--saffron) 55%, transparent);
+	padding: 0 1px;
+	border-radius: 2px;
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-out);
+}
+.md-body .comment-mark:hover {
+	background: color-mix(in srgb, var(--saffron) 26%, transparent);
+}
+
+/* ---------- first/last child rhythm ---------- */
+.md-body > :first-child {
+	margin-top: 0;
+}
+.md-body > :last-child {
+	margin-bottom: 0;
+}
+
+/* ==========================================================================
+   Print — a document prints like a document: just the rendered markdown,
+   black on white, no app chrome. Triggered from the Export menu.
+   ========================================================================== */
+@media print {
+	body {
+		background: #fff !important;
+	}
+	body * {
+		visibility: hidden;
+	}
+	.print-root,
+	.print-root * {
+		visibility: visible;
+	}
+	.print-root {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		max-width: 100%;
+		padding: 0;
+		margin: 0;
+		overflow: visible !important;
+	}
+	.md-body {
+		color: #111;
+		font-size: 12pt;
+	}
+	.md-body .code-copy,
+	.md-body .mermaid-fullscreen-btn,
+	.md-body .h-anchor {
+		display: none !important;
+	}
+	.md-body pre,
+	.md-body code {
+		border-color: #ddd;
+		background: #f6f6f6;
+	}
+	.md-body a {
+		color: #1a1a8c;
+	}
+}

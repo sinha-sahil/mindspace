@@ -180,6 +180,34 @@ function createStore() {
 		saveTimers.set(id, timer);
 	}
 
+	/**
+	 * Persist a pending debounced save for `id` right now (Cmd+S). No-op when
+	 * nothing is queued. The savingCount slot claimed by saveContent is
+	 * released here instead of in its timer.
+	 */
+	async function flushSave(id: string): Promise<void> {
+		const timer = saveTimers.get(id);
+		if (!timer || !client) {
+			return;
+		}
+		clearTimeout(timer);
+		saveTimers.delete(id);
+		const doc = state.items.find((d) => d.id === id);
+		try {
+			if (doc) {
+				const { error } = await client
+					.from('documents')
+					.update({ content: doc.content })
+					.eq('id', id);
+				if (error) {
+					state.error = error.message;
+				}
+			}
+		} finally {
+			state.savingCount = Math.max(0, state.savingCount - 1);
+		}
+	}
+
 	function select(id: string) {
 		if (state.items.some((d) => d.id === id)) {
 			state.activeId = id;
@@ -271,6 +299,7 @@ function createStore() {
 		remove,
 		rename,
 		saveContent,
+		flushSave,
 		select,
 		setInitialDoc,
 		reset

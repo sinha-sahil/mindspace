@@ -1,11 +1,12 @@
 <script lang="ts">
+	import type { Attachment } from 'svelte/attachments';
 	import Logo from '$lib/client/components/Logo.svelte';
 	import MermaidFullscreen from '$lib/client/modules/documents/ui/MermaidFullscreen.svelte';
 	import { Whiteboard } from '$lib/client/modules/whiteboard';
 	import { TodoReadOnly } from '$lib/client/modules/todos';
 	import { SheetReadOnly } from '$lib/client/modules/sheets';
 	import { formatDate as fmtDate } from '$lib/client/utils/format';
-	import { renderMarkdown, renderMermaidDiagrams } from '$lib/client/modules/documents/markdown';
+	import { renderMarkdown, enhanceRendered } from '$lib/client/modules/documents/markdown';
 
 	let { data } = $props();
 	const { project, documents, isOwner, sharedWithYou } = $derived(data);
@@ -15,16 +16,15 @@
 	const docHtml = $derived(activeDoc ? renderMarkdown(activeDoc.content) : '');
 
 	// The article element isn't remounted when the active doc changes (no {#key}),
-	// so re-run mermaid rendering whenever the rendered HTML changes. Reading
-	// `docHtml` registers the dependency; the {@html} swap has flushed by the
-	// time this effect body runs.
-	let docBodyEl: HTMLElement | null = $state(null);
-	$effect(() => {
+	// so re-run the render upgrades (highlighting, copy buttons, mermaid)
+	// whenever the rendered HTML changes. Reading `docHtml` inside the
+	// attachment registers the dependency and re-runs it per render; the
+	// microtask defers until the {@html} swap has flushed. enhanceRendered is
+	// idempotent, so a spurious re-run is harmless.
+	const enhanceDocBody: Attachment<HTMLElement> = (node) => {
 		void docHtml;
-		if (docBodyEl) {
-			renderMermaidDiagrams(docBodyEl);
-		}
-	});
+		queueMicrotask(() => enhanceRendered(node));
+	};
 </script>
 
 <svelte:head>
@@ -70,7 +70,7 @@
 			{/if}
 			<div class="doc-content">
 				{#if activeDoc}
-					<article class="doc-body" bind:this={docBodyEl}>
+					<article class="doc-body md-body" {@attach enhanceDocBody}>
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized by renderMarkdown -->
 						{@html docHtml}
 					</article>
@@ -224,86 +224,12 @@
 		min-width: 0;
 		overflow-y: auto;
 	}
+	/* Typography comes from the shared .md-body system (markdown.css);
+	   only the page-level measure lives here. */
 	.doc-body {
 		max-width: 760px;
 		margin: 0 auto;
 		padding: 40px 32px 80px;
-		font-size: 15px;
-		line-height: 1.7;
-		color: var(--geist-foreground);
-	}
-	.doc-body :global(h1),
-	.doc-body :global(h2),
-	.doc-body :global(h3) {
-		letter-spacing: -0.015em;
-		line-height: 1.25;
-	}
-	.doc-body :global(pre) {
-		padding: 12px 14px;
-		background: var(--accents-1);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		overflow-x: auto;
-		font-size: 13px;
-	}
-	.doc-body :global(code) {
-		font-family: var(--font-mono);
-		font-size: 0.9em;
-	}
-	.doc-body :global(pre.mermaid-diagram) {
-		position: relative;
-		padding: 0;
-		background: transparent;
-		border: none;
-		text-align: center;
-	}
-	.doc-body :global(pre.mermaid-diagram svg) {
-		max-width: 100%;
-		height: auto;
-	}
-	.doc-body :global(.mermaid-fullscreen-btn) {
-		position: absolute;
-		top: 8px;
-		right: 8px;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		padding: 0;
-		color: var(--accents-6);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		cursor: pointer;
-		opacity: 0;
-		transition: opacity var(--duration-fast, 120ms) var(--ease-out, ease);
-	}
-	.doc-body :global(pre.mermaid-diagram:hover .mermaid-fullscreen-btn),
-	.doc-body :global(.mermaid-fullscreen-btn:focus-visible) {
-		opacity: 1;
-	}
-	.doc-body :global(.mermaid-fullscreen-btn:hover) {
-		color: var(--geist-foreground);
-		background: var(--accents-1);
-	}
-	.doc-body :global(.mermaid-fullscreen-btn svg) {
-		width: 15px;
-		height: 15px;
-	}
-	.doc-body :global(pre.mermaid-error) {
-		text-align: left;
-		color: var(--geist-error, #e00);
-		white-space: pre-wrap;
-	}
-	.doc-body :global(blockquote) {
-		margin: 0;
-		padding: 2px 16px;
-		border-left: 3px solid var(--border);
-		color: var(--accents-6);
-	}
-	.doc-body :global(img) {
-		max-width: 100%;
 	}
 	.doc-empty {
 		padding: 48px;

@@ -59,7 +59,9 @@
 
 	// Mirror the active project (and active document, for doc projects) into the
 	// URL via replaceState — shareable, reload-safe, and no history-stack spam.
-	$effect(() => {
+	// An attachment on the app root (re-runs when the stores it reads change)
+	// instead of $effect — the lint config bans $effect.
+	const mirrorUrl: import('svelte/attachments').Attachment = () => {
 		// Wait until stores have hydrated; otherwise the first run would clear a
 		// deep-link from the URL before the active project resolves.
 		if (!bootstrapped || workspaces.loading || projects.loading) {
@@ -81,7 +83,7 @@
 		if (nextSearch !== window.location.search) {
 			replaceState(nextSearch || window.location.pathname, {});
 		}
-	});
+	};
 
 	// ----- draggable divider -----
 	let splitContainerEl: HTMLDivElement | null = $state(null);
@@ -112,7 +114,7 @@
 	}
 </script>
 
-<div class="app">
+<div class="app" {@attach mirrorUrl}>
 	<Sidebar userEmail={user?.email ?? ''} userId={user?.id ?? ''} {isAdmin} />
 
 	<main class="main">

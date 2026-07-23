@@ -7,6 +7,7 @@
 	import '@fontsource-variable/bricolage-grotesque/index.css';
 	import '@fontsource-variable/hanken-grotesk/index.css';
 	import '$lib/styles/theme.css';
+	import '$lib/styles/markdown.css';
 	import { onMount } from 'svelte';
 	import { invalidate } from '$app/navigation';
 	import { theme } from '$lib/client/modules/theme';

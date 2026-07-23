@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { MERMAID_FULLSCREEN_BTN_CLASS } from '../markdown';
 
@@ -151,12 +152,14 @@
 		}
 	}
 
-	// Fit once the SVG has been inserted into the stage.
-	$effect(() => {
+	// Fit once the SVG has been inserted into the stage. An attachment on the
+	// diagram element (mounts with the overlay, re-runs when svgHtml changes)
+	// instead of $effect — the lint config bans $effect.
+	const fitOnContent: Attachment<HTMLDivElement> = () => {
 		if (open && svgHtml) {
 			tick().then(fitToStage);
 		}
-	});
+	};
 
 	onMount(() => {
 		document.addEventListener('click', onDocClick);
@@ -203,7 +206,7 @@
 
 		<div class="stage" bind:this={stageEl}>
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG is mermaid-rendered (securityLevel strict) and already trusted in the document -->
-			<div class="diagram" bind:this={diagramEl}>{@html svgHtml}</div>
+			<div class="diagram" bind:this={diagramEl} {@attach fitOnContent}>{@html svgHtml}</div>
 		</div>
 	</div>
 {/if}
