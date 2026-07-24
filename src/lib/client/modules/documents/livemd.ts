@@ -273,21 +273,28 @@ const codeBlockLine = Decoration.line({ class: 'livemd-codeline' });
 const fenceLine = Decoration.line({ class: 'livemd-fence' });
 const taskDoneLine = Decoration.line({ class: 'livemd-task-done' });
 
-/** Lines touched by any selection range. */
+/** Lines whose raw markdown is revealed for editing.
+ *
+ *  Only EMPTY selection ranges (carets) reveal. A non-empty selection is a
+ *  highlighting gesture — comment, copy, format — and revealing marks while
+ *  the user drags makes the text shift under the pointer, which is what made
+ *  select-to-comment feel broken. The layout stays perfectly still during
+ *  selection; place the caret inside something to edit its source. */
 function revealedLines(state: EditorState): Set<number> {
 	const lines = new Set<number>();
 	for (const range of state.selection.ranges) {
-		const from = state.doc.lineAt(range.from).number;
-		const to = state.doc.lineAt(range.to).number;
-		for (let n = from; n <= to; n++) {
-			lines.add(n);
+		if (!range.empty) {
+			continue;
 		}
+		lines.add(state.doc.lineAt(range.head).number);
 	}
 	return lines;
 }
 
+/** True when a CARET sits inside [from, to] — same stability rule as above:
+ *  drag-selections never flip a block widget back to source. */
 function selectionIntersects(state: EditorState, from: number, to: number): boolean {
-	return state.selection.ranges.some((r) => r.to >= from && r.from <= to);
+	return state.selection.ranges.some((r) => r.empty && r.head >= from && r.head <= to);
 }
 
 function fenceLang(state: EditorState, node: { from: number; to: number }): string {

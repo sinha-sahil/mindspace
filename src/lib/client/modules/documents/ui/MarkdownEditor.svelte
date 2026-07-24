@@ -12,6 +12,7 @@
 		buildExtensions,
 		commentHighlights,
 		refreshCommentsEffect,
+		setPendingComment,
 		outlineFromSource,
 		formatStateAt,
 		toggleBold,
@@ -186,41 +187,87 @@
 		pendingRange = null;
 		showForm = false;
 		commentDraft = '';
+		view?.dispatch({ effects: setPendingComment.of(null) });
+		scheduleCommentBtn();
 	}
 
-	function onDblClick() {
+	// Google-Docs model: any selection surfaces a quiet comment button in the
+	// right margin (the page never shifts while selecting); ⌘⌥M does the same
+	// from the keyboard. The button tracks the selection head through scrolls.
+	let commentBtn = $state<{ x: number; y: number } | null>(null);
+	let commentAnchorPos: number | null = null;
+	let commentBtnTimer: ReturnType<typeof setTimeout> | null = null;
+	let pointerHeld = false;
+
+	function hideCommentBtn() {
+		clearTimer(commentBtnTimer);
+		commentBtnTimer = null;
+		commentBtn = null;
+		commentAnchorPos = null;
+	}
+
+	function positionCommentBtn(): boolean {
+		if (!view || !mainEl || !documentId) {
+			return false;
+		}
+		const sel = view.state.selection.main;
+		if (sel.empty) {
+			return false;
+		}
+		const coords = view.coordsAtPos(sel.head);
+		if (!coords) {
+			return false;
+		}
+		const hostRect = mainEl.getBoundingClientRect();
+		const edRect = view.dom.getBoundingClientRect();
+		commentAnchorPos = sel.head;
+		commentBtn = {
+			x: edRect.right - hostRect.left - 46,
+			y: Math.max(6, coords.top - hostRect.top - 4)
+		};
+		return true;
+	}
+
+	function scheduleCommentBtn() {
+		clearTimer(commentBtnTimer);
+		commentBtnTimer = setTimeout(() => {
+			if (!pointerHeld && !pendingRange) {
+				if (!positionCommentBtn()) {
+					commentBtn = null;
+				}
+			}
+		}, 180);
+	}
+
+	function startComment() {
 		if (!documentId || !view || !mainEl) {
 			return;
 		}
-		// Let CodeMirror finish its word-selection first.
-		queueMicrotask(() => {
-			if (!view || !mainEl) {
-				return;
-			}
-			const sel = view.state.selection.main;
-			if (sel.empty) {
-				dismissPopup();
-				return;
-			}
-			const start = view.coordsAtPos(sel.from);
-			const end = view.coordsAtPos(sel.to);
-			if (!start || !end) {
-				return;
-			}
-			const hostRect = mainEl.getBoundingClientRect();
-			const rawX = (start.left + end.right) / 2 - hostRect.left;
-			const POPUP_HALF = 160;
-			const PAD = 12;
-			popupX = Math.max(POPUP_HALF + PAD, Math.min(mainEl.clientWidth - POPUP_HALF - PAD, rawX));
-			popupY = start.top - hostRect.top - 8;
-			pendingRange = {
-				from: sel.from,
-				to: sel.to,
-				quote: view.state.doc.sliceString(sel.from, sel.to)
-			};
-			showForm = false;
-			commentDraft = '';
-		});
+		const sel = view.state.selection.main;
+		if (sel.empty) {
+			return;
+		}
+		if (!commentBtn) {
+			positionCommentBtn();
+		}
+		const anchor = commentBtn ?? { x: mainEl.clientWidth - 60, y: 40 };
+		const POPUP_HALF = 160;
+		const PAD = 12;
+		popupX = Math.max(
+			POPUP_HALF + PAD,
+			Math.min(mainEl.clientWidth - POPUP_HALF - PAD, anchor.x - 140)
+		);
+		popupY = anchor.y + 24;
+		pendingRange = {
+			from: sel.from,
+			to: sel.to,
+			quote: view.state.doc.sliceString(sel.from, sel.to)
+		};
+		commentDraft = '';
+		// Keep the target text visibly marked while focus moves to the composer.
+		view.dispatch({ effects: setPendingComment.of({ from: sel.from, to: sel.to }) });
+		hideCommentBtn();
+		openForm();
 	}
 
 	function openForm() {
@@ -292,6 +339,11 @@
 		col = head - l.from + 1;
 		const sel = v.state.selection.main;
 		selWords = sel.empty ? 0 : countWords(v.state.sliceDoc(sel.from, sel.to));
+		if (sel.empty) {
+			hideCommentBtn();
+		} else if (!pendingRange) {
+			scheduleCommentBtn();
+		}
 	}
 
 	function handleChange(source: string) {
@@ -316,7 +368,8 @@
 						{
 							onChange: handleChange,
 							onViewUpdate: handleViewUpdate,
-							onSave: () => onSave?.()
+							onSave: () => onSave?.(),
+							onComment: () => startComment()
 						},
 						'Start writing… Markdown renders as you type — ⌘B bold, ⌘K links.'
 					),
@@ -335,7 +388,8 @@
 		});
 		scrollerEl = view.scrollDOM;
 		scrollerEl.addEventListener('scroll', onEditorScroll, { passive: true });
-		view.contentDOM.addEventListener('dblclick', onDblClick);
+		view.contentDOM.addEventListener('pointerdown', onPointerDown);
+		window.addEventListener('pointerup', onPointerUp);
 		handleViewUpdate(view);
 		refreshSpy();
 		view.focus();
@@ -343,7 +397,8 @@
 		return () => {
 			clearTimer(statsTimer);
 			clearTimer(outlineTimer);
-			view?.contentDOM.removeEventListener('dblclick', onDblClick);
+			view?.contentDOM.removeEventListener('pointerdown', onPointerDown);
+			window.removeEventListener('pointerup', onPointerUp);
 			scrollerEl?.removeEventListener('scroll', onEditorScroll);
 			view?.destroy();
 			view = null;
@@ -372,6 +427,18 @@
 		}
 	};
 
+	function onPointerDown() {
+		pointerHeld = true;
+		hideCommentBtn();
+	}
+	function onPointerUp() {
+		if (!pointerHeld) {
+			return;
+		}
+		pointerHeld = false;
+		scheduleCommentBtn();
+	}
+
 	function onEditorScroll() {
 		// Fixed-position menus would float detached from their anchor.
 		if (blockMenuOpen || insertMenuOpen) {
@@ -380,6 +447,16 @@
 		}
 		if (pendingRange) {
 			dismissPopup();
+		}
+		// The margin button glues to its text through scrolls.
+		if (commentBtn && commentAnchorPos !== null && view && mainEl) {
+			const coords = view.coordsAtPos(Math.min(commentAnchorPos, view.state.doc.length));
+			if (coords) {
+				const hostRect = mainEl.getBoundingClientRect();
+				commentBtn = { x: commentBtn.x, y: Math.max(6, coords.top - hostRect.top - 4) };
+			} else {
+				hideCommentBtn();
+			}
 		}
 		refreshSpy();
 	}
@@ -413,7 +490,7 @@
 			blockMenuOpen = false;
 			insertMenuOpen = false;
 		}
-		if (!t.closest('.cmt-popup') && !t.closest('.cmt-trigger') && !t.closest('.cm-editor')) {
+		if (!t.closest('.cmt-popup') && !t.closest('.cmt-margin') && !t.closest('.cm-editor')) {
 			dismissPopup();
 		}
 	}
@@ -709,20 +786,20 @@
 			{@attach syncCommentDecos}
 		></div>
 
-		{#if pendingRange && !showForm}
+		{#if commentBtn && !pendingRange}
 			<button
 				type="button"
-				class="cmt-trigger"
-				style="left: {popupX}px; top: {popupY}px;"
+				class="cmt-margin"
+				style="left: {commentBtn.x}px; top: {commentBtn.y}px;"
 				onmousedown={(e) => {
 					e.preventDefault();
 					e.stopPropagation();
 				}}
-				onclick={openForm}
-				title="Comment on selection"
+				onclick={startComment}
+				title="Add comment ({mod}{alt}M)"
+				aria-label="Add comment on selection"
 			>
-				<Icon name="plus" size={11} />
-				<span>Comment</span>
+				<Icon name="message-square" size={15} />
 			</button>
 		{/if}
 
@@ -1285,6 +1362,12 @@
 		height: 15px;
 	}
 
+	.ed-editor :global(.cm-comment-pending) {
+		background: color-mix(in srgb, var(--saffron) 20%, transparent);
+		box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--saffron) 60%, transparent);
+		border-radius: 2px;
+	}
+
 	/* ---------- comment anchors ---------- */
 	.ed-editor :global(.cm-comment-anchor) {
 		background: color-mix(in srgb, var(--saffron) 14%, transparent);
@@ -1297,26 +1380,30 @@
 	}
 
 	/* ---------- comment trigger + popup ---------- */
-	.cmt-trigger {
+	.cmt-margin {
 		position: absolute;
-		transform: translate(-50%, -100%);
 		display: inline-flex;
 		align-items: center;
-		gap: 5px;
-		padding: 5px 9px;
-		font: inherit;
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--bg);
-		background: var(--fg);
-		border: none;
-		border-radius: 6px;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		color: var(--fg-2);
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: 999px;
 		cursor: pointer;
-		box-shadow: var(--shadow-md);
+		box-shadow: var(--shadow-sm);
 		z-index: 5;
+		transition:
+			color var(--duration-fast) var(--ease-out),
+			border-color var(--duration-fast) var(--ease-out),
+			transform var(--duration-fast) var(--ease-out);
 	}
-	.cmt-trigger:hover {
-		opacity: 0.92;
+	.cmt-margin:hover {
+		color: var(--accent);
+		border-color: var(--accent);
+		transform: scale(1.06);
 	}
 	.cmt-popup {
 		position: absolute;

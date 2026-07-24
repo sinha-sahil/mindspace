@@ -22,6 +22,7 @@ import {
 	EditorSelection,
 	Prec,
 	StateEffect,
+	StateField,
 	type Extension,
 	type Range
 } from '@codemirror/state';
@@ -650,6 +651,34 @@ export function commentHighlights(opts: {
 }
 
 /* ==========================================================================
+   Pending-comment highlight — keeps the target text visibly marked while
+   the composer is open (the native selection stops painting once focus
+   moves into the comment textarea).
+   ========================================================================== */
+
+export const setPendingComment = StateEffect.define<{ from: number; to: number } | null>();
+
+export const pendingCommentField = StateField.define<DecorationSet>({
+	create() {
+		return Decoration.none;
+	},
+	update(deco, tr) {
+		deco = deco.map(tr.changes);
+		for (const e of tr.effects) {
+			if (e.is(setPendingComment)) {
+				deco = e.value
+					? Decoration.set([
+							Decoration.mark({ class: 'cm-comment-pending' }).range(e.value.from, e.value.to)
+						])
+					: Decoration.none;
+			}
+		}
+		return deco;
+	},
+	provide: (f) => EditorView.decorations.from(f)
+});
+
+/* ==========================================================================
    Outline over raw markdown source (h1-h3, fenced code skipped).
    ========================================================================== */
 
@@ -696,6 +725,8 @@ export type EditorCallbacks = {
 	onViewUpdate: (view: EditorView) => void;
 	/** Cmd/Ctrl+S. */
 	onSave?: () => void;
+	/** Cmd/Ctrl+Alt+M — comment on the current selection (Google Docs). */
+	onComment?: () => void;
 };
 
 export function buildExtensions(cb: EditorCallbacks, placeholderText: string): Extension[] {
@@ -718,6 +749,13 @@ export function buildExtensions(cb: EditorCallbacks, placeholderText: string): E
 				key: 'Mod-s',
 				run: () => {
 					cb.onSave?.();
+					return true;
+				}
+			},
+			{
+				key: 'Mod-Alt-m',
+				run: () => {
+					cb.onComment?.();
 					return true;
 				}
 			}
@@ -766,6 +804,7 @@ export function buildExtensions(cb: EditorCallbacks, placeholderText: string): E
 		]),
 		markdown({ base: markdownLanguage, codeLanguages: languages }),
 		syntaxHighlighting(mdHighlight),
+		pendingCommentField,
 		EditorView.lineWrapping,
 		cmPlaceholder(placeholderText),
 		// Spellcheck off: technical docs are dense with identifiers and paths,

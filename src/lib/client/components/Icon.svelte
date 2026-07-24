@@ -57,6 +57,7 @@
 	import download from '$lib/assets/icons/download.svg?raw';
 	import printer from '$lib/assets/icons/printer.svg?raw';
 	import heading from '$lib/assets/icons/heading.svg?raw';
+	import messageSquare from '$lib/assets/icons/message-square.svg?raw';
 
 	export const ICONS = {
 		plus: plus,
@@ -116,7 +117,8 @@
 		'columns-2': columns2,
 		download: download,
 		printer: printer,
-		heading: heading
+		heading: heading,
+		'message-square': messageSquare
 	};
 
 	export type IconName = keyof typeof ICONS;
