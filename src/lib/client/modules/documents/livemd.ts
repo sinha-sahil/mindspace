@@ -22,7 +22,11 @@ import {
 import { StateField, type EditorState, type Extension, type Range } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNode } from '@lezer/common';
-import { renderMermaidDiagrams, MERMAID_FULLSCREEN_BTN_CLASS } from './markdown';
+import {
+	renderMermaidDiagrams,
+	renderInlineMarkdown,
+	MERMAID_FULLSCREEN_BTN_CLASS
+} from './markdown';
 
 /* ==========================================================================
    Widgets
@@ -136,6 +140,127 @@ class MermaidWidget extends WidgetType {
 	}
 }
 
+/** Split a GFM table row into cells: unescaped `|` delimits, `\|` survives. */
+function splitRow(line: string): string[] {
+	let t = line.trim();
+	if (t.startsWith('|')) {
+		t = t.slice(1);
+	}
+	if (t.endsWith('|') && !t.endsWith('\\|')) {
+		t = t.slice(0, -1);
+	}
+	const cells: string[] = [];
+	let cur = '';
+	for (let i = 0; i < t.length; i++) {
+		const ch = t[i];
+		if (ch === '\\' && t[i + 1] === '|') {
+			cur += '\\|';
+			i++;
+		} else if (ch === '|') {
+			cells.push(cur.trim());
+			cur = '';
+		} else {
+			cur += ch;
+		}
+	}
+	cells.push(cur.trim());
+	return cells;
+}
+
+function alignOf(delim: string): '' | 'left' | 'center' | 'right' {
+	const d = delim.trim();
+	const l = d.startsWith(':');
+	const r = d.endsWith(':');
+	if (l && r) {
+		return 'center';
+	}
+	if (r) {
+		return 'right';
+	}
+	if (l) {
+		return 'left';
+	}
+	return '';
+}
+
+class TableWidget extends WidgetType {
+	constructor(
+		readonly src: string,
+		/** Doc position of the table's first character. */
+		readonly from: number
+	) {
+		super();
+	}
+	eq(other: TableWidget): boolean {
+		return other.src === this.src;
+	}
+	toDOM(view: EditorView): HTMLElement {
+		const wrap = document.createElement('div');
+		wrap.className = 'livemd-tablewrap';
+		const table = document.createElement('table');
+		table.className = 'livemd-table';
+
+		const lines = this.src.split('\n');
+		// Row → doc offset of its line start, so a click lands the cursor on
+		// the row being edited.
+		let offset = 0;
+		const rows: { text: string; at: number }[] = [];
+		for (const line of lines) {
+			rows.push({ text: line, at: offset });
+			offset += line.length + 1;
+		}
+		const header = rows[0];
+		const delim = rows[1];
+		const aligns = delim ? splitRow(delim.text).map(alignOf) : [];
+
+		const jump = (at: number) => {
+			const pos = Math.min(this.from + at, view.state.doc.length);
+			view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+			view.focus();
+		};
+
+		const fillRow = (tr: HTMLTableRowElement, line: string, tag: 'th' | 'td', at: number) => {
+			splitRow(line).forEach((cell, i) => {
+				const el = document.createElement(tag);
+				// renderInlineMarkdown sanitizes through the shared DOMPurify pass.
+				el.innerHTML = renderInlineMarkdown(cell);
+				const a = aligns[i];
+				if (a) {
+					el.style.textAlign = a;
+				}
+				tr.appendChild(el);
+			});
+			tr.addEventListener('click', () => jump(at));
+		};
+
+		if (header) {
+			const thead = document.createElement('thead');
+			const tr = document.createElement('tr');
+			fillRow(tr, header.text, 'th', header.at);
+			thead.appendChild(tr);
+			table.appendChild(thead);
+		}
+		const tbody = document.createElement('tbody');
+		for (const row of rows.slice(2)) {
+			if (!row.text.trim()) {
+				continue;
+			}
+			const tr = document.createElement('tr');
+			fillRow(tr, row.text, 'td', row.at);
+			tbody.appendChild(tr);
+		}
+		table.appendChild(tbody);
+		wrap.appendChild(table);
+		return wrap;
+	}
+	ignoreEvent(event: Event): boolean {
+		return event.type === 'click';
+	}
+	get estimatedHeight(): number {
+		return Math.max(64, this.src.split('\n').length * 34);
+	}
+}
+
 /* ==========================================================================
    Decoration builder
    ========================================================================== */
@@ -174,40 +299,69 @@ function isLiveMermaid(state: EditorState, node: { from: number; to: number }): 
 	return fenceLang(state, node) === 'mermaid' && !selectionIntersects(state, node.from, node.to);
 }
 
-/* Block-level decorations (the mermaid widget swaps whole lines, which
-   affects vertical layout) must come from a StateField — CodeMirror forbids
-   ViewPlugins from providing block decorations. */
-function buildMermaidDecos(state: EditorState): DecorationSet {
+/** A table renders as a widget only when the selection is outside it AND it
+ *  starts at a line start (indented/quoted tables keep their raw source). */
+function isLiveTable(state: EditorState, node: { from: number; to: number }): boolean {
+	return (
+		!selectionIntersects(state, node.from, node.to) &&
+		state.doc.lineAt(node.from).from === node.from
+	);
+}
+
+/* Block-level decorations (widgets that swap whole lines, affecting vertical
+   layout) must come from a StateField — CodeMirror forbids ViewPlugins from
+   providing block decorations. Mermaid diagrams and tables both live here. */
+function buildBlockWidgets(state: EditorState): DecorationSet {
 	const decos: Range<Decoration>[] = [];
 	syntaxTree(state).iterate({
 		enter: (node): boolean | void => {
-			if (node.name !== 'FencedCode') {
-				return;
+			if (node.name === 'FencedCode') {
+				if (isLiveMermaid(state, node)) {
+					const firstLine = state.doc.lineAt(node.from);
+					const lastLine = state.doc.lineAt(node.to);
+					const innerFrom = Math.min(firstLine.to + 1, node.to);
+					const inner = state.doc.sliceString(innerFrom, Math.max(lastLine.from - 1, node.from));
+					decos.push(
+						Decoration.replace({
+							widget: new MermaidWidget(inner, innerFrom),
+							block: true
+						}).range(node.from, node.to)
+					);
+				}
+				return false;
 			}
-			if (isLiveMermaid(state, node)) {
-				const firstLine = state.doc.lineAt(node.from);
-				const lastLine = state.doc.lineAt(node.to);
-				const innerFrom = Math.min(firstLine.to + 1, node.to);
-				const inner = state.doc.sliceString(innerFrom, Math.max(lastLine.from - 1, node.from));
-				decos.push(
-					Decoration.replace({
-						widget: new MermaidWidget(inner, innerFrom),
-						block: true
-					}).range(node.from, node.to)
-				);
+			if (node.name === 'Table') {
+				if (isLiveTable(state, node)) {
+					decos.push(
+						Decoration.replace({
+							widget: new TableWidget(state.doc.sliceString(node.from, node.to), node.from),
+							block: true
+						}).range(node.from, node.to)
+					);
+				}
+				return false;
 			}
-			return false;
+			return;
 		}
 	});
 	return Decoration.set(decos, true);
 }
 
-const mermaidField = StateField.define<DecorationSet>({
-	create: buildMermaidDecos,
-	update(value, tr) {
-		return tr.docChanged || tr.selection ? buildMermaidDecos(tr.state) : value;
+const blockWidgetField = StateField.define<{ decos: DecorationSet; treeLen: number }>({
+	create(state) {
+		return { decos: buildBlockWidgets(state), treeLen: syntaxTree(state).length };
 	},
-	provide: (f) => EditorView.decorations.from(f)
+	update(value, tr) {
+		// Also rebuild when the syntax tree has grown — on large documents the
+		// parser reaches distant tables/diagrams after idle parsing, without
+		// any doc or selection change to piggyback on.
+		const treeLen = syntaxTree(tr.state).length;
+		if (tr.docChanged || tr.selection || treeLen !== value.treeLen) {
+			return { decos: buildBlockWidgets(tr.state), treeLen };
+		}
+		return value;
+	},
+	provide: (f) => EditorView.decorations.from(f, (v) => v.decos)
 });
 
 function buildDecorations(view: EditorView): DecorationSet {
@@ -226,7 +380,15 @@ function buildDecorations(view: EditorView): DecorationSet {
 			enter: (node): boolean | void => {
 				const name = node.name;
 
-				/* ---- multi-line: fenced code (mermaid handled by the field) ---- */
+				/* ---- multi-line blocks (widgets come from the field) ---- */
+				if (name === 'Table') {
+					// Widget-replaced tables need no inline decorations; revealed
+					// tables keep their raw source styling.
+					if (isLiveTable(state, node)) {
+						return false;
+					}
+					return;
+				}
 				if (name === 'FencedCode') {
 					if (isLiveMermaid(state, node)) {
 						return false; // replaced by the block widget
@@ -436,5 +598,5 @@ export function livePreview(): Extension {
 			}
 		}
 	);
-	return [mermaidField, plugin];
+	return [blockWidgetField, plugin];
 }

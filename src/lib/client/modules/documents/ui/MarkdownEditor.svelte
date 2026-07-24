@@ -1181,6 +1181,65 @@
 	.ed-editor :global(.livemd-callout-caution) {
 		--callout-hue: var(--rose);
 	}
+	.ed-editor :global(.livemd-tablewrap) {
+		padding: 4px 0 6px;
+		overflow-x: auto;
+	}
+	.ed-editor :global(.livemd-table) {
+		border-collapse: collapse;
+		width: 100%;
+		font-family: var(--font-sans);
+		font-size: 13px;
+		line-height: 1.55;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		overflow: hidden;
+	}
+	.ed-editor :global(.livemd-table th),
+	.ed-editor :global(.livemd-table td) {
+		padding: 7px 13px;
+		text-align: left;
+		vertical-align: top;
+		border-right: 1px solid var(--border);
+	}
+	.ed-editor :global(.livemd-table th:last-child),
+	.ed-editor :global(.livemd-table td:last-child) {
+		border-right: none;
+	}
+	.ed-editor :global(.livemd-table thead th) {
+		font-size: 11.5px;
+		font-weight: 620;
+		letter-spacing: 0.02em;
+		color: var(--fg-2);
+		background: var(--surface-2);
+		border-bottom: 1px solid var(--border-strong);
+		white-space: nowrap;
+	}
+	.ed-editor :global(.livemd-table tbody td) {
+		border-top: 1px solid var(--border);
+	}
+	.ed-editor :global(.livemd-table tbody tr:first-child td) {
+		border-top: none;
+	}
+	.ed-editor :global(.livemd-table tbody tr) {
+		cursor: pointer;
+	}
+	.ed-editor :global(.livemd-table tbody tr:hover td) {
+		background: color-mix(in srgb, var(--bg-2) 55%, transparent);
+	}
+	.ed-editor :global(.livemd-table code) {
+		font-family: var(--font-mono);
+		font-size: 0.85em;
+		background: var(--bg-2);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 1px 4px;
+	}
+	.ed-editor :global(.livemd-table a) {
+		color: var(--accent);
+	}
+
 	.ed-editor :global(.livemd-mermaid) {
 		padding: 6px 0;
 		text-align: center;

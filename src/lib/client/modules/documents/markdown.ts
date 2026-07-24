@@ -114,6 +114,19 @@ export function renderMarkdown(source: string): string {
 	return DOMPurify.sanitize(html);
 }
 
+/** Render a single line of inline markdown (bold, code, links…) to sanitized
+ *  HTML — used by the live editor's table widget for cell contents. */
+export function renderInlineMarkdown(source: string): string {
+	if (!DOMPurify) {
+		return '';
+	}
+	const html = marked.parseInline(source, { async: false });
+	if (typeof html !== 'string') {
+		return '';
+	}
+	return DOMPurify.sanitize(html);
+}
+
 /**
  * Mermaid is heavy (~1MB) and browser-only, so it's lazy-loaded the first time
  * a diagram actually needs rendering and cached thereafter. `null` until then.
