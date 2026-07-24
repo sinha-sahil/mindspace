@@ -25,6 +25,7 @@ export type EventMap = {
 	workspace_renamed: { workspace_id: string };
 	workspace_deleted: { workspace_id: string };
 	workspace_member_added: { workspace_id: string; role: 'editor' | 'viewer' };
+	workspace_invite_link_created: { workspace_id: string; role: 'editor' | 'viewer' };
 	workspace_member_removed: { workspace_id: string };
 	workspace_member_role_changed: { workspace_id: string; role: 'editor' | 'viewer' };
 	workspace_switched: { workspace_id: string };

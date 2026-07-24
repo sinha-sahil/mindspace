@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSupabaseAdmin } from '$lib/server/supabase-admin';
+import { findOrCreateUserByEmail, upsertWorkspaceMember } from '$lib/server/workspace-invites';
 
 type WorkspaceRole = 'editor' | 'viewer';
 
@@ -116,47 +117,22 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		throw error(400, "That email isn't on the platform allowlist yet.");
 	}
 
-	// Look up the auth.users row by email. If they haven't signed in, no row.
-	let targetUserId: string | null = null;
-	let page = 1;
-	const perPage = 200;
-	while (page <= 5) {
-		const { data, error: listErr } = await admin.auth.admin.listUsers({
-			page,
-			perPage
-		});
-		if (listErr) {
-			throw error(500, listErr.message);
-		}
-		const found = data.users.find((u) => (u.email ?? '').toLowerCase() === email);
-		if (found) {
-			targetUserId = found.id;
-			break;
-		}
-		if (data.users.length < perPage) {
-			break;
-		}
-		page++;
-	}
-	if (!targetUserId) {
-		throw error(
-			400,
-			"That user is on the allowlist but hasn't signed in yet — ask them to log in once first."
-		);
+	// Resolve (or silently create) the auth user, so adding someone who has
+	// never signed in just works — their membership is waiting at first login.
+	const who = await findOrCreateUserByEmail(admin, email);
+	if ('error' in who) {
+		throw error(500, who.error);
 	}
 
-	const { error: insErr } = await admin.from('workspace_members').upsert(
-		{
-			workspace_id: workspaceId,
-			user_id: targetUserId,
-			role,
-			added_by: locals.user.id
-		},
-		{ onConflict: 'workspace_id,user_id' }
-	);
-	if (insErr) {
-		throw error(500, insErr.message);
+	const added = await upsertWorkspaceMember(admin, {
+		workspaceId,
+		userId: who.userId,
+		role,
+		addedBy: locals.user.id
+	});
+	if (added.error) {
+		throw error(500, added.error);
 	}
 
-	return json({ userId: targetUserId, email, role });
+	return json({ userId: who.userId, email, role });
 };

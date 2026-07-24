@@ -1,9 +1,12 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getSupabaseAdmin } from '$lib/server/supabase-admin';
+import { parseWorkspaceInviteNote } from '$lib/shared/workspace-invite-note';
+import { findOrCreateUserByEmail, upsertWorkspaceMember } from '$lib/server/workspace-invites';
 
 type Invite = {
 	token: string;
+	created_by: string | null;
 	grant_admin: boolean;
 	max_uses: number | null;
 	use_count: number;
@@ -30,7 +33,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	const admin = getSupabaseAdmin();
 	const { data, error: dbError } = await admin
 		.from('app_invites')
-		.select('token, grant_admin, max_uses, use_count, expires_at, note')
+		.select('token, created_by, grant_admin, max_uses, use_count, expires_at, note')
 		.eq('token', params.token)
 		.maybeSingle();
 
@@ -39,11 +42,16 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	const result = validateInvite(data);
+	const workspaceGrant = result.ok ? parseWorkspaceInviteNote(result.invite.note) : null;
 	return {
 		valid: result.ok,
 		reason: result.ok ? null : result.reason,
 		grantsAdmin: result.ok ? result.invite.grant_admin : false,
-		note: result.ok ? result.invite.note : null
+		// Workspace invites carry their grant in the note — don't show the raw
+		// JSON; the page renders workspaceName instead.
+		note: result.ok && !workspaceGrant ? result.invite.note : null,
+		workspaceName: workspaceGrant?.workspaceName ?? null,
+		workspaceRole: workspaceGrant?.role ?? null
 	};
 };
 
@@ -61,7 +69,7 @@ export const actions: Actions = {
 
 		const { data: inviteRow, error: inviteError } = await admin
 			.from('app_invites')
-			.select('token, grant_admin, max_uses, use_count, expires_at, note')
+			.select('token, created_by, grant_admin, max_uses, use_count, expires_at, note')
 			.eq('token', params.token)
 			.maybeSingle();
 		if (inviteError) {
@@ -87,6 +95,26 @@ export const actions: Actions = {
 			.upsert({ email, is_admin: willBeAdmin }, { onConflict: 'email' });
 		if (upsertError) {
 			return fail(500, { message: upsertError.message });
+		}
+
+		// Workspace invites also join the workspace right now: the auth user is
+		// created on the spot if this email has never signed in, so the
+		// membership is already waiting when they first log in.
+		const workspaceGrant = parseWorkspaceInviteNote(result.invite.note);
+		if (workspaceGrant) {
+			const who = await findOrCreateUserByEmail(admin, email);
+			if ('error' in who) {
+				return fail(500, { message: who.error });
+			}
+			const added = await upsertWorkspaceMember(admin, {
+				workspaceId: workspaceGrant.workspaceId,
+				userId: who.userId,
+				role: workspaceGrant.role,
+				addedBy: result.invite.created_by
+			});
+			if (added.error) {
+				return fail(500, { message: added.error });
+			}
 		}
 
 		// Increment use_count.

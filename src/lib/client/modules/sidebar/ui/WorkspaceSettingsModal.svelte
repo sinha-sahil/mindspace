@@ -37,6 +37,89 @@
 	let addingMember = $state(false);
 	let addError = $state('');
 
+	// The suggestion list renders position:fixed — the modal body clips
+	// absolutely-positioned children (overflow hidden), which cut the list
+	// off mid-row. Anchored to the input's viewport rect at open time.
+	let pickerInputEl: HTMLInputElement | null = $state(null);
+	let pickerRect = $state({ x: 0, y: 0, w: 0 });
+
+	function repositionPicker() {
+		if (!pickerInputEl) {
+			return;
+		}
+		const r = pickerInputEl.getBoundingClientRect();
+		pickerRect = { x: r.left, y: r.bottom + 4, w: r.width };
+	}
+
+	// Close the floating list when clicking away or when anything scrolls
+	// (a fixed-position list would float detached from its anchor).
+	const wirePickerDismiss: Attachment<HTMLDivElement> = (node) => {
+		function onDocMouseDown(e: MouseEvent) {
+			const t = e.target;
+			if (t instanceof Node && !node.contains(t)) {
+				pickerOpen = false;
+			}
+		}
+		function onAnyScroll(e: Event) {
+			if (pickerOpen && e.target instanceof Node && !node.contains(e.target)) {
+				pickerOpen = false;
+			}
+		}
+		document.addEventListener('mousedown', onDocMouseDown);
+		document.addEventListener('scroll', onAnyScroll, true);
+		return () => {
+			document.removeEventListener('mousedown', onDocMouseDown);
+			document.removeEventListener('scroll', onAnyScroll, true);
+		};
+	};
+
+	// Shareable invite link (owner-only).
+	let inviteRole = $state<'editor' | 'viewer'>('editor');
+	let inviteUrl = $state('');
+	let creatingInvite = $state(false);
+	let inviteError = $state('');
+
+	async function createInviteLink() {
+		const ws = workspace;
+		if (!ws || creatingInvite) {
+			return;
+		}
+		creatingInvite = true;
+		inviteError = '';
+		try {
+			const res = await fetch(`/api/workspaces/${ws.id}/invites`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ role: inviteRole })
+			});
+			if (!res.ok) {
+				throw new Error((await res.text()) || `Request failed (${res.status})`);
+			}
+			const data: { url: string } = await res.json();
+			inviteUrl = data.url;
+			analytics.track('workspace_invite_link_created', {
+				workspace_id: ws.id,
+				role: inviteRole
+			});
+		} catch (e) {
+			inviteError = e instanceof Error ? e.message : 'Could not create the invite link';
+		} finally {
+			creatingInvite = false;
+		}
+	}
+
+	async function copyInviteLink() {
+		if (!inviteUrl) {
+			return;
+		}
+		try {
+			await navigator.clipboard.writeText(inviteUrl);
+			toasts.success('Invite link copied');
+		} catch {
+			toasts.error('Could not access the clipboard');
+		}
+	}
+
 	let searchToken = 0;
 
 	// Reset the form and load members when the modal's content mounts (the
@@ -93,11 +176,13 @@
 	}
 
 	function onPickerInput() {
+		repositionPicker();
 		pickerOpen = true;
 		searchPicker(pickerQuery.trim());
 	}
 
 	function onPickerFocus() {
+		repositionPicker();
 		pickerOpen = true;
 		if (pickerSuggestions.length === 0) {
 			searchPicker(pickerQuery.trim());
@@ -355,11 +440,12 @@
 
 						{#if isOwner}
 							<div class="add-row">
-								<div class="picker-wrap">
+								<div class="picker-wrap" {@attach wirePickerDismiss}>
 									<input
 										type="email"
 										class="text-input"
 										placeholder="Add by email"
+										bind:this={pickerInputEl}
 										bind:value={pickerQuery}
 										oninput={onPickerInput}
 										onfocus={onPickerFocus}
@@ -368,7 +454,11 @@
 										autocomplete="off"
 									/>
 									{#if pickerOpen && pickerSuggestions.length > 0}
-										<ul class="picker-suggestions" role="listbox">
+										<ul
+											class="picker-suggestions"
+											role="listbox"
+											style="left: {pickerRect.x}px; top: {pickerRect.y}px; width: {pickerRect.w}px;"
+										>
 											{#each pickerSuggestions as email, i (email)}
 												<li>
 													<button
@@ -405,6 +495,42 @@
 							{/if}
 						{/if}
 					</section>
+
+					{#if isOwner}
+						<section class="block">
+							<div class="block-label">Invite link</div>
+							<p class="hint invite-hint">
+								Anyone with the link joins this workspace — even if they've never signed in. Links
+								allow 25 uses and expire after 30 days.
+							</p>
+							<div class="add-row">
+								<select class="role-select" bind:value={inviteRole} disabled={creatingInvite}>
+									<option value="editor">Editor</option>
+									<option value="viewer">Viewer</option>
+								</select>
+								<button
+									type="button"
+									class="btn primary"
+									onclick={createInviteLink}
+									disabled={creatingInvite}
+								>
+									{creatingInvite ? 'Creating…' : inviteUrl ? 'New link' : 'Create invite link'}
+								</button>
+							</div>
+							{#if inviteUrl}
+								<div class="invite-row">
+									<input type="text" class="text-input invite-url" readonly value={inviteUrl} />
+									<button type="button" class="btn primary" onclick={copyInviteLink}>
+										<Icon name="copy" size={13} />
+										<span>Copy</span>
+									</button>
+								</div>
+							{/if}
+							{#if inviteError}
+								<p class="error">{inviteError}</p>
+							{/if}
+						</section>
+					{/if}
 				</div>
 			{/if}
 		{/snippet}
@@ -609,11 +735,10 @@
 	}
 
 	.picker-suggestions {
-		position: absolute;
-		left: 0;
-		right: 0;
-		top: calc(100% + 4px);
-		z-index: 10;
+		/* Fixed, anchored to the input's viewport rect — the modal body clips
+		   absolutely-positioned children, which made the list unreachable. */
+		position: fixed;
+		z-index: 260; /* above --modal-z-index: 200 */
 		max-height: 200px;
 		overflow-y: auto;
 		list-style: none;
@@ -640,5 +765,22 @@
 	.picker-suggestion:hover,
 	.picker-suggestion.active {
 		background: var(--accents-1);
+	}
+
+	.invite-hint {
+		margin: 0;
+	}
+	.invite-row {
+		display: flex;
+		gap: 6px;
+		align-items: stretch;
+	}
+	.invite-url {
+		font-size: 12px;
+		font-family: var(--font-mono);
+		color: var(--accents-6);
+	}
+	.invite-row .btn {
+		gap: 6px;
 	}
 </style>

@@ -36,7 +36,13 @@
 					<Icon name="sparkles" size={20} />
 				</div>
 				<h1>You're invited</h1>
-				{#if data.note}
+				{#if data.workspaceName}
+					<div class="note">
+						Join the “{data.workspaceName}” workspace{data.workspaceRole === 'viewer'
+							? ' as a viewer'
+							: ''}
+					</div>
+				{:else if data.note}
 					<div class="note">"{data.note}"</div>
 				{/if}
 				<p>Add your email to claim this invite. We'll send a magic link so you can sign in.</p>

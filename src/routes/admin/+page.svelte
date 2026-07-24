@@ -3,6 +3,17 @@
 	import Logo from '$lib/client/components/Logo.svelte';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import { formatDate as fmtDate } from '$lib/client/utils/format';
+	import { parseWorkspaceInviteNote } from '$lib/shared/workspace-invite-note';
+
+	/** Workspace invites store their grant as JSON in `note` — render it
+	 *  as a readable label instead of the raw blob. */
+	function inviteLabel(note: string | null): string {
+		const ws = parseWorkspaceInviteNote(note);
+		if (ws) {
+			return `Workspace invite — “${ws.workspaceName}” (${ws.role})`;
+		}
+		return note || 'Untitled invite';
+	}
 
 	let { data, form } = $props();
 
@@ -224,7 +235,7 @@
 								</div>
 								<div class="row-meta">
 									<div class="row-title">
-										<span>{inv.note || 'Untitled invite'}</span>
+										<span>{inviteLabel(inv.note)}</span>
 										{#if inv.grant_admin}
 											<span class="badge admin">
 												<Icon name="shield" size={9} />
