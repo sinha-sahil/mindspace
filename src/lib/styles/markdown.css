@@ -3,47 +3,47 @@
    the editor's live preview, and the public share page. Apply `.md-body` to
    any container that receives `renderMarkdown()` output.
 
-   Voice: Editorial Luxe — Fraunces display for h1/h2, crisp Geist body,
-   indigo accent as punctuation. Sized for long-form reading (15.5px body).
+   Voice: Mono — type-led minimal; achromatic chrome, chroma only where it
+   means something. Sized for long-form reading (15.5px body).
    ========================================================================== */
 
 /* ---------- code syntax palette (theme-aware) ----------
-   Restrained, 4-hue editorial set derived from the app palette. Same triple
+   Mono syntax set: five hues at one solved weight, purple-free. Same triple
    declaration pattern as theme.css: light default → explicit dark → system
    dark fallback. */
 :root {
-	--code-kw: #7048b7; /* keywords · violet-indigo */
-	--code-str: #2b7a52; /* strings · sage */
-	--code-num: #b07112; /* numbers/constants · saffron-deep */
-	--code-fn: #3d55c5; /* fn & class names · ink indigo */
-	--code-type: #0f7285; /* types/tags · teal-ink */
-	--code-com: #8b8d96; /* comments · muted */
-	--code-attr: #3a3c46; /* props/attrs · fg-2 */
-	--code-add-bg: rgba(43, 122, 82, 0.12);
-	--code-del-bg: rgba(204, 36, 67, 0.1);
+	--code-kw: #b14b47; /* keywords · rust */
+	--code-str: #39784d; /* strings · sage */
+	--code-num: #9b5d1d; /* numbers/constants · ochre */
+	--code-fn: #2b6ead; /* fn & class names · azure */
+	--code-type: #00777e; /* types/tags · teal-ink */
+	--code-com: #6e6e6e; /* comments · muted */
+	--code-attr: #404040; /* props/attrs · fg-2 */
+	--code-add-bg: rgba(45, 130, 94, 0.12);
+	--code-del-bg: rgba(198, 72, 85, 0.1);
 }
 :root[data-theme='dark'] {
-	--code-kw: #b8a3f6;
-	--code-str: #7fce9f;
-	--code-num: #e5b567;
-	--code-fn: #9fb0ff;
-	--code-type: #6cc7d8;
-	--code-com: #767986;
-	--code-attr: #ced0d7;
-	--code-add-bg: rgba(93, 194, 145, 0.14);
-	--code-del-bg: rgba(248, 117, 130, 0.12);
+	--code-kw: #c5736c;
+	--code-str: #61956e;
+	--code-num: #b27f50;
+	--code-fn: #588dc3;
+	--code-type: #40969a;
+	--code-com: #7e7e7e;
+	--code-attr: #b9b9b9;
+	--code-add-bg: rgba(76, 144, 112, 0.14);
+	--code-del-bg: rgba(190, 107, 110, 0.12);
 }
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme]) {
-		--code-kw: #b8a3f6;
-		--code-str: #7fce9f;
-		--code-num: #e5b567;
-		--code-fn: #9fb0ff;
-		--code-type: #6cc7d8;
-		--code-com: #767986;
-		--code-attr: #ced0d7;
-		--code-add-bg: rgba(93, 194, 145, 0.14);
-		--code-del-bg: rgba(248, 117, 130, 0.12);
+		--code-kw: #c5736c;
+		--code-str: #61956e;
+		--code-num: #b27f50;
+		--code-fn: #588dc3;
+		--code-type: #40969a;
+		--code-com: #7e7e7e;
+		--code-attr: #b9b9b9;
+		--code-add-bg: rgba(76, 144, 112, 0.14);
+		--code-del-bg: rgba(190, 107, 110, 0.12);
 	}
 }
 

@@ -2,20 +2,21 @@ import { browser } from '$app/environment';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-/** A visual identity ("skin") — orthogonal to light/dark mode. The default
- *  `editorial-luxe` is the bare :root in theme.css; the others set `data-skin`. */
-export type ThemeSkin = 'editorial-luxe' | 'lumen' | 'voltaic' | 'terracotta';
+/** The one chromatic choice in the Mono theme system. Everything else is
+ *  achromatic; the accent recolors links, selection, focus, checked tasks and
+ *  primary actions. `coral` is the bare :root default in theme.css; the
+ *  others set `data-accent`. */
+export type ThemeAccent = 'coral' | 'blue' | 'green';
 
-export const SKINS: { id: ThemeSkin; label: string; blurb: string }[] = [
-	{ id: 'editorial-luxe', label: 'Editorial Luxe', blurb: 'Quiet luxury · Fraunces Didone' },
-	{ id: 'lumen', label: 'Lumen', blurb: 'Luminous spatial glass · electric indigo' },
-	{ id: 'voltaic', label: 'Voltaic', blurb: 'Electric precision · graphite + azure' },
-	{ id: 'terracotta', label: 'Terracotta', blurb: 'Earthy & tactile · moss green' }
+export const ACCENTS: { id: ThemeAccent; label: string; light: string; dark: string }[] = [
+	{ id: 'coral', label: 'Coral', light: '#c5443d', dark: '#d06e64' },
+	{ id: 'blue', label: 'Blue', light: '#006dd8', dark: '#4c94e0' },
+	{ id: 'green', label: 'Green', light: '#007f52', dark: '#4ea079' }
 ];
 
 const MODE_KEY = 'mindspace::theme';
-const SKIN_KEY = 'mindspace::skin';
-const DEFAULT_SKIN: ThemeSkin = 'editorial-luxe';
+const ACCENT_KEY = 'mindspace::accent';
+const DEFAULT_ACCENT: ThemeAccent = 'coral';
 
 function readInitialMode(): ThemeMode {
 	if (!browser) {
@@ -28,16 +29,16 @@ function readInitialMode(): ThemeMode {
 	return 'system';
 }
 
-function readInitialSkin(): ThemeSkin {
+function readInitialAccent(): ThemeAccent {
 	if (!browser) {
-		return DEFAULT_SKIN;
+		return DEFAULT_ACCENT;
 	}
-	const v = localStorage.getItem(SKIN_KEY);
-	const found = v ? SKINS.find((s) => s.id === v) : null;
+	const v = localStorage.getItem(ACCENT_KEY);
+	const found = v ? ACCENTS.find((a) => a.id === v) : null;
 	if (found) {
 		return found.id;
 	}
-	return DEFAULT_SKIN;
+	return DEFAULT_ACCENT;
 }
 
 function applyMode(mode: ThemeMode) {
@@ -52,28 +53,30 @@ function applyMode(mode: ThemeMode) {
 	}
 }
 
-function applySkin(skin: ThemeSkin) {
+function applyAccent(accent: ThemeAccent) {
 	if (!browser) {
 		return;
 	}
 	const html = document.documentElement;
-	// The default skin is the bare :root, so leave the attribute off for it.
-	if (skin === DEFAULT_SKIN) {
-		html.removeAttribute('data-skin');
+	// The default accent is the bare :root, so leave the attribute off for it.
+	if (accent === DEFAULT_ACCENT) {
+		html.removeAttribute('data-accent');
 	} else {
-		html.setAttribute('data-skin', skin);
+		html.setAttribute('data-accent', accent);
 	}
+	// The retired skin attribute must never linger from an old session.
+	html.removeAttribute('data-skin');
 }
 
 function createTheme() {
-	const state: { mode: ThemeMode; skin: ThemeSkin } = $state({
+	const state: { mode: ThemeMode; accent: ThemeAccent } = $state({
 		mode: readInitialMode(),
-		skin: readInitialSkin()
+		accent: readInitialAccent()
 	});
 
 	if (browser) {
 		applyMode(state.mode);
-		applySkin(state.skin);
+		applyAccent(state.accent);
 	}
 
 	function set(mode: ThemeMode) {
@@ -84,11 +87,11 @@ function createTheme() {
 		}
 	}
 
-	function setSkin(skin: ThemeSkin) {
-		state.skin = skin;
+	function setAccent(accent: ThemeAccent) {
+		state.accent = accent;
 		if (browser) {
-			localStorage.setItem(SKIN_KEY, skin);
-			applySkin(skin);
+			localStorage.setItem(ACCENT_KEY, accent);
+			applyAccent(accent);
 		}
 	}
 
@@ -96,11 +99,11 @@ function createTheme() {
 		get mode() {
 			return state.mode;
 		},
-		get skin() {
-			return state.skin;
+		get accent() {
+			return state.accent;
 		},
 		set,
-		setSkin
+		setAccent
 	};
 }
 

@@ -6,7 +6,7 @@
 	import McpInstallModal from '$lib/client/modules/mcp/ui/McpInstallModal.svelte';
 	import { projects, type Project, type ProjectKind } from '$lib/client/modules/projects';
 	import { workspaces, type Workspace } from '$lib/client/modules/workspaces';
-	import { theme, type ThemeMode, type ThemeSkin, SKINS } from '$lib/client/modules/theme';
+	import { theme, type ThemeMode, type ThemeAccent, ACCENTS } from '$lib/client/modules/theme';
 	import { sidebar } from '$lib/client/modules/sidebar';
 	import { splitView } from '$lib/client/modules/split-view';
 	import { commandPalette } from '$lib/client/modules/command-palette';
@@ -539,8 +539,8 @@
 		theme.set(mode);
 	}
 
-	function setSkin(skin: ThemeSkin) {
-		theme.setSkin(skin);
+	function setAccent(accent: ThemeAccent) {
+		theme.setAccent(accent);
 	}
 
 	const userInitial = $derived((userEmail || '?')[0].toUpperCase());
@@ -1012,23 +1012,23 @@
 					</button>
 				</div>
 
-				<div class="popover-section-label">Skin</div>
-				<div class="skin-list" role="group" aria-label="Skin">
-					{#each SKINS as s (s.id)}
+				<div class="popover-section-label">Accent</div>
+				<div class="accent-row" role="group" aria-label="Accent">
+					{#each ACCENTS as a (a.id)}
 						<button
-							class="skin-row"
-							class:active={theme.skin === s.id}
-							onclick={() => setSkin(s.id)}
-							title={s.blurb}
+							class="accent-pill"
+							class:active={theme.accent === a.id}
+							onclick={() => setAccent(a.id)}
+							title="Accent · {a.label}"
+							aria-label="Accent {a.label}"
+							aria-pressed={theme.accent === a.id}
 						>
-							<span class="skin-swatch" data-skin-preview={s.id} aria-hidden="true"></span>
-							<span class="skin-meta">
-								<span class="skin-name">{s.label}</span>
-								<span class="skin-blurb">{s.blurb}</span>
-							</span>
-							{#if theme.skin === s.id}
-								<Icon name="check" size={13} class="skin-check" />
-							{/if}
+							<span
+								class="accent-dot"
+								style="background: light-dark({a.light}, {a.dark})"
+								aria-hidden="true"
+							></span>
+							<span>{a.label}</span>
 						</button>
 					{/each}
 				</div>
@@ -2320,76 +2320,39 @@
 		box-shadow: var(--shadow-smallest);
 	}
 
-	.skin-list {
+	.accent-row {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		padding: 0 4px 4px;
+		gap: 6px;
 	}
-	.skin-row {
-		display: flex;
-		align-items: center;
-		gap: 9px;
-		width: 100%;
-		padding: 6px 8px;
-		font: inherit;
-		text-align: left;
-		background: transparent;
-		border: 1px solid transparent;
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-		transition: background 100ms;
-	}
-	.skin-row:hover {
-		background: var(--accents-1);
-	}
-	.skin-row.active {
-		background: var(--accent-soft);
-		border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-	}
-	.skin-swatch {
-		flex-shrink: 0;
-		width: 22px;
-		height: 22px;
-		border-radius: 7px;
-		border: 1px solid var(--border-strong);
-		box-shadow: var(--shadow-smallest);
-	}
-	.skin-swatch[data-skin-preview='editorial-luxe'] {
-		background: linear-gradient(135deg, #4d53c1 0%, #c77fb0 55%, #e2b878 100%);
-	}
-	.skin-swatch[data-skin-preview='lumen'] {
-		background: linear-gradient(135deg, #5b48f0 0%, #b06fd6 50%, #5fb6e8 100%);
-	}
-	.skin-swatch[data-skin-preview='voltaic'] {
-		background: linear-gradient(135deg, #2f6df0 0%, #41c0e0 50%, #6a4bd6 100%);
-	}
-	.skin-swatch[data-skin-preview='terracotta'] {
-		background: linear-gradient(135deg, #3f7d4e 0%, #c5703f 55%, #d9a23f 100%);
-	}
-	.skin-meta {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		min-width: 0;
+	.accent-pill {
 		flex: 1;
-	}
-	.skin-name {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+		padding: 7px 8px;
+		font: inherit;
 		font-size: 12px;
-		font-weight: 600;
+		font-weight: 500;
 		color: var(--geist-foreground);
-		letter-spacing: -0.005em;
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		cursor: pointer;
+		transition: border-color 100ms;
 	}
-	.skin-blurb {
-		font-size: 10.5px;
-		color: var(--accents-5);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.accent-pill:hover {
+		border-color: var(--border-strong);
 	}
-	.skin-row :global(.skin-check) {
+	.accent-pill.active {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+	}
+	.accent-dot {
+		width: 13px;
+		height: 13px;
+		border-radius: 99px;
 		flex-shrink: 0;
-		color: var(--accent);
 	}
 
 	.muted {

@@ -5,7 +5,7 @@
 	import { commandPalette } from '../store.svelte';
 	import { workspaces } from '$lib/client/modules/workspaces';
 	import { projects } from '$lib/client/modules/projects';
-	import { theme, type ThemeMode, SKINS } from '$lib/client/modules/theme';
+	import { theme, type ThemeMode, ACCENTS } from '$lib/client/modules/theme';
 	import { toasts } from '$lib/client/modules/toasts';
 
 	type Props = { isAdmin: boolean };
@@ -27,7 +27,7 @@
 		const actionCmds: Command[] = [];
 		const navigateCmds: Command[] = [];
 		const themeCmds: Command[] = [];
-		const skinCmds: Command[] = [];
+		const accentCmds: Command[] = [];
 
 		for (const project of projects.projects) {
 			projectCmds.push({
@@ -139,18 +139,18 @@
 			});
 		}
 
-		for (const s of SKINS) {
-			if (theme.skin === s.id) {
+		for (const a of ACCENTS) {
+			if (theme.accent === a.id) {
 				continue;
 			}
-			skinCmds.push({
-				value: `skin:${s.id}`,
-				label: `Skin · ${s.label}`,
+			accentCmds.push({
+				value: `accent:${a.id}`,
+				label: `Accent · ${a.label}`,
 				group: 'Theme',
 				icon: 'sparkles',
 				run: () => {
-					theme.setSkin(s.id);
-					toasts.info(`Skin: ${s.label}`);
+					theme.setAccent(a.id);
+					toasts.info(`Accent: ${a.label}`);
 				}
 			});
 		}
@@ -175,7 +175,7 @@
 			...actionCmds,
 			...navigateCmds,
 			...themeCmds,
-			...skinCmds
+			...accentCmds
 		];
 	});
 

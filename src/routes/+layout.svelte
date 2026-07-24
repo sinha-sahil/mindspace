@@ -3,9 +3,6 @@
 	import '@fontsource-variable/geist-mono/index.css';
 	import '@fontsource-variable/fraunces/opsz.css';
 	import '@fontsource-variable/fraunces/opsz-italic.css';
-	// Fonts for the alternate skins (Lumen → Bricolage, Terracotta → Hanken).
-	import '@fontsource-variable/bricolage-grotesque/index.css';
-	import '@fontsource-variable/hanken-grotesk/index.css';
 	import '$lib/styles/theme.css';
 	import '$lib/styles/markdown.css';
 	import { onMount } from 'svelte';
@@ -19,7 +16,7 @@
 
 	onMount(() => {
 		theme.set(theme.mode);
-		theme.setSkin(theme.skin);
+		theme.setAccent(theme.accent);
 		analytics.init();
 		if (user) {
 			analytics.identify(user.id, { email: user.email, isAdmin });

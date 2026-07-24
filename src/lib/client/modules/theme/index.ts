@@ -1,2 +1,2 @@
-export { theme, SKINS } from './store.svelte';
-export type { ThemeMode, ThemeSkin } from './store.svelte';
+export { theme, ACCENTS } from './store.svelte';
+export type { ThemeMode, ThemeAccent } from './store.svelte';
