@@ -1335,9 +1335,10 @@
 		font-family: var(--font-sans);
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--fg);
-		background: var(--surface);
-		border: 1px solid var(--border);
+		/* Inverted ink pill: surface-on-surface was invisible over the tab
+		   strip in dark mode and read as garbled text. */
+		color: var(--bg);
+		background: var(--fg);
 		border-radius: 7px;
 		box-shadow: var(--shadow-md);
 		white-space: nowrap;
@@ -1359,9 +1360,10 @@
 		font-family: var(--font-sans);
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--fg);
-		background: var(--surface);
-		border: 1px solid var(--border);
+		/* Inverted ink pill: surface-on-surface was invisible over the tab
+		   strip in dark mode and read as garbled text. */
+		color: var(--bg);
+		background: var(--fg);
 		border-radius: 7px;
 		box-shadow: var(--shadow-md);
 		white-space: nowrap;
