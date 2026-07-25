@@ -503,9 +503,9 @@ const editorTheme = EditorView.theme({
 		overflowX: 'hidden'
 	},
 	'.cm-content': {
-		maxWidth: '764px',
+		maxWidth: '900px',
 		margin: '0 auto',
-		padding: '34px 52px 45vh',
+		padding: '34px 48px 45vh',
 		caretColor: 'var(--accent)'
 	},
 	'.cm-line': { padding: '0 2px' },

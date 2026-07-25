@@ -1036,7 +1036,7 @@
 	}
 
 	.outline {
-		flex: 0 0 216px;
+		flex: 0 0 196px;
 		min-height: 0;
 		padding: 22px 8px 20px 18px;
 		overflow-y: auto;

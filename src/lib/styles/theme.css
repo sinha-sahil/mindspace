@@ -574,6 +574,30 @@ textarea:focus-visible,
 	--command-menu-kbd-box-shadow: 0 1px 0 var(--border);
 }
 
+/* Project tabs (top bar) — labeled tabs, accent indicator = current. */
+.ms-tabs {
+	--tabs-bar-background: transparent;
+	--tabs-bar-border-bottom: none;
+	--tabs-bar-gap: 2px;
+	--tabs-item-padding: 17px 12px 15px;
+	--tabs-item-font-size: 12.5px;
+	--tabs-item-font-weight: 500;
+	--tabs-item-color: var(--muted);
+	--tabs-hover-color: var(--fg);
+	--tabs-hover-background: transparent;
+	--tabs-active-color: var(--fg);
+	--tabs-active-font-weight: 600;
+	--tabs-active-background: transparent;
+	--tabs-indicator-color: var(--accent);
+	--tabs-indicator-height: 2px;
+	--tabs-indicator-border-radius: 2px 2px 0 0;
+	--tabs-fade-size: 36px;
+	--tabs-arrow-size: 26px;
+	--tabs-arrow-background: transparent;
+	--tabs-arrow-color: var(--muted);
+	--tabs-arrow-hover-color: var(--fg);
+}
+
 /* Toast variants — desaturated editorial fills, deep enough to keep white
    text AA, never fire-engine. Info is a dark ink chip in both modes (the
    "exhibition label"). Consumed by the in-house Toaster card. */

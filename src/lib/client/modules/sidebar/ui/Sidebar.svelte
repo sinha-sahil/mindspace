@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ContextMenu, Modal, Button } from 'polymorph-ui-components';
+	import { ContextMenu, Modal, Button, Tabs, type TabItem } from 'polymorph-ui-components';
 	import Logo from '$lib/client/components/Logo.svelte';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import WorkspaceSettingsModal from './WorkspaceSettingsModal.svelte';
@@ -464,6 +464,17 @@
 	 * focused, the click fills the right pane; otherwise it selects normally
 	 * (and clicking the already-active project in expanded mode renames it).
 	 */
+	const tabItems = $derived<TabItem[]>(
+		projects.projects.map((p) => ({ key: p.id, label: p.name }))
+	);
+
+	function selectProjectByKey(key: string) {
+		const project = projects.projects.find((p) => p.id === key);
+		if (project) {
+			handleProjectClick(project);
+		}
+	}
+
 	function handleProjectClick(project: Project) {
 		if (splitView.enabled && splitView.focused === 'right') {
 			splitView.setRight(project.id);
@@ -815,119 +826,149 @@
 		{/if}
 	</div>
 
-	<nav class="list" aria-label="Projects" bind:this={listEl}>
-		{#if projects.loading}
-			{#if !collapsed}
-				<div class="skeleton-list">
-					{#each Array(4) as _, i (i)}
-						<div class="skeleton-row">
-							<div class="skeleton-dot"></div>
-							<div class="skeleton-text">
-								<div class="skeleton-bar w-{(i % 3) + 1}"></div>
-								<div class="skeleton-bar small w-{(i % 2) + 1}"></div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			{/if}
-		{:else}
-			{#each projects.projects as project, projectIdx (project.id)}
-				{@const active = project.id === projects.activeId}
-				{@const isEditing = editingId === project.id && !collapsed}
-				{#if dropIndex === projectIdx && draggingId !== null && draggingId !== project.id}
-					<div class="drop-indicator" aria-hidden="true"></div>
-				{/if}
-				<ContextMenu
-					items={projectMenuItems(project)}
-					onselect={(item) => handleProjectMenu(item.value, project)}
+	{#if collapsed && sidebar.barPosition === 'top'}
+		<div class="tabstrip">
+			{#if tabItems.length > 0}
+				<Tabs
+					classes="ms-tabs"
+					items={tabItems}
+					activeKey={projects.activeId ?? ''}
+					onkeychange={selectProjectByKey}
 				>
-					<div
-						class="item"
-						class:active
-						class:icon-only={collapsed}
-						class:editing={isEditing}
-						class:dragging={draggingId === project.id}
-						style="--tint: {tintForKey(project.id).hex};"
+					{#snippet tab({ index, label, active })}
+						{@const project = projects.projects[index]}
+						{#if project}
+							<span
+								class="ttab"
+								class:active
+								style="--tint: {tintForKey(project.id).hex};"
+								title={label}
+							>
+								<Icon name={KIND_ICONS[project.kind]} size={13} />
+								<span class="ttab-label">{label}</span>
+							</span>
+						{:else}
+							<span class="ttab"><span class="ttab-label">{label}</span></span>
+						{/if}
+					{/snippet}
+				</Tabs>
+			{/if}
+		</div>
+	{:else}
+		<nav class="list" aria-label="Projects" bind:this={listEl}>
+			{#if projects.loading}
+				{#if !collapsed}
+					<div class="skeleton-list">
+						{#each Array(4) as _, i (i)}
+							<div class="skeleton-row">
+								<div class="skeleton-dot"></div>
+								<div class="skeleton-text">
+									<div class="skeleton-bar w-{(i % 3) + 1}"></div>
+									<div class="skeleton-bar small w-{(i % 2) + 1}"></div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			{:else}
+				{#each projects.projects as project, projectIdx (project.id)}
+					{@const active = project.id === projects.activeId}
+					{@const isEditing = editingId === project.id && !collapsed}
+					{#if dropIndex === projectIdx && draggingId !== null && draggingId !== project.id}
+						<div class="drop-indicator" aria-hidden="true"></div>
+					{/if}
+					<ContextMenu
+						items={projectMenuItems(project)}
+						onselect={(item) => handleProjectMenu(item.value, project)}
 					>
-						<button
-							class="row"
-							class:rail-tile={collapsed}
-							use:railTip={collapsed ? project.name : null}
-							aria-label={collapsed ? project.name : null}
-							title={!collapsed && !active ? project.name : null}
-							onpointerdown={(e) => beginDrag(e, project.id, e.currentTarget)}
-							onclick={() => {
-								if (consumeClickIfDragged()) {
-									return;
-								}
-								handleProjectClick(project);
-							}}
+						<div
+							class="item"
+							class:active
+							class:icon-only={collapsed}
+							class:editing={isEditing}
+							class:dragging={draggingId === project.id}
+							style="--tint: {tintForKey(project.id).hex};"
 						>
-							{#if collapsed}
-								<span class="rail-kind" aria-hidden="true">
-									<Icon name={KIND_ICONS[project.kind]} size={15} />
-								</span>
-								{#if project.visibility === 'link'}
-									<span class="rail-flag" aria-hidden="true">
-										<Icon name="link" size={8} strokeWidth={2.5} />
-									</span>
-								{/if}
-							{:else}
-								<span class="kind-icon" aria-hidden="true">
-									<Icon name={KIND_ICONS[project.kind]} size={12} />
-								</span>
-								<span class="meta">
-									{#if isEditing}
-										<input
-											bind:this={renameInputEl}
-											class="rename"
-											bind:value={draftName}
-											onkeydown={handleRenameKey}
-											onblur={commitRename}
-											onclick={(e) => e.stopPropagation()}
-										/>
-									{:else}
-										<span class="name">{project.name}</span>
-										<span class="time">
-											{#if project.visibility === 'link'}
-												<span class="link-tag" title="Anyone with link">
-													<Icon name="link" size={9} strokeWidth={2.5} />
-												</span>
-											{/if}
-											<span>{relativeTime(project.updatedAt)}</span>
-										</span>
-									{/if}
-								</span>
-							{/if}
-						</button>
-						{#if !collapsed && !isEditing}
 							<button
-								class="row-trash"
-								title="Delete project"
-								aria-label="Delete project"
-								onclick={(e) => {
-									e.stopPropagation();
-									handleDeleteProject(project.id, project.name);
+								class="row"
+								class:rail-tile={collapsed}
+								use:railTip={collapsed ? project.name : null}
+								aria-label={collapsed ? project.name : null}
+								title={!collapsed && !active ? project.name : null}
+								onpointerdown={(e) => beginDrag(e, project.id, e.currentTarget)}
+								onclick={() => {
+									if (consumeClickIfDragged()) {
+										return;
+									}
+									handleProjectClick(project);
 								}}
 							>
-								<Icon name="trash" size={13} />
+								{#if collapsed}
+									<span class="rail-kind" aria-hidden="true">
+										<Icon name={KIND_ICONS[project.kind]} size={15} />
+									</span>
+									{#if project.visibility === 'link'}
+										<span class="rail-flag" aria-hidden="true">
+											<Icon name="link" size={8} strokeWidth={2.5} />
+										</span>
+									{/if}
+								{:else}
+									<span class="kind-icon" aria-hidden="true">
+										<Icon name={KIND_ICONS[project.kind]} size={12} />
+									</span>
+									<span class="meta">
+										{#if isEditing}
+											<input
+												bind:this={renameInputEl}
+												class="rename"
+												bind:value={draftName}
+												onkeydown={handleRenameKey}
+												onblur={commitRename}
+												onclick={(e) => e.stopPropagation()}
+											/>
+										{:else}
+											<span class="name">{project.name}</span>
+											<span class="time">
+												{#if project.visibility === 'link'}
+													<span class="link-tag" title="Anyone with link">
+														<Icon name="link" size={9} strokeWidth={2.5} />
+													</span>
+												{/if}
+												<span>{relativeTime(project.updatedAt)}</span>
+											</span>
+										{/if}
+									</span>
+								{/if}
 							</button>
-						{/if}
-					</div>
-				</ContextMenu>
-			{:else}
-				{#if !collapsed}
-					<div class="empty-state">
-						<p>No projects yet.</p>
-						<p class="hint">Tap "New project" above.</p>
-					</div>
+							{#if !collapsed && !isEditing}
+								<button
+									class="row-trash"
+									title="Delete project"
+									aria-label="Delete project"
+									onclick={(e) => {
+										e.stopPropagation();
+										handleDeleteProject(project.id, project.name);
+									}}
+								>
+									<Icon name="trash" size={13} />
+								</button>
+							{/if}
+						</div>
+					</ContextMenu>
+				{:else}
+					{#if !collapsed}
+						<div class="empty-state">
+							<p>No projects yet.</p>
+							<p class="hint">Tap "New project" above.</p>
+						</div>
+					{/if}
+				{/each}
+				{#if dropIndex !== null && draggingId !== null && dropIndex >= projects.projects.length}
+					<div class="drop-indicator" aria-hidden="true"></div>
 				{/if}
-			{/each}
-			{#if dropIndex !== null && draggingId !== null && dropIndex >= projects.projects.length}
-				<div class="drop-indicator" aria-hidden="true"></div>
 			{/if}
-		{/if}
-	</nav>
+		</nav>
+	{/if}
 
 	<footer class="foot">
 		<button
@@ -2442,23 +2483,40 @@
 		padding: 0 4px;
 		gap: 8px;
 	}
-	.sidebar.collapsed.top .list {
-		flex-direction: row;
-		align-items: center;
+	.tabstrip {
 		flex: 1;
 		min-width: 0;
 		height: 100%;
-		padding: 0 8px;
-		gap: 8px;
-		overflow-x: auto;
-		overflow-y: hidden;
-		scrollbar-width: none;
+		display: flex;
+		align-items: stretch;
+		padding: 0 4px;
 	}
-	.sidebar.collapsed.top .list::-webkit-scrollbar {
-		display: none;
+	.tabstrip :global(.ms-tabs) {
+		width: 100%;
 	}
-	.sidebar.collapsed.top .item {
+	.ttab {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		min-width: 0;
+		color: color-mix(in srgb, var(--tint, var(--muted)) 45%, var(--muted));
+	}
+	.ttab :global(.icon) {
 		flex-shrink: 0;
+		color: color-mix(in srgb, var(--tint, var(--muted)) 65%, var(--muted));
+	}
+	.ttab-label {
+		max-width: 140px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--fg-2);
+	}
+	.ttab.active .ttab-label {
+		color: var(--fg);
+	}
+	.ttab.active :global(.icon) {
+		color: var(--accent);
 	}
 	.sidebar.collapsed.top .foot {
 		flex-direction: row;
