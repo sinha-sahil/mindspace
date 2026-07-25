@@ -10,7 +10,7 @@
 	import { dev, browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/client/components/Icon.svelte';
-	import { Sidebar, sidebar } from '$lib/client/modules/sidebar';
+	import { Sidebar, ProjectTabs, sidebar } from '$lib/client/modules/sidebar';
 	import { projects } from '$lib/client/modules/projects';
 	import { workspaces } from '$lib/client/modules/workspaces';
 	import { CommandPalette } from '$lib/client/modules/command-palette';
@@ -196,7 +196,22 @@ Meridian is our **offline-first** sync engine. This brief covers the *why*, the 
 				1024
 			),
 			projectRow('p-board', 'Architecture sketches', 'whiteboard', null, 2048),
-			projectRow('p-doc', 'Q3 Product Brief', 'doc', null, 3072)
+			projectRow('p-doc', 'Q3 Product Brief', 'doc', null, 3072),
+			...Array.from({ length: 28 }, (_, i) =>
+				projectRow(
+					`p-extra-${i}`,
+					[
+						'Fresh projects roadmap',
+						'Ledgers',
+						'Quarterly planning notes',
+						'API surface audit',
+						'Growth experiments'
+					][i % 5] + ` ${i + 1}`,
+					(['doc', 'todo', 'sheet', 'whiteboard'] as const)[i % 4],
+					null,
+					4096 + i * 1024
+				)
+			)
 		],
 		documents: [
 			{
@@ -285,52 +300,57 @@ Meridian is our **offline-first** sync engine. This brief covers the *why*, the 
 			<span>{isDark ? 'Light' : 'Dark'}</span>
 		</button>
 	</header>
-	<div class="app" class:topbar={sidebar.topBar}>
+	<div class="app">
 		<Sidebar userEmail="dev@mindspace.local" userId="u-dev" isAdmin={false} />
-		<main class="pane">
-			{#if active?.kind === 'todo'}
-				{#key active.id}
-					<TodoProjectView
-						project={active}
-						saving={false}
-						onSceneChange={() => {}}
-						onRename={() => {}}
-					/>
-				{/key}
-			{:else if active?.kind === 'sheet'}
-				{#key active.id}
-					<SheetProjectView
-						project={active}
-						saving={false}
-						onSceneChange={() => {}}
-						onRename={() => {}}
-					/>
-				{/key}
-			{:else if active?.kind === 'whiteboard'}
-				{#key active.id}
-					<ProjectPane
-						project={active}
-						live={false}
-						focused={true}
-						compact={false}
-						supabase={null}
-						userId="u-dev"
-						userEmail="dev@mindspace.local"
-						onFocus={() => {}}
-						onSceneChange={() => {}}
-						onRename={() => {}}
-						onSetVisibility={() => {}}
-						saving={false}
-					/>
-				{/key}
-			{:else if active?.kind === 'doc'}
-				{#key active.id}
-					<DocProjectView projectId={active.id} {supabase} />
-				{/key}
-			{:else}
-				<div class="empty">No active project</div>
+		<div class="workarea">
+			{#if sidebar.collapsed}
+				<ProjectTabs />
 			{/if}
-		</main>
+			<main class="pane">
+				{#if active?.kind === 'todo'}
+					{#key active.id}
+						<TodoProjectView
+							project={active}
+							saving={false}
+							onSceneChange={() => {}}
+							onRename={() => {}}
+						/>
+					{/key}
+				{:else if active?.kind === 'sheet'}
+					{#key active.id}
+						<SheetProjectView
+							project={active}
+							saving={false}
+							onSceneChange={() => {}}
+							onRename={() => {}}
+						/>
+					{/key}
+				{:else if active?.kind === 'whiteboard'}
+					{#key active.id}
+						<ProjectPane
+							project={active}
+							live={false}
+							focused={true}
+							compact={false}
+							supabase={null}
+							userId="u-dev"
+							userEmail="dev@mindspace.local"
+							onFocus={() => {}}
+							onSceneChange={() => {}}
+							onRename={() => {}}
+							onSetVisibility={() => {}}
+							saving={false}
+						/>
+					{/key}
+				{:else if active?.kind === 'doc'}
+					{#key active.id}
+						<DocProjectView projectId={active.id} {supabase} />
+					{/key}
+				{:else}
+					<div class="empty">No active project</div>
+				{/if}
+			</main>
+		</div>
 	</div>
 	<CommandPalette isAdmin={false} />
 </div>
@@ -381,7 +401,11 @@ Meridian is our **offline-first** sync engine. This brief covers the *why*, the 
 		min-height: 0;
 		display: flex;
 	}
-	.app.topbar {
+	.workarea {
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		display: flex;
 		flex-direction: column;
 	}
 	.pane {

@@ -579,7 +579,7 @@ textarea:focus-visible,
 	--tabs-bar-background: transparent;
 	--tabs-bar-border-bottom: none;
 	--tabs-bar-gap: 2px;
-	--tabs-item-padding: 17px 12px 15px;
+	--tabs-item-padding: 12px 12px 10px;
 	--tabs-item-font-size: 12.5px;
 	--tabs-item-font-weight: 500;
 	--tabs-item-color: var(--muted);

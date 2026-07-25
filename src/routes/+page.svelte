@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { replaceState } from '$app/navigation';
-	import { Sidebar, sidebar } from '$lib/client/modules/sidebar';
+	import { Sidebar, ProjectTabs, sidebar } from '$lib/client/modules/sidebar';
 	import { ProjectPane } from '$lib/client/modules/whiteboard';
 	import { projects } from '$lib/client/modules/projects';
 	import { workspaces } from '$lib/client/modules/workspaces';
@@ -114,131 +114,136 @@
 	}
 </script>
 
-<div class="app" class:topbar={sidebar.topBar} {@attach mirrorUrl}>
+<div class="app" {@attach mirrorUrl}>
 	<Sidebar userEmail={user?.email ?? ''} userId={user?.id ?? ''} {isAdmin} />
 
-	<main class="main">
-		{#if workspaces.loading || projects.loading}
-			<div class="empty">
-				<p class="muted">Loading…</p>
-			</div>
-		{:else if projects.active}
-			{@const active = projects.active}
-			{#if active.kind === 'doc'}
-				<DocProjectView projectId={active.id} {supabase} />
-			{:else if active.kind === 'todo'}
-				{#key active.id}
-					<TodoProjectView
-						project={active}
-						saving={projects.isSaving}
-						onSceneChange={(scene) => projects.saveScene(active.id, scene)}
-						onRename={(name) => projects.rename(active.id, name)}
-					/>
-				{/key}
-			{:else if active.kind === 'sheet'}
-				{#key active.id}
-					<SheetProjectView
-						project={active}
-						saving={projects.isSaving}
-						onSceneChange={(scene) => projects.saveScene(active.id, scene)}
-						onRename={(name) => projects.rename(active.id, name)}
-					/>
-				{/key}
-			{:else if splitView.enabled}
-				<div class="split" bind:this={splitContainerEl}>
-					<div class="pane-slot" style="flex: {splitView.ratio};">
-						<ProjectPane
+	<div class="workarea">
+		{#if sidebar.collapsed}
+			<ProjectTabs />
+		{/if}
+		<main class="main">
+			{#if workspaces.loading || projects.loading}
+				<div class="empty">
+					<p class="muted">Loading…</p>
+				</div>
+			{:else if projects.active}
+				{@const active = projects.active}
+				{#if active.kind === 'doc'}
+					<DocProjectView projectId={active.id} {supabase} />
+				{:else if active.kind === 'todo'}
+					{#key active.id}
+						<TodoProjectView
 							project={active}
-							live={splitView.focused === 'left'}
-							focused={splitView.focused === 'left'}
-							compact
-							{supabase}
-							userId={user?.id ?? null}
-							userEmail={user?.email ?? null}
-							onFocus={() => splitView.focus('left')}
-							onClose={() => splitView.close()}
 							saving={projects.isSaving}
 							onSceneChange={(scene) => projects.saveScene(active.id, scene)}
 							onRename={(name) => projects.rename(active.id, name)}
-							onSetVisibility={(v, exp) => projects.setVisibility(active.id, v, exp)}
 						/>
-					</div>
+					{/key}
+				{:else if active.kind === 'sheet'}
+					{#key active.id}
+						<SheetProjectView
+							project={active}
+							saving={projects.isSaving}
+							onSceneChange={(scene) => projects.saveScene(active.id, scene)}
+							onRename={(name) => projects.rename(active.id, name)}
+						/>
+					{/key}
+				{:else if splitView.enabled}
+					<div class="split" bind:this={splitContainerEl}>
+						<div class="pane-slot" style="flex: {splitView.ratio};">
+							<ProjectPane
+								project={active}
+								live={splitView.focused === 'left'}
+								focused={splitView.focused === 'left'}
+								compact
+								{supabase}
+								userId={user?.id ?? null}
+								userEmail={user?.email ?? null}
+								onFocus={() => splitView.focus('left')}
+								onClose={() => splitView.close()}
+								saving={projects.isSaving}
+								onSceneChange={(scene) => projects.saveScene(active.id, scene)}
+								onRename={(name) => projects.rename(active.id, name)}
+								onSetVisibility={(v, exp) => projects.setVisibility(active.id, v, exp)}
+							/>
+						</div>
 
-					<div
-						class="divider"
-						class:dragging={draggingDivider}
-						role="separator"
-						aria-label="Resize panes"
-						aria-orientation="vertical"
-						tabindex="-1"
-						onpointerdown={startDividerDrag}
-					>
-						<span class="divider-grip"></span>
-					</div>
+						<div
+							class="divider"
+							class:dragging={draggingDivider}
+							role="separator"
+							aria-label="Resize panes"
+							aria-orientation="vertical"
+							tabindex="-1"
+							onpointerdown={startDividerDrag}
+						>
+							<span class="divider-grip"></span>
+						</div>
 
-					<div class="pane-slot" style="flex: {1 - splitView.ratio};">
-						{#if splitView.rightId}
-							{#key splitView.rightId}
-								<SplitPane
-									projectId={splitView.rightId}
+						<div class="pane-slot" style="flex: {1 - splitView.ratio};">
+							{#if splitView.rightId}
+								{#key splitView.rightId}
+									<SplitPane
+										projectId={splitView.rightId}
+										{supabase}
+										userId={user?.id ?? null}
+										userEmail={user?.email ?? null}
+										live={splitView.focused === 'right'}
+										focused={splitView.focused === 'right'}
+										onFocus={() => splitView.focus('right')}
+										onClose={() => splitView.close()}
+									/>
+								{/key}
+							{:else}
+								<PanePicker
 									{supabase}
-									userId={user?.id ?? null}
-									userEmail={user?.email ?? null}
-									live={splitView.focused === 'right'}
 									focused={splitView.focused === 'right'}
 									onFocus={() => splitView.focus('right')}
 									onClose={() => splitView.close()}
+									onpick={(id) => splitView.setRight(id)}
 								/>
-							{/key}
-						{:else}
-							<PanePicker
-								{supabase}
-								focused={splitView.focused === 'right'}
-								onFocus={() => splitView.focus('right')}
-								onClose={() => splitView.close()}
-								onpick={(id) => splitView.setRight(id)}
-							/>
-						{/if}
+							{/if}
+						</div>
 					</div>
-				</div>
+				{:else}
+					<ProjectPane
+						project={active}
+						live
+						focused={false}
+						compact={false}
+						{supabase}
+						userId={user?.id ?? null}
+						userEmail={user?.email ?? null}
+						onFocus={() => {}}
+						onToggleSplit={() => splitView.enable()}
+						saving={projects.isSaving}
+						onSceneChange={(scene) => projects.saveScene(active.id, scene)}
+						onRename={(name) => projects.rename(active.id, name)}
+						onSetVisibility={(v, exp) => projects.setVisibility(active.id, v, exp)}
+					/>
+				{/if}
 			{:else}
-				<ProjectPane
-					project={active}
-					live
-					focused={false}
-					compact={false}
-					{supabase}
-					userId={user?.id ?? null}
-					userEmail={user?.email ?? null}
-					onFocus={() => {}}
-					onToggleSplit={() => splitView.enable()}
-					saving={projects.isSaving}
-					onSceneChange={(scene) => projects.saveScene(active.id, scene)}
-					onRename={(name) => projects.rename(active.id, name)}
-					onSetVisibility={(v, exp) => projects.setVisibility(active.id, v, exp)}
-				/>
-			{/if}
-		{:else}
-			<div class="empty grainy">
-				<div class="empty-stage">
-					<span class="empty-eyebrow">{workspaces.active?.name ?? 'Workspace'} · Empty</span>
-					<h2 class="empty-title display">
-						A blank<br /><span class="display-italic gradient-text">canvas.</span>
-					</h2>
-					<p class="empty-lede">
-						Nothing here yet. Start a whiteboard to sketch, diagram, and think out loud — every
-						change autosaves as you go.
-					</p>
-					<div class="empty-actions">
-						<button type="button" class="empty-cta" onclick={() => projects.add()}>
-							<span class="empty-cta-glyph">＋</span> New whiteboard
-						</button>
-						<span class="empty-footnote">Private to this workspace until you share it.</span>
+				<div class="empty grainy">
+					<div class="empty-stage">
+						<span class="empty-eyebrow">{workspaces.active?.name ?? 'Workspace'} · Empty</span>
+						<h2 class="empty-title display">
+							A blank<br /><span class="display-italic gradient-text">canvas.</span>
+						</h2>
+						<p class="empty-lede">
+							Nothing here yet. Start a whiteboard to sketch, diagram, and think out loud — every
+							change autosaves as you go.
+						</p>
+						<div class="empty-actions">
+							<button type="button" class="empty-cta" onclick={() => projects.add()}>
+								<span class="empty-cta-glyph">＋</span> New whiteboard
+							</button>
+							<span class="empty-footnote">Private to this workspace until you share it.</span>
+						</div>
 					</div>
 				</div>
-			</div>
-		{/if}
-	</main>
+			{/if}
+		</main>
+	</div>
 </div>
 
 <CommandPalette {isAdmin} />
@@ -258,7 +263,11 @@
 		min-height: 0;
 		overflow: hidden;
 	}
-	.app.topbar {
+	.workarea {
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		display: flex;
 		flex-direction: column;
 	}
 

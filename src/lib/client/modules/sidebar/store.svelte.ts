@@ -1,9 +1,6 @@
 import { browser } from '$app/environment';
 
 const STORAGE_KEY = 'mindspace::sidebar-collapsed';
-const BAR_KEY = 'mindspace::sidebar-bar';
-
-export type BarPosition = 'top' | 'left';
 
 function readInitial(): boolean {
 	if (!browser) {
@@ -12,16 +9,8 @@ function readInitial(): boolean {
 	return localStorage.getItem(STORAGE_KEY) === '1';
 }
 
-function readBar(): BarPosition {
-	if (!browser) {
-		return 'top';
-	}
-	// Default is the top tab bar; 'left' restores the vertical icon rail.
-	return localStorage.getItem(BAR_KEY) === 'left' ? 'left' : 'top';
-}
-
 function createSidebarStore() {
-	const state = $state({ collapsed: readInitial(), barPosition: readBar() });
+	const state = $state({ collapsed: readInitial() });
 
 	function toggle() {
 		state.collapsed = !state.collapsed;
@@ -40,27 +29,12 @@ function createSidebarStore() {
 		state.collapsed = true;
 	}
 
-	function setBarPosition(pos: BarPosition) {
-		state.barPosition = pos;
-		if (browser) {
-			localStorage.setItem(BAR_KEY, pos);
-		}
-	}
-
 	return {
 		get collapsed() {
 			return state.collapsed;
 		},
-		get barPosition() {
-			return state.barPosition;
-		},
-		/** True when the collapsed strip renders as a horizontal top bar. */
-		get topBar() {
-			return state.collapsed && state.barPosition === 'top';
-		},
 		toggle,
-		collapseForView,
-		setBarPosition
+		collapseForView
 	};
 }
 

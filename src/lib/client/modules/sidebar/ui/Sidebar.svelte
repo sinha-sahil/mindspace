@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ContextMenu, Modal, Button, Tabs, type TabItem } from 'polymorph-ui-components';
+	import { ContextMenu, Modal, Button } from 'polymorph-ui-components';
 	import Logo from '$lib/client/components/Logo.svelte';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import WorkspaceSettingsModal from './WorkspaceSettingsModal.svelte';
@@ -464,17 +464,6 @@
 	 * focused, the click fills the right pane; otherwise it selects normally
 	 * (and clicking the already-active project in expanded mode renames it).
 	 */
-	const tabItems = $derived<TabItem[]>(
-		projects.projects.map((p) => ({ key: p.id, label: p.name }))
-	);
-
-	function selectProjectByKey(key: string) {
-		const project = projects.projects.find((p) => p.id === key);
-		if (project) {
-			handleProjectClick(project);
-		}
-	}
-
 	function handleProjectClick(project: Project) {
 		if (splitView.enabled && splitView.focused === 'right') {
 			splitView.setRight(project.id);
@@ -590,7 +579,7 @@
 
 <svelte:window onmousedown={closeMenusOnOutside} onkeydown={closeMenusOnEscape} />
 
-<aside class="sidebar" class:collapsed class:top={collapsed && sidebar.barPosition === 'top'}>
+<aside class="sidebar" class:collapsed>
 	<header class="head">
 		{#if !collapsed}
 			<a href="/" class="brand">
@@ -826,35 +815,7 @@
 		{/if}
 	</div>
 
-	{#if collapsed && sidebar.barPosition === 'top'}
-		<div class="tabstrip">
-			{#if tabItems.length > 0}
-				<Tabs
-					classes="ms-tabs"
-					items={tabItems}
-					activeKey={projects.activeId ?? ''}
-					onkeychange={selectProjectByKey}
-				>
-					{#snippet tab({ index, label, active })}
-						{@const project = projects.projects[index]}
-						{#if project}
-							<span
-								class="ttab"
-								class:active
-								style="--tint: {tintForKey(project.id).hex};"
-								title={label}
-							>
-								<Icon name={KIND_ICONS[project.kind]} size={13} />
-								<span class="ttab-label">{label}</span>
-							</span>
-						{:else}
-							<span class="ttab"><span class="ttab-label">{label}</span></span>
-						{/if}
-					{/snippet}
-				</Tabs>
-			{/if}
-		</div>
-	{:else}
+	{#if !collapsed}
 		<nav class="list" aria-label="Projects" bind:this={listEl}>
 			{#if projects.loading}
 				{#if !collapsed}
@@ -968,6 +929,8 @@
 				{/if}
 			{/if}
 		</nav>
+	{:else}
+		<div class="rail-spacer" aria-hidden="true"></div>
 	{/if}
 
 	<footer class="foot">
@@ -1036,26 +999,6 @@
 					>
 						<Icon name="monitor" size={13} />
 						<span>System</span>
-					</button>
-				</div>
-
-				<div class="popover-section-label">Project bar</div>
-				<div class="theme-toggle" role="group" aria-label="Project bar position">
-					<button
-						class="theme-pill"
-						class:active={sidebar.barPosition === 'top'}
-						onclick={() => sidebar.setBarPosition('top')}
-					>
-						<Icon name="layout" size={13} />
-						<span>Top</span>
-					</button>
-					<button
-						class="theme-pill"
-						class:active={sidebar.barPosition === 'left'}
-						onclick={() => sidebar.setBarPosition('left')}
-					>
-						<Icon name="sidebar" size={13} />
-						<span>Left</span>
 					</button>
 				</div>
 
@@ -2461,85 +2404,7 @@
 
 	/* MCP install modal moved to its own component: McpInstallModal.svelte */
 
-	/* ---------- top tab-bar mode (collapsed strip along the top) ---------- */
-	.sidebar.collapsed.top {
-		flex-direction: row;
-		align-items: center;
-		width: 100%;
-		height: 54px;
-		border-right: none;
-		border-bottom: 1px solid var(--border);
-	}
-	.sidebar.collapsed.top .head {
-		border-bottom: none;
-		padding: 0 4px 0 10px;
-	}
-	.sidebar.collapsed.top .ws-row {
-		border-bottom: none;
-		padding: 0 4px;
-	}
-	.sidebar.collapsed.top .actions.rail {
-		flex-direction: row;
-		padding: 0 4px;
-		gap: 8px;
-	}
-	.tabstrip {
+	.rail-spacer {
 		flex: 1;
-		min-width: 0;
-		height: 100%;
-		display: flex;
-		align-items: stretch;
-		padding: 0 4px;
-	}
-	.tabstrip :global(.ms-tabs) {
-		width: 100%;
-	}
-	.ttab {
-		display: inline-flex;
-		align-items: center;
-		gap: 7px;
-		min-width: 0;
-		color: color-mix(in srgb, var(--tint, var(--muted)) 45%, var(--muted));
-	}
-	.ttab :global(.icon) {
-		flex-shrink: 0;
-		color: color-mix(in srgb, var(--tint, var(--muted)) 65%, var(--muted));
-	}
-	.ttab-label {
-		max-width: 140px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		color: var(--fg-2);
-	}
-	.ttab.active .ttab-label {
-		color: var(--fg);
-	}
-	.ttab.active :global(.icon) {
-		color: var(--accent);
-	}
-	.sidebar.collapsed.top .foot {
-		flex-direction: row;
-		align-items: center;
-		border-top: none;
-		border-left: 1px solid var(--border);
-		padding: 0 10px;
-		gap: 8px;
-		height: 100%;
-	}
-	/* Popovers hang below the bar instead of beside a rail. */
-	.sidebar.collapsed.top .popover {
-		top: calc(100% + 8px);
-		bottom: auto;
-		left: 8px;
-		right: auto;
-	}
-	.sidebar.collapsed.top .user-menu {
-		left: auto;
-		right: 8px;
-	}
-	.sidebar.collapsed.top .ws-menu {
-		top: calc(100% + 8px);
-		bottom: auto;
 	}
 </style>
