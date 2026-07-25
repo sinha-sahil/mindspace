@@ -633,6 +633,7 @@
 		{ v: 'text', label: 'Plain text', hint: '' }
 	];
 
+	// Curated content colors — deliberately no purples/pinks (house rule).
 	const SWATCHES = [
 		'#1f2937',
 		'#ef4444',
@@ -640,9 +641,9 @@
 		'#eab308',
 		'#22c55e',
 		'#0ea5e9',
-		'#6366f1',
-		'#a855f7',
-		'#ec4899',
+		'#0d9488',
+		'#64748b',
+		'#92400e',
 		'#78716c',
 		'#ffffff',
 		'#000000'
@@ -1514,26 +1515,34 @@
 	// right-click context menu
 	// =====================================================================
 	let ctx = $state<{ x: number; y: number; kind: 'cell' | 'col' | 'row' } | null>(null);
+	function ctxPos(e: MouseEvent): { x: number; y: number } {
+		const MENU_W = 240;
+		const MENU_H = 420;
+		const x = Math.min(e.clientX + 6, window.innerWidth - MENU_W - 8);
+		const y = Math.min(e.clientY + 6, window.innerHeight - MENU_H - 8);
+		return { x: Math.max(8, x), y: Math.max(8, y) };
+	}
+
 	function openCellCtx(e: MouseEvent, r: number, c: number) {
 		e.preventDefault();
 		if (!inRange(r, c)) {
 			setActive(r, c, false);
 		}
-		ctx = { x: e.clientX, y: e.clientY, kind: 'cell' };
+		ctx = { ...ctxPos(e), kind: 'cell' };
 	}
 	function openColCtx(e: MouseEvent, c: number) {
 		e.preventDefault();
 		if (!(c >= range.c1 && c <= range.c2)) {
 			selectColumn(c, false);
 		}
-		ctx = { x: e.clientX, y: e.clientY, kind: 'col' };
+		ctx = { ...ctxPos(e), kind: 'col' };
 	}
 	function openRowCtx(e: MouseEvent, r: number) {
 		e.preventDefault();
 		if (!(r >= range.r1 && r <= range.r2)) {
 			selectRow(r, false);
 		}
-		ctx = { x: e.clientX, y: e.clientY, kind: 'row' };
+		ctx = { ...ctxPos(e), kind: 'row' };
 	}
 	function closeCtx() {
 		ctx = null;

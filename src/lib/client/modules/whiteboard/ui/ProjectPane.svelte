@@ -5,8 +5,6 @@
 	import Whiteboard from './Whiteboard.svelte';
 	import { collab } from '../collab.svelte';
 	import { type Project, type Visibility } from '$lib/client/modules/projects';
-	import { commandPalette } from '$lib/client/modules/command-palette';
-	import { workspaces } from '$lib/client/modules/workspaces';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { initialFor } from '$lib/client/utils/color';
 	import type { AppSupabaseClient } from '../../../../../app';
@@ -73,13 +71,6 @@
 		}
 		return `${Math.floor(h / 24)}d ago`;
 	}
-
-	const platformMod = $derived.by(() => {
-		if (typeof navigator === 'undefined') {
-			return 'Ctrl';
-		}
-		return /mac|iphone|ipad/i.test(navigator.platform) ? '⌘' : 'Ctrl';
-	});
 
 	// Inline title edit.
 	let titleEditing = $state(false);
@@ -293,7 +284,6 @@
 <section class="pane" class:focused class:split={compact} onpointerdowncapture={() => onFocus()}>
 	<header class="masthead">
 		<div class="masthead-lead">
-			<span class="eyebrow">{workspaces.active?.name ?? 'Workspace'}</span>
 			<div class="title-row">
 				{#if titleEditing}
 					<input
@@ -337,17 +327,6 @@
 					{/if}
 				</div>
 				<span class="masthead-rule" aria-hidden="true"></span>
-			{/if}
-			{#if !compact}
-				<button
-					class="cmdk-trigger"
-					title="Open command palette"
-					onclick={() => commandPalette.setOpen(true)}
-				>
-					<Icon name="search" size={13} />
-					<span>Search…</span>
-					<kbd class="cmdk-kbd">{platformMod} K</kbd>
-				</button>
 			{/if}
 			<div class="share-wrap">
 				<button
@@ -523,16 +502,6 @@
 		min-width: 0;
 		flex: 1 1 auto;
 	}
-	.eyebrow {
-		font-size: 9.5px;
-		font-weight: 600;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--muted);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
 	.title-row {
 		display: flex;
 		align-items: baseline;
@@ -545,11 +514,11 @@
 		display: contents;
 	}
 	.project-title-btn {
-		font-family: var(--font-display);
-		font-size: 19px;
-		font-weight: 500;
-		line-height: 1.1;
-		letter-spacing: -0.012em;
+		font: inherit;
+		font-size: 15px;
+		font-weight: 650;
+		line-height: 1.2;
+		letter-spacing: -0.01em;
 		color: var(--fg);
 		background: transparent;
 		border: none;
@@ -575,10 +544,10 @@
 	.project-title-input {
 		margin: -1px -6px;
 		padding: 1px 6px;
-		font-family: var(--font-display);
-		font-size: 19px;
-		font-weight: 500;
-		letter-spacing: -0.012em;
+		font: inherit;
+		font-size: 15px;
+		font-weight: 650;
+		letter-spacing: -0.01em;
 		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border-strong, var(--border));
@@ -651,47 +620,6 @@
 		align-items: center;
 		gap: 8px;
 		flex-shrink: 0;
-	}
-
-	.cmdk-trigger {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		padding: 5px 6px 5px 10px;
-		font: inherit;
-		font-size: 12px;
-		color: var(--muted);
-		background: var(--bg-2);
-		border: 1px solid var(--border);
-		border-radius: 7px;
-		cursor: pointer;
-		transition:
-			color 120ms,
-			border-color 120ms,
-			background 120ms;
-	}
-	.cmdk-trigger:hover {
-		color: var(--fg);
-		border-color: var(--soft);
-		background: var(--surface);
-	}
-	.cmdk-trigger span {
-		min-width: 90px;
-		text-align: left;
-	}
-	.cmdk-kbd {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 36px;
-		height: 18px;
-		padding: 0 5px;
-		font-family: var(--font-mono);
-		font-size: 10px;
-		color: var(--fg-2);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 4px;
 	}
 
 	.share-wrap {

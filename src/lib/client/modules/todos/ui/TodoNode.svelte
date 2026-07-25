@@ -313,11 +313,11 @@
 			border-color 120ms;
 	}
 	.check:hover {
-		border-color: var(--accent, var(--fg));
+		border-color: var(--accent);
 	}
 	.check.checked {
-		background: var(--accent, var(--sage));
-		border-color: var(--accent, var(--sage));
+		background: var(--accent);
+		border-color: var(--accent);
 	}
 
 	.section-mark {
@@ -328,10 +328,10 @@
 	.section-mark::before {
 		content: '';
 		display: inline-block;
-		width: 4px;
-		height: 14px;
+		width: 3px;
+		height: 13px;
 		border-radius: 2px;
-		background: var(--accent, var(--muted));
+		background: var(--border-strong);
 		vertical-align: middle;
 	}
 
@@ -360,10 +360,8 @@
 	}
 
 	.section .text {
-		font-size: 12px;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
+		font-size: 12.5px;
+		font-weight: 650;
 		color: var(--fg-2);
 	}
 
@@ -417,7 +415,7 @@
 		flex-shrink: 0;
 	}
 	.rating {
-		display: inline-flex;
+		display: none;
 		align-items: center;
 		gap: 3px;
 		height: 18px;
@@ -426,16 +424,14 @@
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
-		/* Always visible (muted when unset) so the rating control is discoverable;
-		   it brightens once set or on row hover. */
-		opacity: 0.6;
-		transition:
-			opacity 100ms,
-			border-color 100ms;
+		transition: border-color 100ms;
 	}
+	/* Set ratings always show; unset ones appear on hover/focus so the text
+	   keeps the row's width at rest (long tasks used to clip to 2 letters). */
 	.rating.set,
-	.row:hover .rating {
-		opacity: 1;
+	.row:hover .rating,
+	.row:focus-within .rating {
+		display: inline-flex;
 	}
 	.rating:hover {
 		border-color: var(--muted);
@@ -472,7 +468,7 @@
 		height: 10px;
 	}
 	.bar.on {
-		background: var(--saffron, #e0a106);
+		background: var(--fg-2);
 	}
 
 	/* priority = burning flames */
@@ -495,7 +491,7 @@
 		background: var(--soft);
 	}
 	.dot.on {
-		background: var(--sage, #5f9a6f);
+		background: var(--fg-2);
 	}
 
 	/* Nesting guide rail + indent. */

@@ -1809,10 +1809,8 @@
 	}
 	.kind-hint {
 		font-size: 11px;
+		line-height: 1.4;
 		color: var(--muted);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
 	.cmdk-hint {

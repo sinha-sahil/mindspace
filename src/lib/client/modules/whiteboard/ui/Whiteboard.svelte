@@ -217,7 +217,20 @@
 		min-height: 0;
 	}
 
+	/* Excalidraw ships violet (#6965db). Its active-tool tint, selection
+	   handles, and focus states all derive from the --color-primary family —
+	   remap the whole family onto the app accent (accent = active state in
+	   the Mono grammar). */
 	.excal-host :global(.excalidraw) {
-		--color-primary: var(--fg);
+		--color-primary: var(--accent);
+		--color-primary-darker: color-mix(in srgb, var(--accent) 85%, #000);
+		--color-primary-darkest: color-mix(in srgb, var(--accent) 72%, #000);
+		--color-primary-hover: color-mix(in srgb, var(--accent) 90%, #000);
+		--color-primary-light: color-mix(in srgb, var(--accent) 16%, var(--surface));
+		--color-primary-light-darker: color-mix(in srgb, var(--accent) 26%, var(--surface));
+		--color-surface-primary-container: color-mix(in srgb, var(--accent) 15%, var(--surface));
+		--color-brand-hover: color-mix(in srgb, var(--accent) 90%, #000);
+		--color-brand-active: color-mix(in srgb, var(--accent) 80%, #000);
+		--focus-highlight-color: color-mix(in srgb, var(--accent) 45%, transparent);
 	}
 </style>

@@ -271,6 +271,20 @@
 	};
 
 	// ----- view (sort + filter) -----
+	let sortMenuOpen = $state(false);
+	const SORT_LABELS: Record<B.TodoSort, string> = {
+		manual: 'Manual',
+		effort: 'Effort',
+		time: 'Time',
+		priority: 'Priority'
+	};
+	const SORT_OPTIONS: { value: B.TodoSort; label: string }[] = [
+		{ value: 'manual', label: 'Manual' },
+		{ value: 'effort', label: 'Effort' },
+		{ value: 'time', label: 'Time' },
+		{ value: 'priority', label: 'Priority' }
+	];
+
 	function setSort(sort: B.TodoSort) {
 		B.setView(board, { ...board.view, sort });
 		persist();
@@ -374,6 +388,20 @@
 	});
 </script>
 
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape') {
+			sortMenuOpen = false;
+		}
+	}}
+	onmousedown={(e) => {
+		const el = e.target;
+		if (sortMenuOpen && el instanceof Element && !el.closest('.sort-wrap')) {
+			sortMenuOpen = false;
+		}
+	}}
+/>
+
 <section class="todo">
 	<header class="head">
 		{#if titleEditing}
@@ -402,44 +430,37 @@
 				<span class="overall">{totalProgress.done}/{totalProgress.total} done</span>
 			{/if}
 
-			<div class="sort-group" role="group" aria-label="Sort tasks">
-				<span class="sort-label">Sort</span>
+			<div class="sort-wrap">
 				<button
 					type="button"
-					class="sort-btn"
-					class:active={board.view.sort === 'manual'}
-					title="Manual order"
-					onclick={() => setSort('manual')}
+					class="sort-trigger"
+					aria-haspopup="menu"
+					aria-expanded={sortMenuOpen}
+					title="Sort tasks"
+					onclick={() => (sortMenuOpen = !sortMenuOpen)}
 				>
-					Manual
+					<span class="sort-trigger-label">Sort</span>
+					<span class="sort-trigger-value">{SORT_LABELS[board.view.sort]}</span>
+					<Icon name="chevron-down" size={11} />
 				</button>
-				<button
-					type="button"
-					class="sort-btn"
-					class:active={board.view.sort === 'effort'}
-					title="Heaviest effort first"
-					onclick={() => setSort('effort')}
-				>
-					Effort
-				</button>
-				<button
-					type="button"
-					class="sort-btn"
-					class:active={board.view.sort === 'time'}
-					title="Longest time first"
-					onclick={() => setSort('time')}
-				>
-					Time
-				</button>
-				<button
-					type="button"
-					class="sort-btn"
-					class:active={board.view.sort === 'priority'}
-					title="Most on-fire first"
-					onclick={() => setSort('priority')}
-				>
-					Priority
-				</button>
+				{#if sortMenuOpen}
+					<div class="sort-menu" role="menu" aria-label="Sort tasks">
+						{#each SORT_OPTIONS as opt (opt.value)}
+							<button
+								type="button"
+								class="sort-item"
+								role="menuitem"
+								onclick={() => {
+									setSort(opt.value);
+									sortMenuOpen = false;
+								}}
+							>
+								<span>{opt.label}</span>
+								{#if board.view.sort === opt.value}<Icon name="check" size={12} />{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 			<button
 				type="button"
@@ -456,7 +477,7 @@
 			<SaveState {saving} />
 			<div class="zoom-group" role="group" aria-label="Zoom">
 				<button type="button" class="zoom-btn" title="Zoom out" onclick={() => zoomBy(1 / 1.2)}>
-					<Icon name="x" size={13} />
+					<Icon name="minus" size={13} />
 				</button>
 				<button type="button" class="zoom-level" title="Reset view" onclick={resetView}>
 					{Math.round(zoom * 100)}%
@@ -715,42 +736,68 @@
 		}
 	}
 
-	.sort-group {
+	.sort-wrap {
+		position: relative;
+	}
+	.sort-trigger {
 		display: inline-flex;
 		align-items: center;
-		gap: 2px;
-		padding: 2px;
-		background: var(--bg-2);
-		border: 1px solid var(--border);
-		border-radius: 7px;
-	}
-	.sort-label {
-		padding: 0 6px 0 4px;
-		font-size: 11px;
-		font-weight: 600;
-		letter-spacing: 0.03em;
-		text-transform: uppercase;
-		color: var(--muted);
-	}
-	.sort-btn {
-		padding: 3px 9px;
+		gap: 6px;
+		height: 28px;
+		padding: 0 10px;
 		font: inherit;
-		font-size: 11.5px;
+		font-size: 12px;
 		font-weight: 500;
 		color: var(--fg-2);
 		background: transparent;
-		border: none;
-		border-radius: 5px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
 		cursor: pointer;
+		transition:
+			border-color 120ms,
+			background 120ms;
 	}
-	.sort-btn:hover {
-		color: var(--fg);
-		background: var(--surface);
+	.sort-trigger:hover {
+		border-color: var(--border-strong);
+		background: var(--bg-2);
 	}
-	.sort-btn.active {
+	.sort-trigger-label {
+		color: var(--muted);
+	}
+	.sort-trigger-value {
+		font-weight: 600;
 		color: var(--fg);
+	}
+	.sort-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 100;
+		min-width: 150px;
+		padding: 4px;
 		background: var(--surface);
-		box-shadow: inset 0 0 0 1px var(--border);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-md);
+	}
+	.sort-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		width: 100%;
+		padding: 7px 10px;
+		font: inherit;
+		font-size: 12.5px;
+		color: var(--fg);
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-xs);
+		cursor: pointer;
+		text-align: left;
+	}
+	.sort-item:hover {
+		background: var(--bg-2);
 	}
 	.filter-btn {
 		display: inline-flex;
@@ -904,7 +951,7 @@
 		opacity: 1;
 	}
 	.resize-handle:hover::before {
-		background: var(--accent, var(--muted));
+		background: var(--accent);
 		height: 44px;
 	}
 	.resize-handle.explicit::before {
@@ -919,7 +966,7 @@
 		flex-shrink: 0;
 	}
 	.rating {
-		display: inline-flex;
+		display: none;
 		align-items: center;
 		gap: 3px;
 		height: 18px;
@@ -928,16 +975,11 @@
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
-		opacity: 0.6;
-		transition:
-			opacity 100ms,
-			border-color 100ms;
+		transition: border-color 100ms;
 	}
-	.rating.set {
-		opacity: 1;
-	}
+	.rating.set,
 	.card-head:hover .rating {
-		opacity: 1;
+		display: inline-flex;
 	}
 	.rating:hover {
 		border-color: var(--muted-2);
@@ -972,7 +1014,7 @@
 		height: 10px;
 	}
 	.bar.on {
-		background: var(--saffron, #e0a106);
+		background: var(--fg-2);
 	}
 	.dots {
 		display: inline-flex;
@@ -986,7 +1028,7 @@
 		background: var(--soft);
 	}
 	.dot.on {
-		background: var(--sage, #5f9a6f);
+		background: var(--fg-2);
 	}
 	.flames {
 		display: inline-flex;
@@ -1073,7 +1115,7 @@
 		display: block;
 		height: 100%;
 		border-radius: 3px;
-		background: var(--accent, var(--sage));
+		background: var(--accent);
 		transition: width 200ms ease;
 	}
 

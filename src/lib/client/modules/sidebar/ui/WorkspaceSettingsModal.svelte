@@ -407,7 +407,10 @@
 						{#if loadingMembers}
 							<p class="hint">Loading…</p>
 						{:else if membersError}
-							<p class="error">{membersError}</p>
+							<div class="inline-error" role="alert">
+								<Icon name="alert-circle" size={13} />
+								<span>{membersError}</span>
+							</div>
 						{:else if members.length === 0}
 							<p class="hint">No one else has access yet.</p>
 						{:else}
@@ -681,6 +684,22 @@
 		margin: 4px 0 0;
 		font-size: 12px;
 		color: var(--rose);
+	}
+	.inline-error {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		padding: 10px 12px;
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--rose);
+		background: color-mix(in srgb, var(--rose) 7%, transparent);
+		border: 1px solid color-mix(in srgb, var(--rose) 25%, transparent);
+		border-radius: var(--radius-sm);
+	}
+	.inline-error :global(.icon) {
+		flex-shrink: 0;
+		margin-top: 1px;
 	}
 	.hint {
 		margin: 4px 0 0;

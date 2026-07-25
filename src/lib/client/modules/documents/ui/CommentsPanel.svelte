@@ -121,7 +121,6 @@
 
 {#snippet panelBody()}
 	<header class="head">
-		<Icon name="mail" size={13} />
 		<span class="title">Threads</span>
 		<span class="count">{threads.length}</span>
 		<button
@@ -138,7 +137,10 @@
 	{#if comments.loading}
 		<p class="muted">Loading…</p>
 	{:else if comments.error}
-		<p class="muted error">{comments.error}</p>
+		<div class="panel-error" role="alert">
+			<Icon name="alert-circle" size={13} />
+			<span>{comments.error}</span>
+		</div>
 	{:else if threads.length === 0}
 		<p class="muted">No threads yet. Select text in the document to start one.</p>
 	{:else}
@@ -290,9 +292,14 @@
 		gap: 8px;
 		padding: 12px 12px 12px 16px;
 		border-bottom: 1px solid var(--border);
-		font-size: 13px;
+	}
+	.head .title {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
 		font-weight: 600;
-		color: var(--fg);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
 	.head .count {
 		margin-left: auto;
@@ -323,8 +330,22 @@
 		font-size: 12px;
 		color: var(--muted);
 	}
-	.muted.error {
+	.panel-error {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		margin: 12px;
+		padding: 10px 12px;
+		font-size: 12px;
+		line-height: 1.5;
 		color: var(--rose);
+		background: color-mix(in srgb, var(--rose) 7%, transparent);
+		border: 1px solid color-mix(in srgb, var(--rose) 25%, transparent);
+		border-radius: var(--radius-sm);
+	}
+	.panel-error :global(.icon) {
+		flex-shrink: 0;
+		margin-top: 1px;
 	}
 	.list {
 		list-style: none;
