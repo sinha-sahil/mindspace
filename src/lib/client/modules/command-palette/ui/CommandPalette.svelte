@@ -4,7 +4,7 @@
 	import Icon, { type IconName } from '$lib/client/components/Icon.svelte';
 	import { commandPalette } from '../store.svelte';
 	import { workspaces } from '$lib/client/modules/workspaces';
-	import { projects } from '$lib/client/modules/projects';
+	import { KIND_ICONS, projects } from '$lib/client/modules/projects';
 	import { theme, type ThemeMode, ACCENTS } from '$lib/client/modules/theme';
 	import { toasts } from '$lib/client/modules/toasts';
 
@@ -34,7 +34,7 @@
 				value: `project:${project.id}`,
 				label: project.name,
 				group: 'Projects',
-				icon: project.visibility === 'link' ? 'link' : 'folder',
+				icon: project.visibility === 'link' ? 'link' : KIND_ICONS[project.kind],
 				run: () => projects.select(project.id)
 			});
 		}
@@ -224,6 +224,6 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 </style>

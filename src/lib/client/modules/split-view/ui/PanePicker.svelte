@@ -121,7 +121,7 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		position: relative;
 		padding: 24px;
 	}
@@ -132,7 +132,7 @@
 		left: 0;
 		right: 0;
 		height: 2px;
-		background: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
 	}
 
 	.head {
@@ -145,7 +145,7 @@
 	.title {
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.close {
 		display: inline-flex;
@@ -153,15 +153,15 @@
 		justify-content: center;
 		width: 26px;
 		height: 26px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.close:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 
 	.body {
@@ -185,14 +185,14 @@
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.ws-select {
 		height: 34px;
 		padding: 0 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 7px;
@@ -202,10 +202,10 @@
 	.muted {
 		margin: 4px 0 0;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.muted.error {
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 
 	.project-list {
@@ -226,7 +226,7 @@
 		padding: 8px 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 7px;
@@ -235,13 +235,13 @@
 		transition: border-color 120ms;
 	}
 	.project-item:hover {
-		border-color: var(--accents-3);
+		border-color: var(--soft);
 	}
 	.project-icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.project-name {
 		flex: 1;

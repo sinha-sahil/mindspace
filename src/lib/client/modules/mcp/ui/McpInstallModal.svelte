@@ -105,6 +105,14 @@
 	}
 </script>
 
+<svelte:window
+	onkeydown={(e) => {
+		if (open && e.key === 'Escape') {
+			handleClose();
+		}
+	}}
+/>
+
 {#if open}
 	<Modal
 		classes="ms-modal"
@@ -292,7 +300,7 @@
 	.tab-sub {
 		font-size: 11px;
 		font-weight: 400;
-		color: var(--muted-2);
+		color: var(--muted);
 	}
 	.tab.active .tab-sub {
 		color: var(--muted);
@@ -335,14 +343,14 @@
 			box-shadow var(--duration-fast) var(--ease-out);
 	}
 	.field-input::placeholder {
-		color: var(--muted-2);
+		color: var(--muted);
 	}
 	.field-input:focus {
 		border-color: var(--accent);
 		box-shadow: 0 0 0 3px var(--accent-soft);
 	}
 	.field-input:disabled {
-		opacity: 0.6;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
 	}
 	.generate-btn {
@@ -375,7 +383,7 @@
 		transform: translateY(0.5px);
 	}
 	.generate-btn:disabled {
-		opacity: 0.5;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
 	}
 	.error {
@@ -464,7 +472,7 @@
 		background: var(--surface-2);
 	}
 	.copy-btn:disabled {
-		opacity: 0.4;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
 	}
 	.cmd {

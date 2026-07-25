@@ -260,17 +260,17 @@
 		padding: 5px 12px;
 		font-size: 12.5px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-decoration: none;
 		border-radius: 6px;
 	}
 	.tab:hover {
 		color: var(--fg);
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.tab.active {
 		color: var(--fg);
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 
 	.main {
@@ -299,7 +299,7 @@
 	.sub {
 		margin: 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 		max-width: 460px;
 	}
 	.sub strong {
@@ -325,8 +325,8 @@
 			background 120ms;
 	}
 	.btn:hover:not(:disabled) {
-		border-color: var(--accents-3);
-		background: var(--accents-1);
+		border-color: var(--soft);
+		background: var(--bg-2);
 	}
 	.btn:disabled {
 		opacity: 0.5;
@@ -342,7 +342,7 @@
 		background: var(--fg);
 	}
 	.btn.ghost {
-		color: var(--accents-5);
+		color: var(--muted);
 		border-color: var(--border);
 	}
 
@@ -366,7 +366,7 @@
 		flex: 1;
 	}
 	.reveal-dismiss {
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		cursor: pointer;
@@ -376,7 +376,7 @@
 	.reveal-warn {
 		margin: 0;
 		font-size: 12px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.reveal-row {
 		display: flex;
@@ -421,7 +421,7 @@
 		font-weight: 500;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.field input {
 		height: 34px;
@@ -448,7 +448,7 @@
 		text-align: center;
 		border: 1px dashed var(--border);
 		border-radius: 10px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.empty p {
 		margin: 4px 0;
@@ -488,16 +488,16 @@
 	.t-prefix {
 		font-family: var(--font-mono);
 		font-size: 11.5px;
-		color: var(--accents-5);
+		color: var(--muted);
 		padding: 1px 6px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border-radius: 4px;
 	}
 	.t-meta {
 		display: flex;
 		gap: 6px;
 		font-size: 11.5px;
-		color: var(--accents-5);
+		color: var(--muted);
 		flex-wrap: wrap;
 	}
 	.t-revoke {
@@ -510,14 +510,14 @@
 		padding: 4px 9px;
 		font: inherit;
 		font-size: 11.5px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.t-revoke:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		border-color: rgba(238, 0, 0, 0.3);
 		background: rgba(238, 0, 0, 0.06);
 	}
@@ -536,13 +536,13 @@
 	.docs p {
 		margin: 6px 0;
 		font-size: 12.5px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.docs code {
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		padding: 1px 5px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 4px;
 	}
@@ -550,7 +550,7 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		padding: 10px 12px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		overflow-x: auto;
@@ -565,6 +565,6 @@
 	.error {
 		margin: 0;
 		font-size: 12px;
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 </style>

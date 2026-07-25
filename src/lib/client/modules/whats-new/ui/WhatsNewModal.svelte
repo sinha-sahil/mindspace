@@ -53,7 +53,7 @@
 	.intro {
 		margin: 0 0 18px;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 
 	.releases {
@@ -80,14 +80,14 @@
 		font-size: 14px;
 		font-weight: 600;
 		letter-spacing: -0.01em;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.release-date {
 		font-size: 11px;
 		font-weight: 500;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		color: var(--accents-5);
+		color: var(--muted);
 		flex-shrink: 0;
 	}
 
@@ -111,8 +111,8 @@
 		width: 32px;
 		height: 32px;
 		flex-shrink: 0;
-		color: var(--accent, var(--geist-foreground));
-		background: color-mix(in srgb, var(--accent, var(--geist-success)) 12%, transparent);
+		color: var(--accent, var(--fg));
+		background: color-mix(in srgb, var(--accent, var(--sage)) 12%, transparent);
 		border-radius: 8px;
 	}
 	.feature-text {
@@ -124,11 +124,11 @@
 	.feature-title {
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.feature-desc {
 		font-size: 12.5px;
 		line-height: 1.5;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 </style>

@@ -110,7 +110,7 @@
 		align-items: center;
 		gap: 10px;
 		text-decoration: none;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		font-size: 14px;
 		font-weight: 600;
 		letter-spacing: -0.01em;
@@ -130,12 +130,12 @@
 		border-radius: var(--radius-md);
 	}
 	.icon.ok {
-		color: var(--geist-success);
+		color: var(--sage);
 		background: rgba(0, 112, 243, 0.1);
 		border: 1px solid rgba(0, 112, 243, 0.3);
 	}
 	.icon.error {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 		border: 1px solid rgba(238, 0, 0, 0.3);
 	}
@@ -148,17 +148,17 @@
 	.note {
 		font-size: 13px;
 		font-style: italic;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		padding: 8px 12px;
-		background: var(--accents-1);
-		border-left: 3px solid var(--geist-foreground);
+		background: var(--bg-2);
+		border-left: 3px solid var(--fg);
 		border-radius: var(--radius-sm);
 		align-self: stretch;
 	}
 	p {
 		margin: 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 		line-height: 1.5;
 	}
 	.badge {
@@ -168,7 +168,7 @@
 		padding: 4px 10px;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--geist-success);
+		color: var(--sage);
 		background: rgba(0, 112, 243, 0.08);
 		border: 1px solid rgba(0, 112, 243, 0.3);
 		border-radius: var(--radius-pill);
@@ -188,7 +188,7 @@
 	.field-label {
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.field-wrap {
 		position: relative;
@@ -199,7 +199,7 @@
 		position: absolute;
 		left: 12px;
 		display: inline-flex;
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.field input {
 		width: 100%;
@@ -207,7 +207,7 @@
 		padding: 0 12px 0 36px;
 		font: inherit;
 		font-size: 14px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
@@ -215,7 +215,7 @@
 		transition: border-color 120ms;
 	}
 	.field input:focus {
-		border-color: var(--geist-foreground);
+		border-color: var(--fg);
 	}
 	.btn {
 		display: inline-flex;
@@ -233,26 +233,26 @@
 		cursor: pointer;
 	}
 	.btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 	}
 	.btn.primary:hover {
 		opacity: 0.9;
 	}
 	.btn.secondary {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border-color: var(--border);
 		align-self: flex-start;
 	}
 	.btn.secondary:hover {
-		border-color: var(--accents-3);
-		background: var(--accents-1);
+		border-color: var(--soft);
+		background: var(--bg-2);
 	}
 	.error {
 		margin: 0;
 		font-size: 12px;
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 </style>

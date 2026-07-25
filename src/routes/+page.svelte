@@ -299,13 +299,13 @@
 	}
 	.divider:hover,
 	.divider.dragging {
-		background: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
 	}
 	.divider-grip {
 		width: 2px;
 		height: 28px;
 		border-radius: 2px;
-		background: var(--accents-4);
+		background: var(--muted-2);
 	}
 	.divider:hover .divider-grip,
 	.divider.dragging .divider-grip {

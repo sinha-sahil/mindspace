@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
-	import { Button, Tooltip } from 'polymorph-ui-components';
 	import Icon, { type IconName } from '$lib/client/components/Icon.svelte';
+	import SaveState from '$lib/client/components/SaveState.svelte';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { sidebar } from '$lib/client/modules/sidebar';
 	import { documents } from '../store.svelte';
 	import { comments } from '../comments.svelte';
-	import { countWords, readingTimeMinutes, renderMarkdown, enhanceRendered } from '../markdown';
+	import { renderMarkdown, enhanceRendered } from '../markdown';
 	import MarkdownEditor from './MarkdownEditor.svelte';
 	import CommentsPanel from './CommentsPanel.svelte';
 	import MermaidFullscreen from './MermaidFullscreen.svelte';
@@ -22,9 +22,6 @@
 	let focusedThreadId = $state<string | null>(null);
 	let exportOpen = $state(false);
 	let editorRef: { scrollToThread: (id: string) => void } | null = $state(null);
-
-	const fmtNum = new Intl.NumberFormat();
-	const docWords = $derived(documents.active ? countWords(documents.active.content) : 0);
 
 	// The doc editor is the width-hungriest view in the app — tuck the app
 	// rail away when it opens. Non-persistent: the user's stored preference
@@ -289,20 +286,17 @@
 		<header class="files-head">
 			<span class="files-title">Documents</span>
 			<div class="files-actions">
-				<Tooltip text="Refresh documents" position="bottom">
-					<Button
-						classes="btn-icon"
-						ariaLabel="Refresh documents"
-						disabled={refreshing}
-						showLoader={refreshing}
-						loaderType="Circular"
-						onclick={refreshDocs}
-					>
-						{#snippet icon()}
-							{#if !refreshing}<Icon name="refresh" size={12} />{/if}
-						{/snippet}
-					</Button>
-				</Tooltip>
+				<button
+					type="button"
+					class="icon-btn"
+					class:spin={refreshing}
+					title="Refresh documents"
+					aria-label="Refresh documents"
+					onclick={refreshDocs}
+					disabled={refreshing}
+				>
+					<Icon name="refresh" size={13} />
+				</button>
 				<button
 					type="button"
 					class="icon-btn"
@@ -311,16 +305,16 @@
 					onclick={pickFile}
 					disabled={uploading}
 				>
-					<Icon name="arrow-up-right" size={12} />
+					<Icon name="arrow-up-right" size={13} />
 				</button>
 				<button
 					type="button"
-					class="icon-btn primary"
+					class="icon-btn"
 					title="New document"
 					aria-label="New document"
 					onclick={newDoc}
 				>
-					<Icon name="plus" size={14} />
+					<Icon name="plus" size={13} />
 				</button>
 			</div>
 		</header>
@@ -396,12 +390,7 @@
 					</button>
 				{/if}
 				<div class="head-right">
-					<span class="doc-meta">
-						{fmtNum.format(docWords)} words · {readingTimeMinutes(docWords)} min read
-					</span>
-					<span class="save-pill" class:saving={documents.isSaving}>
-						<span class="dot"></span>{documents.isSaving ? 'Saving' : 'Saved'}
-					</span>
+					<SaveState saving={documents.isSaving} />
 					<div class="export-wrap">
 						<button
 							type="button"
@@ -490,7 +479,7 @@
 		width: 220px;
 		flex: 0 0 220px;
 		border-right: 1px solid var(--border);
-		background: var(--accents-1);
+		background: var(--bg-2);
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
@@ -510,7 +499,7 @@
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: var(--accents-5);
+		color: var(--muted);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -524,34 +513,40 @@
 	.icon-btn {
 		display: inline-flex;
 		align-items: center;
-		gap: 5px;
-		padding: 4px 8px;
+		justify-content: center;
+		width: 26px;
+		height: 26px;
+		padding: 0;
 		font: inherit;
-		font-size: 11px;
-		font-weight: 500;
-		color: var(--accents-6);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 5px;
+		color: var(--muted);
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
+		transition:
+			color 120ms,
+			background 120ms;
+	}
+	.icon-btn.spin :global(.icon) {
+		animation: icon-spin 0.9s linear infinite;
+	}
+	@keyframes icon-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.icon-btn.spin :global(.icon) {
+			animation: none;
+		}
 	}
 	.icon-btn:hover:not(:disabled) {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		background: var(--bg-2);
 	}
 	.icon-btn:disabled {
-		opacity: 0.5;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
-	}
-	.icon-btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
-	}
-	.icon-btn.primary:hover:not(:disabled) {
-		color: var(--geist-background);
-		border-color: var(--geist-foreground);
-		opacity: 0.9;
 	}
 	.file-input {
 		display: none;
@@ -590,7 +585,7 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: 6px;
@@ -604,18 +599,18 @@
 		white-space: nowrap;
 	}
 	:global(.file-icon) {
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.file-row:hover :global(.file-icon),
 	.file-row.active :global(.file-icon) {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.file-del {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		width: 24px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
@@ -628,7 +623,7 @@
 		opacity: 1;
 	}
 	.file-del:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 
@@ -655,7 +650,7 @@
 		font: inherit;
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 5px;
@@ -667,15 +662,15 @@
 		text-align: left;
 	}
 	.doc-title-btn:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.doc-title-input {
 		padding: 2px 6px;
 		font: inherit;
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--accent, var(--border-strong));
 		border-radius: 5px;
 		outline: none;
@@ -687,18 +682,6 @@
 		align-items: center;
 		gap: 12px;
 		flex-shrink: 0;
-	}
-
-	.doc-meta {
-		font-size: 11.5px;
-		color: var(--muted-2);
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
-	@media (max-width: 980px) {
-		.doc-meta {
-			display: none;
-		}
 	}
 
 	.export-wrap {
@@ -760,23 +743,6 @@
 		color: var(--muted);
 	}
 
-	.save-pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 12px;
-		color: var(--accents-5);
-	}
-	.save-pill .dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--geist-success);
-	}
-	.save-pill.saving .dot {
-		background: var(--geist-warning);
-		animation: pulse 1.4s ease-in-out infinite;
-	}
 	@keyframes pulse {
 		50% {
 			opacity: 0.4;
@@ -801,7 +767,7 @@
 		align-items: center;
 		justify-content: center;
 		gap: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 		font-size: 13px;
 	}
 	.empty-cta {
@@ -811,9 +777,9 @@
 		padding: 7px 14px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border: 1px solid var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
 		border-radius: 7px;
 		cursor: pointer;
 	}
@@ -822,6 +788,6 @@
 		padding: 12px 16px;
 		margin: 0;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 </style>

@@ -13,7 +13,7 @@
 <style>
 	.flame {
 		display: block;
-		fill: var(--accents-3);
+		fill: var(--soft);
 		transition: fill 120ms ease;
 	}
 	.flame.on {

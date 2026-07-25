@@ -162,7 +162,7 @@
 		left: 0;
 		z-index: 4;
 		flex-shrink: 0;
-		background: var(--accents-2);
+		background: var(--border);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
 	}
@@ -174,8 +174,8 @@
 		font-size: 11px;
 		font-weight: 600;
 		letter-spacing: 0.03em;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
 	}
@@ -192,8 +192,8 @@
 		justify-content: center;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
 	}
@@ -203,7 +203,7 @@
 		align-items: center;
 		padding: 0 5px;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
@@ -223,7 +223,7 @@
 		align-items: center;
 		padding: 0 5px;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
@@ -239,7 +239,7 @@
 		gap: 2px;
 		padding: 5px 10px;
 		border-top: 1px solid var(--border);
-		background: var(--accents-1);
+		background: var(--bg-2);
 		overflow-x: auto;
 		flex-shrink: 0;
 	}
@@ -248,7 +248,7 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 6px;
@@ -256,7 +256,7 @@
 		white-space: nowrap;
 	}
 	.tab.active {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border-color: var(--border);
 	}

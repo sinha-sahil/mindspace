@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
+	import SaveState from '$lib/client/components/SaveState.svelte';
 	import type { Project } from '$lib/client/modules/projects';
 	import {
 		parseBook,
@@ -1634,9 +1635,7 @@
 			</button>
 		{/if}
 		<div class="head-right">
-			<span class="save-pill" class:saving>
-				<span class="dot"></span>{saving ? 'Saving' : 'Saved'}
-			</span>
+			<SaveState {saving} />
 		</div>
 	</header>
 
@@ -2563,7 +2562,7 @@
 		font: inherit;
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 5px;
@@ -2575,15 +2574,15 @@
 		text-align: left;
 	}
 	.title-btn:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.title-input {
 		padding: 2px 6px;
 		font: inherit;
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--accent, var(--border-strong));
 		border-radius: 5px;
 		outline: none;
@@ -2595,23 +2594,6 @@
 		align-items: center;
 		gap: 12px;
 		flex-shrink: 0;
-	}
-	.save-pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 12px;
-		color: var(--accents-5);
-	}
-	.save-pill .dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--geist-success);
-	}
-	.save-pill.saving .dot {
-		background: var(--geist-warning);
-		animation: pulse 1.4s ease-in-out infinite;
 	}
 	@keyframes pulse {
 		50% {
@@ -2639,7 +2621,7 @@
 		padding: 0 6px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--accents-7);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 6px;
@@ -2649,16 +2631,16 @@
 			border-color 100ms;
 	}
 	.tb-btn:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.tb-btn:disabled {
-		opacity: 0.35;
+		opacity: var(--disabled-opacity);
 		cursor: default;
 	}
 	.tb-btn.on {
-		background: var(--accent-soft, var(--accents-2));
-		border-color: color-mix(in srgb, var(--accent, var(--geist-foreground)) 35%, transparent);
-		color: var(--accent, var(--geist-foreground));
+		background: var(--accent-soft, var(--border));
+		border-color: color-mix(in srgb, var(--accent, var(--fg)) 35%, transparent);
+		color: var(--accent, var(--fg));
 	}
 	.tb-btn.glyph {
 		font-weight: 700;
@@ -2676,7 +2658,7 @@
 	}
 	.tb-btn.text {
 		font-size: 12px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.tb-btn.wide {
 		font-weight: 600;
@@ -2726,7 +2708,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 	}
 	.swatches {
 		display: grid;
@@ -2750,8 +2732,8 @@
 		padding: 5px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
@@ -2771,7 +2753,7 @@
 		padding: 6px 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: 6px;
@@ -2779,15 +2761,15 @@
 		text-align: left;
 	}
 	.numfmt-item:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.numfmt-item.active {
-		background: var(--accent-soft, var(--accents-2));
+		background: var(--accent-soft, var(--border));
 	}
 	.numfmt-hint {
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.align-glyph {
 		position: relative;
@@ -2842,8 +2824,8 @@
 		font-size: 12px;
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-7);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		text-align: center;
@@ -2852,7 +2834,7 @@
 		font-family: var(--font-display, serif);
 		font-style: italic;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.formula-input {
 		flex: 1;
@@ -2861,7 +2843,7 @@
 		font: inherit;
 		font-size: 13px;
 		font-family: var(--font-mono);
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 6px;
@@ -2940,7 +2922,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
@@ -2954,7 +2936,7 @@
 		padding: 6px 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: 6px;
@@ -2963,10 +2945,10 @@
 		white-space: nowrap;
 	}
 	.dd-item:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.dd-item.active {
-		background: var(--accent-soft, var(--accents-2));
+		background: var(--accent-soft, var(--border));
 	}
 
 	.brd-glyph {
@@ -2987,15 +2969,15 @@
 		width: 28px;
 		height: 26px;
 		font-size: 14px;
-		color: var(--accents-7);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.brd-btn:hover {
 		background: var(--surface);
-		border-color: var(--accents-3);
+		border-color: var(--soft);
 	}
 	.brd-row {
 		display: flex;
@@ -3004,7 +2986,7 @@
 	}
 	.brd-lbl {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 		min-width: 36px;
 	}
 	.brd-styles {
@@ -3023,8 +3005,8 @@
 		cursor: pointer;
 	}
 	.brd-style.sel {
-		border-color: var(--accent, var(--geist-foreground));
-		background: var(--accent-soft, var(--accents-2));
+		border-color: var(--accent, var(--fg));
+		background: var(--accent-soft, var(--border));
 	}
 	.brd-style-line {
 		width: 18px;
@@ -3060,7 +3042,7 @@
 		height: 16px;
 	}
 	.swatch.sel {
-		outline: 2px solid var(--accent, var(--geist-foreground));
+		outline: 2px solid var(--accent, var(--fg));
 		outline-offset: 1px;
 	}
 
@@ -3154,7 +3136,7 @@
 		width: 8px;
 		height: 8px;
 		transform: translate(-50%, -50%);
-		background: var(--accent, #3b82f6);
+		background: var(--accent);
 		border: 1px solid var(--surface);
 		border-radius: 1px;
 		cursor: crosshair;
@@ -3163,8 +3145,8 @@
 	.fill-preview {
 		position: absolute;
 		pointer-events: none;
-		border: 2px dashed var(--accent, #3b82f6);
-		background: color-mix(in srgb, var(--accent, #3b82f6) 6%, transparent);
+		border: 2px dashed var(--accent);
+		background: color-mix(in srgb, var(--accent) 6%, transparent);
 		z-index: 7;
 		box-sizing: border-box;
 	}
@@ -3177,7 +3159,7 @@
 		justify-content: flex-start;
 		padding: 0 5px;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
@@ -3189,21 +3171,21 @@
 		z-index: 1;
 	}
 	.merge-cell.selected {
-		background: color-mix(in srgb, var(--accent, #3b82f6) 12%, var(--surface));
+		background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 	}
 	.merge-cell.active {
-		box-shadow: inset 0 0 0 2px var(--accent, #3b82f6);
+		box-shadow: inset 0 0 0 2px var(--accent);
 		z-index: 3;
 	}
 
 	/* ---- frozen pane edges ---- */
 	.col-head.frozen-edge,
 	.cell.frozen-col-edge {
-		border-right: 1.5px solid var(--accents-4);
+		border-right: 1.5px solid var(--muted-2);
 	}
 	.row-head.frozen-edge,
 	.cell.frozen-row-edge {
-		border-bottom: 1.5px solid var(--accents-4);
+		border-bottom: 1.5px solid var(--muted-2);
 	}
 
 	/* ---- find & replace ---- */
@@ -3219,7 +3201,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 	}
 	.find-row {
 		display: flex;
@@ -3231,8 +3213,8 @@
 		padding: 5px 8px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		outline: none;
@@ -3244,7 +3226,7 @@
 		min-width: 34px;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-align: center;
 	}
 	.find-nav {
@@ -3252,25 +3234,25 @@
 		height: 26px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.find-nav:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.find-nav.on {
-		background: var(--accent-soft, var(--accents-2));
-		color: var(--accent, var(--geist-foreground));
+		background: var(--accent-soft, var(--border));
+		color: var(--accent, var(--fg));
 	}
 	.find-btn {
 		padding: 5px 10px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
@@ -3279,7 +3261,7 @@
 		background: var(--surface);
 	}
 	.find-btn:disabled {
-		opacity: 0.4;
+		opacity: var(--disabled-opacity);
 		cursor: default;
 	}
 
@@ -3294,7 +3276,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
@@ -3305,7 +3287,7 @@
 		padding: 7px 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: 6px;
@@ -3314,10 +3296,10 @@
 		white-space: nowrap;
 	}
 	.ctx-item:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.ctx-item.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 	.ctx-sep {
@@ -3339,7 +3321,7 @@
 		z-index: 11;
 		flex-shrink: 0;
 		padding: 0;
-		background: var(--accents-2);
+		background: var(--border);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
 		cursor: pointer;
@@ -3349,12 +3331,12 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: stretch;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
 	}
 	.col-head.hl {
-		background: var(--accent-soft, var(--accents-2));
+		background: var(--accent-soft, var(--border));
 	}
 	.col-head-label {
 		flex: 1;
@@ -3363,7 +3345,7 @@
 		font-size: 11px;
 		font-weight: 600;
 		letter-spacing: 0.03em;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		cursor: pointer;
@@ -3372,7 +3354,7 @@
 		justify-content: center;
 	}
 	.col-head.hl .col-head-label {
-		color: var(--accent, var(--geist-foreground));
+		color: var(--accent, var(--fg));
 	}
 	.col-resize {
 		position: absolute;
@@ -3384,7 +3366,7 @@
 		z-index: 5;
 	}
 	.col-resize:hover {
-		background: color-mix(in srgb, var(--accent, var(--geist-foreground)) 50%, transparent);
+		background: color-mix(in srgb, var(--accent, var(--fg)) 50%, transparent);
 	}
 	.grid-row {
 		display: flex;
@@ -3397,19 +3379,19 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: stretch;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
 	}
 	.row-head.hl {
-		background: var(--accent-soft, var(--accents-2));
+		background: var(--accent-soft, var(--border));
 	}
 	.row-head-label {
 		flex: 1;
 		font: inherit;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		cursor: pointer;
@@ -3418,7 +3400,7 @@
 		justify-content: center;
 	}
 	.row-head.hl .row-head-label {
-		color: var(--accent, var(--geist-foreground));
+		color: var(--accent, var(--fg));
 	}
 	.row-resize {
 		position: absolute;
@@ -3436,7 +3418,7 @@
 		align-items: center;
 		padding: 0 5px;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border-right: 1px solid var(--border);
 		border-bottom: 1px solid var(--border);
@@ -3452,11 +3434,11 @@
 		width: 100%;
 	}
 	.cell.selected {
-		background: color-mix(in srgb, var(--accent, #3b82f6) 12%, var(--surface));
+		background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 	}
 	.cell.active {
 		background: var(--surface);
-		box-shadow: inset 0 0 0 2px var(--accent, #3b82f6);
+		box-shadow: inset 0 0 0 2px var(--accent);
 		z-index: 1;
 	}
 	.cell-input {
@@ -3467,10 +3449,10 @@
 		padding: 0 4px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: none;
-		outline: 2px solid var(--accent, #3b82f6);
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 		z-index: 6;
 		box-sizing: border-box;
@@ -3483,7 +3465,7 @@
 		gap: 6px;
 		padding: 4px 10px;
 		border-top: 1px solid var(--border);
-		background: var(--accents-1);
+		background: var(--bg-2);
 		flex-shrink: 0;
 		min-height: 36px;
 	}
@@ -3494,14 +3476,14 @@
 		width: 26px;
 		height: 26px;
 		flex-shrink: 0;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.tab-add:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 	.tabs {
@@ -3531,7 +3513,7 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		cursor: pointer;
@@ -3539,7 +3521,7 @@
 		padding: 4px 2px;
 	}
 	.tab.active .tab-label {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.tab-input {
 		font: inherit;
@@ -3557,15 +3539,15 @@
 		justify-content: center;
 		width: 18px;
 		height: 18px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 4px;
 		cursor: pointer;
 	}
 	.tab-del:hover {
-		color: var(--geist-error);
-		background: var(--accents-2);
+		color: var(--rose);
+		background: var(--border);
 	}
 	.grow-controls {
 		display: flex;
@@ -3580,14 +3562,14 @@
 		font: inherit;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.grow-btn:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 </style>

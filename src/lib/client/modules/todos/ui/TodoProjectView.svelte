@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
+	import SaveState from '$lib/client/components/SaveState.svelte';
 	import type { Project } from '$lib/client/modules/projects';
 	import * as B from '../board';
 	import TodoNode from './TodoNode.svelte';
@@ -452,9 +453,7 @@
 				<span>Hide done</span>
 			</button>
 
-			<span class="save-pill" class:saving>
-				<span class="dot"></span>{saving ? 'Saving' : 'Saved'}
-			</span>
+			<SaveState {saving} />
 			<div class="zoom-group" role="group" aria-label="Zoom">
 				<button type="button" class="zoom-btn" title="Zoom out" onclick={() => zoomBy(1 / 1.2)}>
 					<Icon name="x" size={13} />
@@ -672,7 +671,7 @@
 		font: inherit;
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 5px;
@@ -684,15 +683,15 @@
 		text-align: left;
 	}
 	.title-btn:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.title-input {
 		padding: 2px 6px;
 		font: inherit;
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--accent, var(--border-strong));
 		border-radius: 5px;
 		outline: none;
@@ -708,24 +707,7 @@
 	.overall {
 		font-size: 12px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-5);
-	}
-	.save-pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 12px;
-		color: var(--accents-5);
-	}
-	.save-pill .dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--geist-success);
-	}
-	.save-pill.saving .dot {
-		background: var(--geist-warning);
-		animation: pulse 1.4s ease-in-out infinite;
+		color: var(--muted);
 	}
 	@keyframes pulse {
 		50% {
@@ -738,7 +720,7 @@
 		align-items: center;
 		gap: 2px;
 		padding: 2px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 7px;
 	}
@@ -748,25 +730,25 @@
 		font-weight: 600;
 		letter-spacing: 0.03em;
 		text-transform: uppercase;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.sort-btn {
 		padding: 3px 9px;
 		font: inherit;
 		font-size: 11.5px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.sort-btn:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 	.sort-btn.active {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		box-shadow: inset 0 0 0 1px var(--border);
 	}
@@ -778,27 +760,27 @@
 		font: inherit;
 		font-size: 11.5px;
 		font-weight: 500;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 7px;
 		cursor: pointer;
 	}
 	.filter-btn:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.filter-btn.active {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 	}
 
 	.zoom-group {
 		display: inline-flex;
 		align-items: center;
 		padding: 2px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 7px;
 	}
@@ -809,14 +791,14 @@
 		width: 24px;
 		height: 22px;
 		padding: 0;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.zoom-btn:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 	.zoom-level {
@@ -825,14 +807,14 @@
 		font: inherit;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.zoom-level:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 	.add-col-btn {
@@ -843,9 +825,9 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border: 1px solid var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
 		border-radius: 6px;
 		cursor: pointer;
 	}
@@ -860,7 +842,7 @@
 		position: relative;
 		overflow: hidden;
 		background-color: var(--bg);
-		background-image: radial-gradient(circle, var(--accents-3) 1px, transparent 1px);
+		background-image: radial-gradient(circle, var(--soft) 1px, transparent 1px);
 		cursor: grab;
 		touch-action: none;
 	}
@@ -891,7 +873,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 12px;
-		box-shadow: var(--shadow-md, 0 8px 30px -12px rgba(0, 0, 0, 0.25));
+		box-shadow: var(--shadow-md);
 	}
 
 	/* Right-edge drag strip to resize the card. */
@@ -914,7 +896,7 @@
 		height: 30px;
 		transform: translateY(-50%);
 		border-radius: 3px;
-		background: var(--accents-3);
+		background: var(--soft);
 		opacity: 0;
 		transition: opacity 120ms;
 	}
@@ -922,7 +904,7 @@
 		opacity: 1;
 	}
 	.resize-handle:hover::before {
-		background: var(--accent, var(--accents-5));
+		background: var(--accent, var(--muted));
 		height: 44px;
 	}
 	.resize-handle.explicit::before {
@@ -942,7 +924,7 @@
 		gap: 3px;
 		height: 18px;
 		padding: 0 5px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
@@ -958,16 +940,16 @@
 		opacity: 1;
 	}
 	.rating:hover {
-		border-color: var(--accents-4);
+		border-color: var(--muted-2);
 	}
 	.rk {
 		font-size: 9px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.rating.set .rk {
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.bars {
 		display: inline-flex;
@@ -978,7 +960,7 @@
 	.bar {
 		width: 2.5px;
 		border-radius: 1px;
-		background: var(--accents-3);
+		background: var(--soft);
 	}
 	.bar.b1 {
 		height: 4px;
@@ -1001,7 +983,7 @@
 		width: 4px;
 		height: 4px;
 		border-radius: 50%;
-		background: var(--accents-3);
+		background: var(--soft);
 	}
 	.dot.on {
 		background: var(--sage, #5f9a6f);
@@ -1026,11 +1008,11 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--accents-4);
+		color: var(--muted-2);
 		flex-shrink: 0;
 	}
 	.card-head:hover .grip {
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.col-title {
 		flex: 1;
@@ -1040,7 +1022,7 @@
 		font-size: 13px;
 		font-weight: 700;
 		letter-spacing: 0.01em;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 5px;
@@ -1048,17 +1030,17 @@
 		cursor: text;
 	}
 	.col-title:focus {
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border-color: var(--border);
 	}
 	.col-title::placeholder {
-		color: var(--accents-4);
+		color: var(--muted);
 	}
 	.col-count {
 		flex-shrink: 0;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.col-del {
 		display: inline-flex;
@@ -1068,14 +1050,14 @@
 		height: 24px;
 		flex-shrink: 0;
 		padding: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.col-del:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 
@@ -1083,7 +1065,7 @@
 		height: 3px;
 		margin: 6px 12px 0;
 		border-radius: 3px;
-		background: var(--accents-2);
+		background: var(--border);
 		overflow: hidden;
 		flex-shrink: 0;
 	}
@@ -1091,7 +1073,7 @@
 		display: block;
 		height: 100%;
 		border-radius: 3px;
-		background: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
 		transition: width 200ms ease;
 	}
 
@@ -1101,7 +1083,7 @@
 	.col-empty {
 		margin: 6px;
 		font-size: 12px;
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 
 	.col-foot {
@@ -1118,15 +1100,15 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.foot-btn:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.foot-btn.ghost {
 		background: transparent;
@@ -1139,10 +1121,10 @@
 		transform: translateX(-50%);
 		padding: 4px 12px;
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: color-mix(in srgb, var(--surface) 82%, transparent);
 		border: 1px solid var(--border);
-		border-radius: var(--radius-pill, 999px);
+		border-radius: var(--radius-pill);
 		pointer-events: none;
 		white-space: nowrap;
 	}

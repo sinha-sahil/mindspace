@@ -264,7 +264,7 @@
 		transition: background 100ms;
 	}
 	.row:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 
 	.twisty {
@@ -275,7 +275,7 @@
 		height: 16px;
 		flex-shrink: 0;
 		padding: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 4px;
@@ -291,8 +291,8 @@
 		pointer-events: none;
 	}
 	.twisty:hover {
-		color: var(--geist-foreground);
-		background: var(--accents-2);
+		color: var(--fg);
+		background: var(--border);
 	}
 
 	.check {
@@ -305,7 +305,7 @@
 		padding: 0;
 		color: #fff;
 		background: transparent;
-		border: 1.5px solid var(--accents-4);
+		border: 1.5px solid var(--muted-2);
 		border-radius: 5px;
 		cursor: pointer;
 		transition:
@@ -313,11 +313,11 @@
 			border-color 120ms;
 	}
 	.check:hover {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent, var(--fg));
 	}
 	.check.checked {
-		background: var(--accent, var(--geist-success));
-		border-color: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
+		border-color: var(--accent, var(--sage));
 	}
 
 	.section-mark {
@@ -331,7 +331,7 @@
 		width: 4px;
 		height: 14px;
 		border-radius: 2px;
-		background: var(--accent, var(--accents-5));
+		background: var(--accent, var(--muted));
 		vertical-align: middle;
 	}
 
@@ -341,7 +341,7 @@
 		padding: 3px 4px;
 		font: inherit;
 		font-size: 13.5px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 4px;
@@ -352,10 +352,10 @@
 		border-color: var(--border);
 	}
 	.text::placeholder {
-		color: var(--accents-4);
+		color: var(--muted);
 	}
 	.row.done .text {
-		color: var(--accents-5);
+		color: var(--muted);
 		text-decoration: line-through;
 	}
 
@@ -364,14 +364,14 @@
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 
 	.count {
 		flex-shrink: 0;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-5);
+		color: var(--muted);
 		padding: 0 4px;
 	}
 
@@ -394,18 +394,18 @@
 		width: 22px;
 		height: 22px;
 		padding: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.act:hover {
-		color: var(--geist-foreground);
-		background: var(--accents-2);
+		color: var(--fg);
+		background: var(--border);
 	}
 	.act.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 
@@ -422,7 +422,7 @@
 		gap: 3px;
 		height: 18px;
 		padding: 0 5px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		cursor: pointer;
@@ -438,16 +438,16 @@
 		opacity: 1;
 	}
 	.rating:hover {
-		border-color: var(--accents-4);
+		border-color: var(--muted);
 	}
 	.rk {
 		font-size: 9px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.rating.set .rk {
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 
 	/* effort = ascending bars */
@@ -460,7 +460,7 @@
 	.bar {
 		width: 2.5px;
 		border-radius: 1px;
-		background: var(--accents-3);
+		background: var(--soft);
 	}
 	.bar.b1 {
 		height: 4px;
@@ -492,7 +492,7 @@
 		width: 4px;
 		height: 4px;
 		border-radius: 50%;
-		background: var(--accents-3);
+		background: var(--soft);
 	}
 	.dot.on {
 		background: var(--sage, #5f9a6f);

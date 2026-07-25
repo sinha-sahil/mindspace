@@ -180,7 +180,7 @@
 		position: relative;
 		overflow: hidden;
 		background-color: var(--bg);
-		background-image: radial-gradient(circle, var(--accents-3) 1px, transparent 1px);
+		background-image: radial-gradient(circle, var(--soft) 1px, transparent 1px);
 		cursor: grab;
 		touch-action: none;
 	}
@@ -203,7 +203,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 12px;
-		box-shadow: var(--shadow-md, 0 8px 30px -12px rgba(0, 0, 0, 0.25));
+		box-shadow: var(--shadow-md);
 	}
 	.card-head {
 		display: flex;
@@ -216,7 +216,7 @@
 		min-width: 0;
 		font-size: 13px;
 		font-weight: 700;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -225,20 +225,20 @@
 		flex-shrink: 0;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.col-bar {
 		height: 3px;
 		margin: 0 12px;
 		border-radius: 3px;
-		background: var(--accents-2);
+		background: var(--border);
 		overflow: hidden;
 	}
 	.col-bar-fill {
 		display: block;
 		height: 100%;
 		border-radius: 3px;
-		background: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
 	}
 	.nodes {
 		padding: 6px 12px 12px;
@@ -246,7 +246,7 @@
 	.col-empty {
 		margin: 6px 4px;
 		font-size: 12px;
-		color: var(--accents-4);
+		color: var(--muted);
 	}
 
 	.node {
@@ -268,12 +268,12 @@
 		flex-shrink: 0;
 		color: #fff;
 		background: transparent;
-		border: 1.5px solid var(--accents-4);
+		border: 1.5px solid var(--muted-2);
 		border-radius: 5px;
 	}
 	.check.checked {
-		background: var(--accent, var(--geist-success));
-		border-color: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
+		border-color: var(--accent, var(--sage));
 	}
 	.section-mark {
 		width: 17px;
@@ -286,18 +286,18 @@
 		width: 4px;
 		height: 14px;
 		border-radius: 2px;
-		background: var(--accent, var(--accents-5));
+		background: var(--accent, var(--muted));
 		vertical-align: middle;
 	}
 	.text {
 		flex: 1;
 		min-width: 0;
 		font-size: 13.5px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		word-break: break-word;
 	}
 	.row.done .text {
-		color: var(--accents-5);
+		color: var(--muted);
 		text-decoration: line-through;
 	}
 	.section .text {
@@ -305,7 +305,7 @@
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.children {
 		margin-left: 16px;
@@ -325,7 +325,7 @@
 		gap: 3px;
 		height: 16px;
 		padding: 0 5px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 5px;
 	}
@@ -333,7 +333,7 @@
 		font-size: 9px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.marks {
 		display: inline-flex;
@@ -344,7 +344,7 @@
 		width: 4px;
 		height: 4px;
 		border-radius: 50%;
-		background: var(--accents-3);
+		background: var(--soft);
 	}
 	.rating.effort .mark.on {
 		background: var(--saffron, #e0a106);

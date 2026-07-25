@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import Icon from '$lib/client/components/Icon.svelte';
-	import { colorForKey, initialFor } from '$lib/client/utils/color';
+	import { initialFor } from '$lib/client/utils/color';
 	import { comments, type Comment } from '../comments.svelte';
 
 	type Props = {
@@ -209,9 +209,8 @@
 {/snippet}
 
 {#snippet messageItem(msg: Comment)}
-	{@const color = colorForKey(msg.createdBy ?? msg.id)}
 	<div class="msg">
-		<span class="avatar" style="--from: {color.from}; --to: {color.to};" aria-hidden="true">
+		<span class="avatar" aria-hidden="true">
 			{initialFor(nameFor(msg))}
 		</span>
 		<div class="msg-body">
@@ -238,7 +237,7 @@
 		width: 320px;
 		flex: 0 0 320px;
 		border-left: 1px solid var(--border);
-		background: var(--accents-1);
+		background: var(--bg-2);
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
@@ -259,14 +258,14 @@
 		width: 32px;
 		height: 32px;
 		padding: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 7px;
 		cursor: pointer;
 	}
 	.reopen:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 	.reopen-count {
@@ -293,13 +292,13 @@
 		border-bottom: 1px solid var(--border);
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.head .count {
 		margin-left: auto;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.collapse-btn {
 		display: inline-flex;
@@ -308,24 +307,24 @@
 		width: 22px;
 		height: 22px;
 		padding: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
 		cursor: pointer;
 	}
 	.collapse-btn:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 	}
 	.muted {
 		padding: 16px;
 		margin: 0;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.muted.error {
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 	.list {
 		list-style: none;
@@ -352,7 +351,7 @@
 			box-shadow 120ms;
 	}
 	.thread.focused {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent, var(--fg));
 		box-shadow: 0 0 0 3px var(--accent-soft, rgba(0, 0, 0, 0.04));
 	}
 
@@ -362,11 +361,11 @@
 		text-align: left;
 		font: inherit;
 		font-size: 11.5px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		font-style: italic;
 		background: transparent;
 		border: none;
-		border-left: 2px solid var(--saffron, var(--accents-3));
+		border-left: 2px solid var(--saffron, var(--soft));
 		padding: 2px 0 2px 8px;
 		cursor: pointer;
 		max-height: 48px;
@@ -378,7 +377,7 @@
 		-webkit-box-orient: vertical;
 	}
 	.quote:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.quote-orphan {
 		border-left-color: var(--rose);
@@ -386,7 +385,7 @@
 		opacity: 0.85;
 	}
 	.quote-orphan:hover {
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	/* Small pill that appears under the quote when the thread's anchored
 	   text can no longer be located in the rendered document — usually
@@ -427,8 +426,9 @@
 		height: 22px;
 		font-size: 10px;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.96);
-		background: linear-gradient(135deg, var(--from), var(--to));
+		color: var(--fg-2);
+		background: var(--bg-2);
+		border: 1px solid var(--border-strong);
 		border-radius: 50%;
 	}
 	.msg-body {
@@ -444,11 +444,11 @@
 	.msg-author {
 		font-size: 12px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.msg-time {
 		font-size: 10.5px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.msg-del {
 		margin-left: auto;
@@ -457,7 +457,7 @@
 		justify-content: center;
 		width: 18px;
 		height: 18px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 4px;
@@ -469,13 +469,13 @@
 		opacity: 1;
 	}
 	.msg-del:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 	.msg-text {
 		font-size: 13px;
 		line-height: 1.45;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		white-space: pre-wrap;
 		word-break: break-word;
 	}
@@ -493,8 +493,8 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 12.5px;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		outline: none;
@@ -503,7 +503,7 @@
 		max-height: 100px;
 	}
 	.reply-input:focus {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent, var(--fg));
 		background: var(--surface);
 	}
 	.send {
@@ -511,14 +511,14 @@
 		font: inherit;
 		font-size: 11.5px;
 		font-weight: 600;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border: 1px solid var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.send:disabled {
-		opacity: 0.5;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
 	}
 </style>

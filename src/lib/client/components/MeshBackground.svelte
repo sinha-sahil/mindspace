@@ -19,7 +19,7 @@
 		z-index: 0;
 		overflow: hidden;
 		pointer-events: none;
-		background: var(--geist-background);
+		background: var(--bg);
 	}
 
 	.blob {
@@ -116,7 +116,7 @@
 	.vignette {
 		position: absolute;
 		inset: 0;
-		background: radial-gradient(circle at center, transparent 40%, var(--geist-background) 110%);
+		background: radial-gradient(circle at center, transparent 40%, var(--bg) 110%);
 	}
 
 	@media (prefers-reduced-motion: reduce) {

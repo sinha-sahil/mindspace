@@ -5,7 +5,7 @@
 	import { workspaces, type Workspace } from '$lib/client/modules/workspaces';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { analytics } from '$lib/client/modules/analytics';
-	import { initialFor, colorForKey } from '$lib/client/utils/color';
+	import { initialFor } from '$lib/client/utils/color';
 
 	type Member = {
 		userId: string;
@@ -333,6 +333,19 @@
 	}
 </script>
 
+<svelte:window
+	onkeydown={(e) => {
+		if (!workspace || e.key !== 'Escape') {
+			return;
+		}
+		if (pickerOpen) {
+			pickerOpen = false;
+			return;
+		}
+		onClose();
+	}}
+/>
+
 {#if workspace}
 	<Modal
 		classes="ms-modal"
@@ -342,14 +355,9 @@
 	>
 		{#snippet content()}
 			{#if workspace}
-				{@const wsColor = colorForKey(workspace.id)}
 				<div class="ws-settings" {@attach initForWorkspace}>
 					<div class="ws-card">
-						<span
-							class="ws-tile"
-							style="--tile-from: {wsColor.from}; --tile-to: {wsColor.to};"
-							aria-hidden="true"
-						>
+						<span class="ws-tile" aria-hidden="true">
 							{initialFor(workspace.name)}
 						</span>
 						<div class="ws-meta">
@@ -561,8 +569,8 @@
 		height: 36px;
 		font-size: 14px;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.96);
-		background: linear-gradient(135deg, var(--tile-from), var(--tile-to));
+		color: var(--bg);
+		background: var(--fg);
 		border-radius: 10px;
 		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
 	}
@@ -575,11 +583,11 @@
 	.ws-name {
 		font-size: 14px;
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.ws-sub {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 
 	.block {
@@ -596,7 +604,7 @@
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 
 	.text-input {
@@ -606,7 +614,7 @@
 		padding: 0 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 7px;
@@ -614,10 +622,10 @@
 		transition: border-color 120ms;
 	}
 	.text-input:focus {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent, var(--fg));
 	}
 	.text-input:disabled {
-		opacity: 0.6;
+		opacity: var(--disabled-opacity);
 	}
 
 	.rename-row,
@@ -636,7 +644,7 @@
 		padding: 0 8px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 7px;
@@ -657,13 +665,13 @@
 		cursor: pointer;
 	}
 	.btn:disabled {
-		opacity: 0.5;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
 	}
 	.btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 	}
 	.btn.primary:hover:not(:disabled) {
 		opacity: 0.9;
@@ -672,12 +680,12 @@
 	.error {
 		margin: 4px 0 0;
 		font-size: 12px;
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 	.hint {
 		margin: 4px 0 0;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 
 	.member-list {
@@ -693,7 +701,7 @@
 		align-items: center;
 		gap: 8px;
 		padding: 6px 8px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 7px;
 	}
@@ -701,7 +709,7 @@
 		flex: 1;
 		min-width: 0;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -712,7 +720,7 @@
 		justify-content: center;
 		width: 26px;
 		height: 26px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: 5px;
@@ -723,13 +731,13 @@
 			border-color 120ms;
 	}
 	.member-remove:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 		border-color: rgba(238, 0, 0, 0.2);
 	}
 	.role-pill {
 		font-size: 11px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
@@ -747,7 +755,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 7px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 	}
 	.picker-suggestion {
 		display: block;
@@ -756,7 +764,7 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
@@ -764,7 +772,7 @@
 	}
 	.picker-suggestion:hover,
 	.picker-suggestion.active {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 
 	.invite-hint {
@@ -778,7 +786,7 @@
 	.invite-url {
 		font-size: 12px;
 		font-family: var(--font-mono);
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.invite-row .btn {
 		gap: 6px;

@@ -929,7 +929,7 @@
 		color: var(--accent);
 	}
 	.tb-btn:disabled {
-		opacity: 0.35;
+		opacity: var(--disabled-opacity);
 		cursor: default;
 	}
 
@@ -998,7 +998,7 @@
 	.tb-menu-item kbd {
 		font-family: var(--font-mono);
 		font-size: 10px;
-		color: var(--muted-2);
+		color: var(--muted);
 		letter-spacing: 0.02em;
 	}
 	.tb-menu-preview {
@@ -1086,7 +1086,7 @@
 		width: 20px;
 		height: 20px;
 		padding: 0;
-		color: var(--muted-2);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 5px;
@@ -1164,7 +1164,7 @@
 	/* ---------- live-preview decorations ---------- */
 	.ed-editor :global(.livemd-bullet) {
 		display: inline-block;
-		color: var(--muted-2);
+		color: var(--muted);
 		font-weight: 700;
 	}
 	.ed-editor :global(.livemd-task) {
@@ -1226,7 +1226,7 @@
 		background: color-mix(in srgb, var(--fg) 4%, transparent);
 	}
 	.ed-editor :global(.livemd-fence) {
-		color: var(--muted-2);
+		color: var(--muted);
 	}
 	.ed-editor :global(.livemd-code) {
 		background: color-mix(in srgb, var(--fg) 6%, transparent);
@@ -1466,7 +1466,7 @@
 		cursor: pointer;
 	}
 	.btn:disabled {
-		opacity: 0.5;
+		opacity: var(--disabled-opacity);
 		cursor: not-allowed;
 	}
 	.btn.ghost {

@@ -218,6 +218,6 @@
 	}
 
 	.excal-host :global(.excalidraw) {
-		--color-primary: var(--geist-foreground);
+		--color-primary: var(--fg);
 	}
 </style>

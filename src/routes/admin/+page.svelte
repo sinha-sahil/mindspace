@@ -281,7 +281,7 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: var(--geist-background);
+		background: var(--bg);
 	}
 
 	.topbar {
@@ -303,17 +303,17 @@
 		align-items: center;
 		gap: 8px;
 		text-decoration: none;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		font-size: 13px;
 		font-weight: 600;
 		letter-spacing: -0.01em;
 	}
 	.crumb {
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.crumb.current {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		font-weight: 500;
 	}
 	.back-link {
@@ -321,11 +321,11 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-decoration: none;
 	}
 	.back-link:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 
 	main {
@@ -350,7 +350,7 @@
 		width: 44px;
 		height: 44px;
 		flex-shrink: 0;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: linear-gradient(
 			135deg,
 			color-mix(in srgb, var(--accent) 20%, var(--surface)),
@@ -369,7 +369,7 @@
 	.hero p {
 		margin: 0;
 		font-size: 14px;
-		color: var(--accents-5);
+		color: var(--muted);
 		max-width: 60ch;
 		line-height: 1.55;
 	}
@@ -383,7 +383,7 @@
 		border-radius: var(--radius-md);
 	}
 	.banner.error {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.06);
 		border: 1px solid rgba(238, 0, 0, 0.3);
 	}
@@ -392,7 +392,7 @@
 		display: inline-flex;
 		gap: 2px;
 		padding: 4px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		width: fit-content;
@@ -405,7 +405,7 @@
 		font: inherit;
 		font-size: 13px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -413,12 +413,12 @@
 		transition: all 120ms;
 	}
 	.tab:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.tab.active {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
-		box-shadow: var(--shadow-smallest);
+		box-shadow: var(--shadow-sm);
 	}
 	.tab-count {
 		display: inline-flex;
@@ -429,8 +429,8 @@
 		padding: 0 6px;
 		font-size: 10px;
 		font-weight: 500;
-		color: var(--accents-6);
-		background: var(--accents-2);
+		color: var(--fg-2);
+		background: var(--border);
 		border-radius: var(--radius-pill);
 	}
 
@@ -439,7 +439,7 @@
 		flex-direction: column;
 		gap: 16px;
 		padding: 20px 22px 22px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 12px;
 	}
@@ -455,7 +455,7 @@
 	.card-head p {
 		margin: 4px 0 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.count {
 		display: inline-flex;
@@ -466,8 +466,8 @@
 		padding: 0 6px;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-6);
-		background: var(--accents-2);
+		color: var(--fg-2);
+		background: var(--border);
 		border-radius: var(--radius-pill);
 	}
 
@@ -497,11 +497,11 @@
 	.field-label {
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.field-label em {
 		font-style: normal;
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.field-wrap {
 		position: relative;
@@ -512,7 +512,7 @@
 		position: absolute;
 		left: 12px;
 		display: inline-flex;
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.field input {
 		width: 100%;
@@ -520,7 +520,7 @@
 		padding: 0 12px;
 		font: inherit;
 		font-size: 14px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
@@ -531,14 +531,14 @@
 		padding-left: 36px;
 	}
 	.field input:focus {
-		border-color: var(--geist-foreground);
+		border-color: var(--fg);
 	}
 	.checkbox {
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
 		font-size: 13px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		padding: 0 4px;
 		height: 36px;
 	}
@@ -560,15 +560,15 @@
 		white-space: nowrap;
 	}
 	.btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 	}
 	.btn.primary:hover {
 		opacity: 0.9;
 	}
 	.btn.ghost {
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border-color: var(--border);
 		height: 30px;
@@ -576,11 +576,11 @@
 		font-size: 12px;
 	}
 	.btn.ghost:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.btn.ghost.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		border-color: rgba(238, 0, 0, 0.4);
 	}
 
@@ -603,7 +603,7 @@
 		transition: border-color 120ms;
 	}
 	.data-row:hover {
-		border-color: var(--accents-3);
+		border-color: var(--soft);
 	}
 	.row-icon {
 		display: inline-flex;
@@ -611,8 +611,8 @@
 		justify-content: center;
 		width: 32px;
 		height: 32px;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		flex-shrink: 0;
@@ -641,11 +641,11 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 		font-family: var(--font-sans);
 	}
 	.dot-sep {
-		color: var(--accents-3);
+		color: var(--soft);
 	}
 	.token {
 		font-family: var(--font-mono);
@@ -657,11 +657,11 @@
 		border-radius: 50%;
 	}
 	.status-dot.on {
-		background: var(--geist-success);
+		background: var(--sage);
 		box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.18);
 	}
 	.status-dot.off {
-		background: var(--accents-3);
+		background: var(--soft);
 	}
 
 	.role-pill {
@@ -674,15 +674,15 @@
 		font-weight: 500;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-pill);
 		cursor: pointer;
 		transition: opacity 100ms;
 	}
 	.role-pill.admin {
-		color: var(--geist-success);
+		color: var(--sage);
 		background: rgba(0, 112, 243, 0.08);
 		border-color: rgba(0, 112, 243, 0.3);
 	}
@@ -701,7 +701,7 @@
 		border-radius: var(--radius-pill);
 	}
 	.badge.admin {
-		color: var(--geist-success);
+		color: var(--sage);
 		background: rgba(0, 112, 243, 0.1);
 	}
 
@@ -714,12 +714,12 @@
 		text-align: center;
 	}
 	:global(.empty-icon) {
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.empty p {
 		margin: 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 
 	.inline-form {

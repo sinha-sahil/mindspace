@@ -60,10 +60,10 @@
 		justify-content: center;
 		padding: 32px;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-align: center;
 	}
 	.error {
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 </style>

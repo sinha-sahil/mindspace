@@ -1,10 +1,15 @@
 <script lang="ts">
-	import { ContextMenu, Modal, Button, Tooltip } from 'polymorph-ui-components';
+	import { ContextMenu, Modal, Button } from 'polymorph-ui-components';
 	import Logo from '$lib/client/components/Logo.svelte';
 	import Icon from '$lib/client/components/Icon.svelte';
 	import WorkspaceSettingsModal from './WorkspaceSettingsModal.svelte';
 	import McpInstallModal from '$lib/client/modules/mcp/ui/McpInstallModal.svelte';
-	import { projects, type Project, type ProjectKind } from '$lib/client/modules/projects';
+	import {
+		projects,
+		KIND_ICONS,
+		type Project,
+		type ProjectKind
+	} from '$lib/client/modules/projects';
 	import { workspaces, type Workspace } from '$lib/client/modules/workspaces';
 	import { theme, type ThemeMode, type ThemeAccent, ACCENTS } from '$lib/client/modules/theme';
 	import { sidebar } from '$lib/client/modules/sidebar';
@@ -13,7 +18,7 @@
 	import { whatsNew } from '$lib/client/modules/whats-new';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { analytics } from '$lib/client/modules/analytics';
-	import { colorForKey, initialFor } from '$lib/client/utils/color';
+	import { initialFor } from '$lib/client/utils/color';
 
 	type Props = {
 		userEmail: string;
@@ -545,11 +550,15 @@
 
 	const userInitial = $derived((userEmail || '?')[0].toUpperCase());
 	const collapsed = $derived(sidebar.collapsed);
-	const wsColor = $derived.by(() => {
-		const ws = workspaces.active;
-		return ws ? colorForKey(ws.id) : { from: '#71717a', to: '#3f3f46', name: 'grey' };
-	});
-	const userColor = $derived(colorForKey(userEmail || 'user'));
+
+	function closeMenusOnEscape(e: KeyboardEvent) {
+		if (e.key !== 'Escape') {
+			return;
+		}
+		wsMenuOpen = false;
+		userMenuOpen = false;
+		newProjectMenuOpen = false;
+	}
 
 	function closeMenusOnOutside(e: MouseEvent) {
 		const target = e.target;
@@ -568,7 +577,7 @@
 	}
 </script>
 
-<svelte:window onmousedown={closeMenusOnOutside} />
+<svelte:window onmousedown={closeMenusOnOutside} onkeydown={closeMenusOnEscape} />
 
 <aside class="sidebar" class:collapsed>
 	<header class="head">
@@ -603,7 +612,6 @@
 			class:rail-tile={collapsed}
 			data-tip={collapsed ? (workspaces.active?.name ?? 'Workspace') : null}
 			title={!collapsed ? (workspaces.active?.name ?? 'Workspace') : null}
-			style="--tile-from: {wsColor.from}; --tile-to: {wsColor.to};"
 			onclick={() => (wsMenuOpen = !wsMenuOpen)}
 		>
 			<span class="ws-avatar" class:rail={collapsed} aria-hidden="true">
@@ -703,20 +711,16 @@
 			>
 				<Icon name="plus" size={16} />
 			</button>
-			<Tooltip text="Refresh projects" position="right">
-				<Button
-					classes="btn-icon-rail"
-					ariaLabel="Refresh projects"
-					disabled={refreshingProjects}
-					showLoader={refreshingProjects}
-					loaderType="Circular"
-					onclick={refreshProjects}
-				>
-					{#snippet icon()}
-						{#if !refreshingProjects}<Icon name="refresh" size={15} />{/if}
-					{/snippet}
-				</Button>
-			</Tooltip>
+			<button
+				class="rail-icon-btn"
+				class:spin={refreshingProjects}
+				data-tip="Refresh projects"
+				aria-label="Refresh projects"
+				disabled={refreshingProjects}
+				onclick={refreshProjects}
+			>
+				<Icon name="refresh" size={15} />
+			</button>
 			<button
 				class="rail-icon-btn"
 				data-tip="Search · ⌘K"
@@ -726,20 +730,16 @@
 				<Icon name="search" size={15} />
 			</button>
 		{:else}
-			<Tooltip text="Refresh projects" position="bottom">
-				<Button
-					classes="btn-icon"
-					ariaLabel="Refresh projects"
-					disabled={refreshingProjects}
-					showLoader={refreshingProjects}
-					loaderType="Circular"
-					onclick={refreshProjects}
-				>
-					{#snippet icon()}
-						{#if !refreshingProjects}<Icon name="refresh" size={13} />{/if}
-					{/snippet}
-				</Button>
-			</Tooltip>
+			<button
+				class="ghost-icon-btn"
+				class:spin={refreshingProjects}
+				title="Refresh projects"
+				aria-label="Refresh projects"
+				disabled={refreshingProjects}
+				onclick={refreshProjects}
+			>
+				<Icon name="refresh" size={13} />
+			</button>
 			<div class="new-project-wrap">
 				<button
 					class="action-btn new-project-trigger"
@@ -759,7 +759,7 @@
 							class="popover-item kind-item"
 							onclick={() => createProjectOfKind('whiteboard')}
 						>
-							<span class="popover-icon"><Icon name="folder" size={14} /></span>
+							<span class="popover-icon"><Icon name={KIND_ICONS.whiteboard} size={14} /></span>
 							<span class="kind-text">
 								<span class="popover-item-text">Whiteboard</span>
 								<span class="kind-hint">Infinite canvas for sketches</span>
@@ -781,7 +781,7 @@
 							class="popover-item kind-item"
 							onclick={() => createProjectOfKind('todo')}
 						>
-							<span class="popover-icon"><Icon name="list" size={14} /></span>
+							<span class="popover-icon"><Icon name={KIND_ICONS.todo} size={14} /></span>
 							<span class="kind-text">
 								<span class="popover-item-text">Todo list</span>
 								<span class="kind-hint">Nested checklists with columns</span>
@@ -834,7 +834,6 @@
 			{#each projects.projects as project, projectIdx (project.id)}
 				{@const active = project.id === projects.activeId}
 				{@const isEditing = editingId === project.id && !collapsed}
-				{@const c = colorForKey(project.id)}
 				{#if dropIndex === projectIdx && draggingId !== null && draggingId !== project.id}
 					<div class="drop-indicator" aria-hidden="true"></div>
 				{/if}
@@ -848,7 +847,6 @@
 						class:icon-only={collapsed}
 						class:editing={isEditing}
 						class:dragging={draggingId === project.id}
-						style="--tile-from: {c.from}; --tile-to: {c.to};"
 					>
 						<button
 							class="row"
@@ -865,8 +863,8 @@
 							}}
 						>
 							{#if collapsed}
-								<span class="rail-letter" aria-hidden="true">
-									{initialFor(project.name)}
+								<span class="rail-kind" aria-hidden="true">
+									<Icon name={KIND_ICONS[project.kind]} size={15} />
 								</span>
 								{#if project.visibility === 'link'}
 									<span class="rail-flag" aria-hidden="true">
@@ -874,21 +872,9 @@
 									</span>
 								{/if}
 							{:else}
-								{#if project.kind === 'doc'}
-									<span class="kind-icon" aria-hidden="true">
-										<Icon name="pencil" size={11} />
-									</span>
-								{:else if project.kind === 'todo'}
-									<span class="kind-icon" aria-hidden="true">
-										<Icon name="list" size={11} />
-									</span>
-								{:else if project.kind === 'sheet'}
-									<span class="kind-icon" aria-hidden="true">
-										<Icon name="table" size={11} />
-									</span>
-								{:else}
-									<span class="dot" aria-hidden="true"></span>
-								{/if}
+								<span class="kind-icon" aria-hidden="true">
+									<Icon name={KIND_ICONS[project.kind]} size={12} />
+								</span>
 								<span class="meta">
 									{#if isEditing}
 										<input
@@ -961,7 +947,6 @@
 			class:rail-tile={collapsed}
 			data-tip={collapsed ? userEmail : null}
 			title={!collapsed ? userEmail : null}
-			style="--tile-from: {userColor.from}; --tile-to: {userColor.to};"
 			onclick={() => (userMenuOpen = !userMenuOpen)}
 		>
 			<span class="user-avatar" class:rail={collapsed} aria-hidden="true">{userInitial}</span>
@@ -1150,7 +1135,7 @@
 		min-height: 0;
 		width: 268px;
 		border-right: 1px solid var(--border);
-		background: var(--accents-1);
+		background: var(--bg-2);
 		transition: width var(--duration) var(--ease-out);
 		flex-shrink: 0;
 	}
@@ -1164,22 +1149,22 @@
 		--context-menu-background-color: var(--surface);
 		--context-menu-border: 1px solid var(--border);
 		--context-menu-border-radius: 8px;
-		--context-menu-box-shadow: var(--shadow-medium);
+		--context-menu-box-shadow: var(--shadow-md);
 		--context-menu-min-width: 200px;
 		--context-menu-padding: 4px;
 		--context-menu-font-family: var(--font-sans);
 		--context-menu-font-size: 13px;
 		--context-menu-item-padding: 7px 10px;
-		--context-menu-item-color: var(--geist-foreground);
+		--context-menu-item-color: var(--fg);
 		--context-menu-item-background-color: transparent;
-		--context-menu-item-hover-background-color: var(--accents-1);
-		--context-menu-item-focus-background-color: var(--accents-1);
+		--context-menu-item-hover-background-color: var(--bg-2);
+		--context-menu-item-focus-background-color: var(--bg-2);
 		--context-menu-item-focus-outline: none;
 		--context-menu-item-font-weight: 500;
-		--context-menu-item-shortcut-color: var(--accents-5);
+		--context-menu-item-shortcut-color: var(--muted);
 		--context-menu-separator-color: var(--border);
 		--context-menu-separator-margin: 4px 4px;
-		--context-menu-item-danger-color: var(--geist-error);
+		--context-menu-item-danger-color: var(--rose);
 		--context-menu-item-danger-hover-background-color: rgba(238, 0, 0, 0.08);
 		--context-menu-item-danger-focus-background-color: rgba(238, 0, 0, 0.08);
 	}
@@ -1234,33 +1219,31 @@
 		margin: 0 auto;
 		padding: 0 !important;
 		border-radius: 10px !important;
-		background: linear-gradient(135deg, var(--tile-from), var(--tile-to)) !important;
-		border: none !important;
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.2) inset,
-			0 4px 10px -4px color-mix(in srgb, var(--tile-from) 50%, transparent),
-			0 0 0 1px color-mix(in srgb, var(--tile-from) 30%, transparent);
+		background: var(--surface) !important;
+		border: 1px solid var(--border) !important;
+		color: var(--fg-2);
 		display: inline-flex !important;
 		align-items: center !important;
 		justify-content: center !important;
 		transition:
 			transform 140ms var(--ease-spring),
-			box-shadow 200ms;
+			border-color 120ms,
+			color 120ms;
 	}
 	.rail-tile:hover {
 		transform: translateY(-1px);
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.25) inset,
-			0 8px 18px -6px color-mix(in srgb, var(--tile-from) 60%, transparent),
-			0 0 0 1px color-mix(in srgb, var(--tile-from) 45%, transparent);
+		border-color: var(--border-strong) !important;
+		color: var(--fg);
+	}
+	.rail-kind {
+		display: inline-flex;
+		line-height: 0;
 	}
 	.rail-letter {
 		font-family: var(--font-sans);
 		font-size: 14px;
 		font-weight: 600;
 		line-height: 1;
-		color: rgba(255, 255, 255, 0.96);
-		text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
 		letter-spacing: -0.01em;
 	}
 	.rail-flag {
@@ -1280,11 +1263,9 @@
 	}
 
 	.item.active .rail-tile {
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.3) inset,
-			0 0 0 2px var(--bg),
-			0 0 0 4px color-mix(in srgb, var(--tile-from) 80%, transparent),
-			0 8px 22px -4px color-mix(in srgb, var(--tile-from) 70%, transparent);
+		border-color: var(--accent) !important;
+		color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 10%, var(--surface)) !important;
 	}
 
 	.rail-icon-btn {
@@ -1397,21 +1378,12 @@
 		width: 36px;
 		height: 36px;
 		font-size: 13px;
-		background: linear-gradient(135deg, var(--tile-from), var(--tile-to));
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.2) inset,
-			0 4px 10px -4px color-mix(in srgb, var(--tile-from) 50%, transparent);
 	}
 
 	.ws-avatar.rail {
 		width: 36px;
 		height: 36px;
 		font-size: 14px;
-		background: linear-gradient(135deg, var(--tile-from), var(--tile-to));
-		color: rgba(255, 255, 255, 0.96);
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.2) inset,
-			0 4px 10px -4px color-mix(in srgb, var(--tile-from) 50%, transparent);
 	}
 
 	.sidebar.collapsed .item {
@@ -1466,7 +1438,7 @@
 		padding: 4px 6px;
 		font: inherit;
 		text-decoration: none;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-md);
@@ -1478,7 +1450,7 @@
 		padding: 4px;
 	}
 	.brand:hover {
-		background: var(--accents-2);
+		background: var(--border);
 	}
 	.brand-text {
 		font-family: var(--font-display);
@@ -1504,7 +1476,7 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: var(--radius-md);
@@ -1517,7 +1489,7 @@
 		padding: 4px;
 	}
 	.ws-trigger:hover {
-		background: var(--accents-2);
+		background: var(--border);
 	}
 	.ws-avatar {
 		display: inline-flex;
@@ -1527,8 +1499,8 @@
 		height: 26px;
 		font-size: 11px;
 		font-weight: 600;
-		color: var(--geist-background);
-		background: linear-gradient(135deg, var(--geist-foreground), var(--accents-7));
+		color: var(--bg);
+		background: var(--fg);
 		border-radius: var(--radius-sm);
 		flex-shrink: 0;
 	}
@@ -1553,10 +1525,10 @@
 	}
 	.ws-sub {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	:global(.caret) {
-		color: var(--accents-5);
+		color: var(--muted);
 		flex-shrink: 0;
 	}
 
@@ -1571,7 +1543,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -1597,7 +1569,7 @@
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.popover-list {
 		display: flex;
@@ -1613,7 +1585,7 @@
 		padding: 7px 8px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -1625,13 +1597,13 @@
 		transition: background 100ms;
 	}
 	.popover-item:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.popover-item.active {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.popover-item.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 	.popover-item-text {
 		flex: 1;
@@ -1646,13 +1618,13 @@
 		justify-content: center;
 		width: 22px;
 		flex-shrink: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.popover-item:hover .popover-icon {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	:global(.popover-check) {
-		color: var(--geist-success);
+		color: var(--sage);
 	}
 	.popover-divider {
 		height: 1px;
@@ -1669,10 +1641,10 @@
 		transition: background 100ms;
 	}
 	.ws-popover-row:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.ws-popover-row.active {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.ws-popover-item {
 		flex: 1;
@@ -1683,7 +1655,7 @@
 		padding: 7px 8px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -1696,7 +1668,7 @@
 		justify-content: center;
 		width: 28px;
 		flex-shrink: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -1712,8 +1684,8 @@
 		opacity: 1;
 	}
 	.ws-settings-btn:hover {
-		color: var(--geist-foreground);
-		background: var(--accents-2);
+		color: var(--fg);
+		background: var(--border);
 	}
 	.ws-rename {
 		flex: 1;
@@ -1722,11 +1694,11 @@
 		padding: 0;
 		font: inherit;
 		font-size: 13px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		outline: none;
-		caret-color: var(--accent, var(--geist-success));
+		caret-color: var(--accent, var(--sage));
 	}
 
 	/* ----- new project ----- */
@@ -1745,6 +1717,46 @@
 		align-items: center;
 		gap: 4px;
 	}
+	.ghost-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		flex-shrink: 0;
+		padding: 0;
+		font: inherit;
+		color: var(--muted);
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		transition:
+			color 120ms,
+			background 120ms;
+	}
+	.ghost-icon-btn:hover:not(:disabled) {
+		color: var(--fg);
+		background: var(--border);
+	}
+	.ghost-icon-btn:disabled {
+		opacity: var(--disabled-opacity);
+		cursor: default;
+	}
+	.spin :global(.icon) {
+		animation: icon-spin 0.9s linear infinite;
+	}
+	@keyframes icon-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.spin :global(.icon) {
+			animation: none;
+		}
+	}
+
 	.action-btn {
 		width: 100%;
 		display: inline-flex;
@@ -1756,9 +1768,9 @@
 		font: inherit;
 		font-size: 13px;
 		font-weight: 500;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border: 1px solid var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
 		border-radius: var(--radius-md);
 		cursor: pointer;
 		transition:
@@ -1797,7 +1809,7 @@
 	}
 	.kind-hint {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -1812,9 +1824,9 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
-		border: 1px dashed var(--border);
+		border: 1px solid var(--border);
 		border-radius: 6px;
 		cursor: pointer;
 		transition:
@@ -1822,8 +1834,8 @@
 			border-color 120ms;
 	}
 	.cmdk-hint:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.cmdk-hint span {
 		flex: 1;
@@ -1842,8 +1854,8 @@
 		padding: 0 4px;
 		font-family: var(--font-mono);
 		font-size: 10px;
-		color: var(--accents-6);
-		background: var(--accents-2);
+		color: var(--fg-2);
+		background: var(--border);
 		border-radius: 3px;
 	}
 
@@ -1864,7 +1876,7 @@
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: var(--accents-2);
+		background: var(--border);
 		flex-shrink: 0;
 	}
 	.skeleton-text {
@@ -1876,12 +1888,7 @@
 	.skeleton-bar {
 		height: 9px;
 		border-radius: 4px;
-		background: linear-gradient(
-			90deg,
-			var(--accents-2) 0%,
-			var(--accents-3) 50%,
-			var(--accents-2) 100%
-		);
+		background: linear-gradient(90deg, var(--border) 0%, var(--soft) 50%, var(--border) 100%);
 		background-size: 200% 100%;
 		animation: shimmer 1.4s ease-in-out infinite;
 	}
@@ -1958,11 +1965,11 @@
 	.drop-indicator {
 		height: 2px;
 		margin: -1px 6px;
-		background: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
 		border-radius: 2px;
 		box-shadow:
-			0 0 0 3px color-mix(in srgb, var(--accent, var(--geist-success)) 18%, transparent),
-			0 0 12px color-mix(in srgb, var(--accent, var(--geist-success)) 50%, transparent);
+			0 0 0 3px color-mix(in srgb, var(--accent, var(--sage)) 18%, transparent),
+			0 0 12px color-mix(in srgb, var(--accent, var(--sage)) 50%, transparent);
 		pointer-events: none;
 		position: relative;
 	}
@@ -1974,7 +1981,7 @@
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: var(--accent, var(--geist-success));
+		background: var(--accent, var(--sage));
 	}
 	.sidebar.collapsed .drop-indicator {
 		margin: -1px 10px;
@@ -1989,7 +1996,7 @@
 		box-shadow:
 			0 12px 28px -8px rgba(0, 0, 0, 0.45),
 			0 4px 10px -4px rgba(0, 0, 0, 0.3),
-			0 0 0 1px color-mix(in srgb, var(--accent, var(--geist-success)) 25%, transparent);
+			0 0 0 1px color-mix(in srgb, var(--accent, var(--sage)) 25%, transparent);
 		transform: rotate(-1.2deg) scale(1.02);
 		transform-origin: 50% 50%;
 		opacity: 0.96;
@@ -2022,7 +2029,7 @@
 		border: none;
 		cursor: pointer;
 		font: inherit;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		border-radius: var(--radius-md);
 	}
 	.item.editing .row {
@@ -2032,31 +2039,17 @@
 		justify-content: center;
 		padding: 8px 0;
 	}
-	.dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--accents-3);
-		flex-shrink: 0;
-		transition:
-			background 120ms,
-			box-shadow 120ms;
-	}
-	.item.active .dot {
-		background: var(--geist-success);
-		box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.18);
-	}
 	.kind-icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		width: 14px;
 		height: 14px;
-		color: var(--accents-5);
+		color: var(--muted);
 		flex-shrink: 0;
 	}
 	.item.active .kind-icon {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.meta {
 		min-width: 0;
@@ -2077,7 +2070,7 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.link-tag {
 		display: inline-flex;
@@ -2085,7 +2078,7 @@
 		justify-content: center;
 		width: 14px;
 		height: 14px;
-		color: var(--geist-success);
+		color: var(--sage);
 		background: rgba(0, 112, 243, 0.12);
 		border-radius: 50%;
 	}
@@ -2095,7 +2088,7 @@
 		justify-content: center;
 		width: 28px;
 		flex-shrink: 0;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-md);
@@ -2111,7 +2104,7 @@
 		opacity: 1;
 	}
 	.row-trash:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 	.empty-state {
@@ -2121,11 +2114,11 @@
 	.empty-state p {
 		margin: 0;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.empty-state .hint {
 		font-size: 11px;
-		color: var(--accents-4);
+		color: var(--muted);
 		margin-top: 2px;
 	}
 
@@ -2137,7 +2130,7 @@
 		width: 28px;
 		height: 28px;
 		font: inherit;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -2149,11 +2142,11 @@
 		height: 22px;
 	}
 	.icon-btn:hover {
-		color: var(--geist-foreground);
-		background: var(--accents-2);
+		color: var(--fg);
+		background: var(--border);
 	}
 	.icon-btn.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		background: rgba(238, 0, 0, 0.08);
 	}
 
@@ -2165,11 +2158,11 @@
 		font: inherit;
 		font-size: 13px;
 		font-weight: 500;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: none;
 		outline: none;
-		caret-color: var(--geist-success);
+		caret-color: var(--sage);
 	}
 
 	/* ----- footer / user profile ----- */
@@ -2190,7 +2183,7 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
@@ -2201,9 +2194,9 @@
 			background 120ms;
 	}
 	.mcp-trigger:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
-		background: var(--accents-1);
+		color: var(--fg);
+		border-color: var(--soft);
+		background: var(--bg-2);
 	}
 	.mcp-label {
 		min-width: 0;
@@ -2226,7 +2219,7 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid transparent;
 		border-radius: var(--radius-md);
@@ -2239,7 +2232,7 @@
 		padding: 4px;
 	}
 	.user-trigger:hover {
-		background: var(--accents-2);
+		background: var(--border);
 	}
 	.user-avatar {
 		display: inline-flex;
@@ -2249,8 +2242,9 @@
 		height: 28px;
 		font-size: 12px;
 		font-weight: 600;
-		color: var(--geist-background);
-		background: linear-gradient(135deg, var(--geist-foreground), var(--accents-7));
+		color: var(--fg-2);
+		background: var(--bg-2);
+		border: 1px solid var(--border-strong);
 		border-radius: 50%;
 		flex-shrink: 0;
 	}
@@ -2270,7 +2264,7 @@
 	}
 	.user-role {
 		font-size: 10px;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
@@ -2290,7 +2284,7 @@
 		gap: 2px;
 		padding: 2px;
 		margin: 2px 4px 6px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 	}
@@ -2304,7 +2298,7 @@
 		font: inherit;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -2312,12 +2306,12 @@
 		transition: all 100ms;
 	}
 	.theme-pill:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.theme-pill.active {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
-		box-shadow: var(--shadow-smallest);
+		box-shadow: var(--shadow-sm);
 	}
 
 	.accent-row {
@@ -2334,7 +2328,7 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 8px;
@@ -2358,7 +2352,7 @@
 	.muted {
 		padding: 12px;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-align: center;
 	}
 	.muted.small {
@@ -2376,7 +2370,7 @@
 	.modal-intro {
 		margin: 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.modal-field {
 		display: flex;
@@ -2386,7 +2380,7 @@
 	.modal-field span {
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.modal-field input {
 		width: 100%;
@@ -2394,7 +2388,7 @@
 		padding: 0 12px;
 		font: inherit;
 		font-size: 14px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
@@ -2402,12 +2396,12 @@
 		transition: border-color 120ms;
 	}
 	.modal-field input:focus {
-		border-color: var(--geist-foreground);
+		border-color: var(--fg);
 	}
 	.modal-error {
 		margin: 0;
 		font-size: 12px;
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 
 	/* MCP install modal moved to its own component: McpInstallModal.svelte */

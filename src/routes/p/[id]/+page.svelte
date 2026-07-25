@@ -121,7 +121,7 @@
 		align-items: center;
 		gap: 8px;
 		text-decoration: none;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		font-size: 13px;
 		font-weight: 600;
 		letter-spacing: -0.01em;
@@ -143,7 +143,7 @@
 	}
 	.meta {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.readonly-pill {
 		display: inline-flex;
@@ -153,23 +153,23 @@
 		font-weight: 500;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-pill);
 	}
 	.readonly-pill.shared {
-		color: var(--accent, var(--geist-success));
-		border-color: color-mix(in srgb, var(--accent, var(--geist-success)) 40%, transparent);
-		background: var(--accent-soft, var(--accents-1));
+		color: var(--accent, var(--sage));
+		border-color: color-mix(in srgb, var(--accent, var(--sage)) 40%, transparent);
+		background: var(--accent-soft, var(--bg-2));
 	}
 	.btn-link {
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-decoration: none;
 	}
 	.btn-link:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.board {
 		flex: 1;
@@ -200,7 +200,7 @@
 		padding: 7px 10px;
 		font: inherit;
 		font-size: 13px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-sm);
@@ -211,12 +211,12 @@
 		white-space: nowrap;
 	}
 	.doc-item:hover {
-		background: var(--accents-1);
-		color: var(--geist-foreground);
+		background: var(--bg-2);
+		color: var(--fg);
 	}
 	.doc-item.active {
-		background: var(--accents-1);
-		color: var(--geist-foreground);
+		background: var(--bg-2);
+		color: var(--fg);
 		font-weight: 500;
 	}
 	.doc-content {
@@ -235,6 +235,6 @@
 		padding: 48px;
 		text-align: center;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 </style>

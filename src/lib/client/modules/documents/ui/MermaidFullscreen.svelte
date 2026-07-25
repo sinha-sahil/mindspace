@@ -218,7 +218,7 @@
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;
-		background: color-mix(in srgb, var(--geist-background) 88%, black);
+		background: color-mix(in srgb, var(--bg) 88%, black);
 		backdrop-filter: blur(4px);
 	}
 	.toolbar {
@@ -232,7 +232,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		z-index: 1;
 	}
 	.toolbar button {
@@ -241,22 +241,22 @@
 		justify-content: center;
 		width: 30px;
 		height: 30px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: none;
 		border-radius: 6px;
 		cursor: pointer;
 	}
 	.toolbar button:hover {
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 	}
 	.zoom-label {
 		min-width: 44px;
 		text-align: center;
 		font-size: 12px;
 		font-variant-numeric: tabular-nums;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.divider {
 		width: 1px;

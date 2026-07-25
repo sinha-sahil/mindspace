@@ -186,7 +186,7 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: var(--geist-background);
+		background: var(--bg);
 	}
 
 	.topbar {
@@ -208,20 +208,20 @@
 		align-items: center;
 		gap: 8px;
 		text-decoration: none;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		font-size: 13px;
 		font-weight: 600;
 		letter-spacing: -0.01em;
 	}
 	:global(.crumb-sep) {
-		color: var(--accents-3);
+		color: var(--soft);
 	}
 	.crumb {
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.crumb.current {
-		color: var(--geist-foreground);
+		color: var(--fg);
 		font-weight: 500;
 	}
 	.back-link {
@@ -230,17 +230,17 @@
 		gap: 6px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--accents-5);
+		color: var(--muted);
 		text-decoration: none;
 		background: transparent;
 		border: none;
 		cursor: pointer;
 	}
 	.back-link:hover {
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.back-link.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 
 	main {
@@ -265,7 +265,7 @@
 		width: 44px;
 		height: 44px;
 		flex-shrink: 0;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: linear-gradient(
 			135deg,
 			color-mix(in srgb, var(--accent) 20%, var(--surface)),
@@ -284,7 +284,7 @@
 	.hero p {
 		margin: 0;
 		font-size: 14px;
-		color: var(--accents-5);
+		color: var(--muted);
 		max-width: 60ch;
 		line-height: 1.55;
 	}
@@ -303,19 +303,19 @@
 	}
 	.banner strong {
 		font-weight: 600;
-		color: var(--geist-foreground);
+		color: var(--fg);
 	}
 	.banner span {
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.banner.warn {
-		color: var(--geist-warning-dark);
+		color: var(--saffron);
 		background: rgba(245, 166, 35, 0.08);
 		border: 1px solid rgba(245, 166, 35, 0.35);
 	}
 	.banner.muted {
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 	}
 
@@ -324,7 +324,7 @@
 		flex-direction: column;
 		gap: 16px;
 		padding: 20px 22px 22px;
-		background: var(--accents-1);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 12px;
 	}
@@ -340,7 +340,7 @@
 	.card-head p {
 		margin: 4px 0 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.count {
 		display: inline-flex;
@@ -351,8 +351,8 @@
 		padding: 0 6px;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-6);
-		background: var(--accents-2);
+		color: var(--fg-2);
+		background: var(--border);
 		border-radius: var(--radius-pill);
 	}
 
@@ -372,11 +372,11 @@
 	.field-label {
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.field-label em {
 		font-style: normal;
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.field-wrap {
 		position: relative;
@@ -387,7 +387,7 @@
 		position: absolute;
 		left: 12px;
 		display: inline-flex;
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.field input {
 		width: 100%;
@@ -395,7 +395,7 @@
 		padding: 0 12px 0 36px;
 		font: inherit;
 		font-size: 14px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
@@ -403,7 +403,7 @@
 		transition: border-color 120ms;
 	}
 	.field input:focus {
-		border-color: var(--geist-foreground);
+		border-color: var(--fg);
 	}
 
 	.btn {
@@ -427,15 +427,15 @@
 		cursor: not-allowed;
 	}
 	.btn.primary {
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border-color: var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 	}
 	.btn.primary:hover:not(:disabled) {
 		opacity: 0.9;
 	}
 	.btn.ghost {
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border-color: var(--border);
 		height: 30px;
@@ -443,18 +443,18 @@
 		font-size: 12px;
 	}
 	.btn.ghost:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.btn.ghost.danger:hover {
-		color: var(--geist-error);
+		color: var(--rose);
 		border-color: rgba(238, 0, 0, 0.4);
 	}
 
 	.error {
 		margin: 0;
 		font-size: 12px;
-		color: var(--geist-error);
+		color: var(--rose);
 	}
 
 	.empty {
@@ -466,12 +466,12 @@
 		text-align: center;
 	}
 	:global(.empty-icon) {
-		color: var(--accents-4);
+		color: var(--muted-2);
 	}
 	.empty p {
 		margin: 0;
 		font-size: 13px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 
 	.passkey-list {
@@ -493,7 +493,7 @@
 		transition: border-color 120ms;
 	}
 	.passkey-row:hover {
-		border-color: var(--accents-3);
+		border-color: var(--soft);
 	}
 	.pk-icon {
 		display: inline-flex;
@@ -501,8 +501,8 @@
 		justify-content: center;
 		width: 36px;
 		height: 36px;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		flex-shrink: 0;
@@ -527,7 +527,7 @@
 		flex-wrap: wrap;
 		gap: 6px;
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.tag {
 		display: inline-flex;
@@ -536,13 +536,13 @@
 		font-weight: 500;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: var(--accents-6);
-		background: var(--accents-1);
+		color: var(--fg-2);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-pill);
 	}
 	.dot-sep {
-		color: var(--accents-3);
+		color: var(--soft);
 	}
 
 	.inline-form {

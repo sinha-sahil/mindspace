@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import Icon from '$lib/client/components/Icon.svelte';
+	import SaveState from '$lib/client/components/SaveState.svelte';
 	import Whiteboard from './Whiteboard.svelte';
 	import { collab } from '../collab.svelte';
 	import { type Project, type Visibility } from '$lib/client/modules/projects';
@@ -449,10 +450,7 @@
 					</div>
 				{/if}
 			</div>
-			<span class="save-state" class:saving>
-				<span class="save-dot"></span>
-				<span>{saving ? 'Saving' : 'Saved'}</span>
-			</span>
+			<SaveState {saving} />
 			{#if compact}
 				<button
 					class="pane-btn"
@@ -571,7 +569,7 @@
 		background: var(--accent-soft);
 	}
 	.project-title-btn:focus-visible {
-		outline: 2px solid var(--accent, var(--geist-foreground));
+		outline: 2px solid var(--accent, var(--fg));
 		outline-offset: 1px;
 	}
 	.project-title-input {
@@ -588,15 +586,15 @@
 		outline: none;
 		min-width: 0;
 		max-width: 360px;
-		caret-color: var(--accent, var(--geist-success));
+		caret-color: var(--accent, var(--sage));
 	}
 	.project-title-input:focus {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent, var(--fg));
 		background: var(--surface);
 	}
 	.meta {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 		flex: 0 0 auto;
 		white-space: nowrap;
 	}
@@ -662,8 +660,8 @@
 		padding: 5px 6px 5px 10px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--accents-5);
-		background: var(--accents-1);
+		color: var(--muted);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: 7px;
 		cursor: pointer;
@@ -673,8 +671,8 @@
 			background 120ms;
 	}
 	.cmdk-trigger:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 		background: var(--surface);
 	}
 	.cmdk-trigger span {
@@ -690,7 +688,7 @@
 		padding: 0 5px;
 		font-family: var(--font-mono);
 		font-size: 10px;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 4px;
@@ -707,7 +705,7 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 7px;
@@ -718,8 +716,8 @@
 			background 120ms;
 	}
 	.share-trigger:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.share-trigger.public {
 		color: var(--accent);
@@ -736,7 +734,7 @@
 		justify-content: center;
 		width: 28px;
 		height: 28px;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: 7px;
@@ -747,37 +745,9 @@
 			background 120ms;
 	}
 	.pane-btn:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 		background: var(--surface);
-	}
-
-	.save-state {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding: 5px 10px;
-		font-size: 12px;
-		font-weight: 500;
-		color: var(--accents-5);
-		border-radius: 7px;
-	}
-	.save-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--sage);
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 22%, transparent);
-	}
-	.save-state.saving .save-dot {
-		background: var(--saffron);
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--saffron) 22%, transparent);
-		animation: pulse 1.4s ease-in-out infinite;
-	}
-	@keyframes pulse {
-		50% {
-			opacity: 0.4;
-		}
 	}
 
 	.share-menu {
@@ -790,7 +760,7 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
-		box-shadow: var(--shadow-medium);
+		box-shadow: var(--shadow-md);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -801,7 +771,7 @@
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.menu-divider {
 		height: 1px;
@@ -821,14 +791,14 @@
 		padding: 6px 8px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--geist-foreground);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
 		outline: none;
 	}
 	.invite-input:focus {
-		border-color: var(--accent, var(--geist-foreground));
+		border-color: var(--accent, var(--fg));
 		background: var(--surface);
 	}
 	.share-list {
@@ -849,7 +819,7 @@
 		border-radius: var(--radius-sm);
 	}
 	.share-person:hover {
-		background: var(--accents-1);
+		background: var(--bg-2);
 	}
 	.share-avatar {
 		display: inline-flex;
@@ -860,15 +830,15 @@
 		flex: 0 0 auto;
 		font-size: 9px;
 		font-weight: 600;
-		color: var(--accents-6);
-		background: var(--accents-2);
+		color: var(--fg-2);
+		background: var(--border);
 		border-radius: 50%;
 	}
 	.share-email {
 		flex: 1;
 		min-width: 0;
 		font-size: 12px;
-		color: var(--geist-foreground);
+		color: var(--fg);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -876,7 +846,7 @@
 	.share-role {
 		flex: 0 0 auto;
 		font-size: 10px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.share-remove {
 		display: inline-flex;
@@ -885,25 +855,25 @@
 		width: 20px;
 		height: 20px;
 		flex: 0 0 auto;
-		color: var(--accents-5);
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: var(--radius-xs);
 		cursor: pointer;
 	}
 	.share-remove:hover {
-		color: var(--geist-foreground);
-		background: var(--accents-2);
+		color: var(--fg);
+		background: var(--border);
 	}
 	.share-hint {
 		margin: 0;
 		padding: 2px 10px 8px;
 		font-size: 11px;
 		line-height: 1.5;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.share-hint.expired {
-		color: var(--saffron, var(--accents-6));
+		color: var(--saffron, var(--fg-2));
 	}
 
 	/* ---- public link ---- */
@@ -917,7 +887,7 @@
 		flex: 1;
 		font-size: 11px;
 		line-height: 1.5;
-		color: var(--accents-6);
+		color: var(--fg-2);
 	}
 	.link-off-btn {
 		flex: 0 0 auto;
@@ -925,15 +895,15 @@
 		font: inherit;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
 		cursor: pointer;
 	}
 	.link-off-btn:hover {
-		color: var(--geist-foreground);
-		border-color: var(--accents-3);
+		color: var(--fg);
+		border-color: var(--soft);
 	}
 	.link-enable-row {
 		display: flex;
@@ -943,7 +913,7 @@
 	}
 	.link-enable-label {
 		font-size: 11px;
-		color: var(--accents-5);
+		color: var(--muted);
 	}
 	.expiry-presets {
 		display: flex;
@@ -954,19 +924,19 @@
 		font: inherit;
 		font-size: 11px;
 		font-weight: 500;
-		color: var(--accents-6);
+		color: var(--fg-2);
 		background: transparent;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-pill);
 		cursor: pointer;
 	}
 	.expiry-chip:hover {
-		border-color: var(--accents-3);
+		border-color: var(--soft);
 	}
 	.expiry-chip.active {
-		color: var(--accent, var(--geist-foreground));
-		border-color: color-mix(in srgb, var(--accent, var(--geist-foreground)) 45%, transparent);
-		background: var(--accent-soft, var(--accents-1));
+		color: var(--accent, var(--fg));
+		border-color: color-mix(in srgb, var(--accent, var(--fg)) 45%, transparent);
+		background: var(--accent-soft, var(--bg-2));
 	}
 	.link-on-btn {
 		margin: 0 8px 6px;
@@ -974,9 +944,9 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border: 1px solid var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
 		border-radius: var(--radius-sm);
 		cursor: pointer;
 	}
@@ -995,8 +965,8 @@
 		font: inherit;
 		font-family: var(--font-mono);
 		font-size: 11px;
-		color: var(--accents-7);
-		background: var(--accents-1);
+		color: var(--fg);
+		background: var(--bg-2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
 		outline: none;
@@ -1006,9 +976,9 @@
 		font: inherit;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--geist-background);
-		background: var(--geist-foreground);
-		border: 1px solid var(--geist-foreground);
+		color: var(--bg);
+		background: var(--fg);
+		border: 1px solid var(--fg);
 		border-radius: var(--radius-sm);
 		cursor: pointer;
 	}
