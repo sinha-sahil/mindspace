@@ -45,7 +45,7 @@
 	.blob-2 {
 		width: 540px;
 		height: 540px;
-		background: radial-gradient(circle, var(--mesh-2, #c083d3), transparent 65%);
+		background: radial-gradient(circle, var(--mesh-2, #d8b09a), transparent 65%);
 		top: 30%;
 		right: -160px;
 		animation: drift2 26s ease-in-out infinite;

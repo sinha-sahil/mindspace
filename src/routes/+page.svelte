@@ -386,16 +386,12 @@
 		font: inherit;
 		font-size: 14px;
 		font-weight: 600;
-		color: #fff;
-		background: var(--accent-gradient);
-		background-size: 180% 100%;
-		background-position: 0 50%;
+		color: var(--bg);
+		background: var(--fg);
 		border: none;
 		border-radius: var(--radius);
 		cursor: pointer;
-		box-shadow:
-			0 8px 30px -10px var(--accent-glow),
-			0 1px 0 rgba(255, 255, 255, 0.2) inset;
+		box-shadow: var(--shadow-sm);
 		transition:
 			background-position 700ms ease,
 			transform 120ms var(--ease-spring),
@@ -404,9 +400,7 @@
 	.empty-cta:hover {
 		background-position: 100% 50%;
 		transform: translateY(-1px);
-		box-shadow:
-			0 14px 36px -10px var(--accent-glow),
-			0 1px 0 rgba(255, 255, 255, 0.25) inset;
+		box-shadow: var(--shadow-md);
 	}
 	.empty-cta-glyph {
 		font-size: 17px;

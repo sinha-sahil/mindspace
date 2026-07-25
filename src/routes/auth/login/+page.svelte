@@ -79,9 +79,9 @@
 					<span class="display-italic gradient-text">way you think.</span>
 				</h1>
 				<p class="lede">
-					An infinite canvas, designed for the small group of people who actually have to make
-					things together. Sketch, diagram, dump ideas — pick up exactly where you left off, on any
-					device.
+					Documents, todo boards, spreadsheets, and whiteboards — one quiet workspace for the small
+					group of people who actually have to make things together. Pick up exactly where you left
+					off, on any device.
 				</p>
 
 				<ul class="features">
@@ -506,26 +506,15 @@
 		transform: translateY(0);
 	}
 	.btn.primary {
-		color: #ffffff;
-		background: var(--accent-gradient);
-		background-size: 180% 100%;
-		background-position: 0% 50%;
-		border-color: transparent;
-		box-shadow:
-			0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-			0 8px 24px -8px var(--accent-glow),
-			0 1px 0 rgba(255, 255, 255, 0.2) inset;
+		color: var(--bg);
+		background: var(--fg);
+		border-color: var(--fg);
 		transition:
-			background-position 800ms ease,
 			transform 120ms var(--ease-spring),
-			box-shadow 200ms;
+			opacity 120ms;
 	}
 	.btn.primary:not(:disabled):hover {
-		background-position: 100% 50%;
-		box-shadow:
-			0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-			0 14px 32px -8px var(--accent-glow),
-			0 1px 0 rgba(255, 255, 255, 0.25) inset;
+		opacity: 0.92;
 	}
 	.btn.ghost {
 		color: var(--fg);

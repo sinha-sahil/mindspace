@@ -1294,25 +1294,13 @@
 		transform: translateY(-1px);
 	}
 	.rail-icon-btn.primary {
-		color: #ffffff;
-		background: var(--accent-gradient);
-		background-size: 180% 100%;
-		background-position: 0% 50%;
+		color: var(--bg);
+		background: var(--fg);
 		border: none;
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.2) inset,
-			0 6px 14px -6px var(--accent-glow);
-		transition:
-			transform 140ms var(--ease-spring),
-			background-position 600ms,
-			box-shadow 220ms;
 	}
 	.rail-icon-btn.primary:hover {
-		background-position: 100% 50%;
+		opacity: 0.92;
 		transform: translateY(-1px);
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.25) inset,
-			0 10px 22px -6px var(--accent-glow);
 	}
 
 	.actions.rail {
