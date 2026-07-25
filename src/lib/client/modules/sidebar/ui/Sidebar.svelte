@@ -18,7 +18,7 @@
 	import { whatsNew } from '$lib/client/modules/whats-new';
 	import { toasts } from '$lib/client/modules/toasts';
 	import { analytics } from '$lib/client/modules/analytics';
-	import { initialFor } from '$lib/client/utils/color';
+	import { initialFor, tintForKey } from '$lib/client/utils/color';
 
 	type Props = {
 		userEmail: string;
@@ -579,7 +579,7 @@
 
 <svelte:window onmousedown={closeMenusOnOutside} onkeydown={closeMenusOnEscape} />
 
-<aside class="sidebar" class:collapsed>
+<aside class="sidebar" class:collapsed class:top={collapsed && sidebar.barPosition === 'top'}>
 	<header class="head">
 		{#if !collapsed}
 			<a href="/" class="brand">
@@ -847,6 +847,7 @@
 						class:icon-only={collapsed}
 						class:editing={isEditing}
 						class:dragging={draggingId === project.id}
+						style="--tint: {tintForKey(project.id).hex};"
 					>
 						<button
 							class="row"
@@ -994,6 +995,26 @@
 					>
 						<Icon name="monitor" size={13} />
 						<span>System</span>
+					</button>
+				</div>
+
+				<div class="popover-section-label">Project bar</div>
+				<div class="theme-toggle" role="group" aria-label="Project bar position">
+					<button
+						class="theme-pill"
+						class:active={sidebar.barPosition === 'top'}
+						onclick={() => sidebar.setBarPosition('top')}
+					>
+						<Icon name="layout" size={13} />
+						<span>Top</span>
+					</button>
+					<button
+						class="theme-pill"
+						class:active={sidebar.barPosition === 'left'}
+						onclick={() => sidebar.setBarPosition('left')}
+					>
+						<Icon name="sidebar" size={13} />
+						<span>Left</span>
 					</button>
 				</div>
 
@@ -1176,7 +1197,9 @@
 	.sidebar.collapsed .ws-row,
 	.sidebar.collapsed .actions,
 	.sidebar.collapsed .foot {
-		padding: 10px 12px;
+		padding: 12px;
+		gap: 10px;
+		align-items: center;
 	}
 	.sidebar.collapsed .ws-row {
 		padding-top: 12px;
@@ -1186,6 +1209,7 @@
 		padding: 8px 12px;
 		gap: 10px;
 		align-items: center;
+		scrollbar-width: none;
 	}
 
 	.rail-brand {
@@ -1219,9 +1243,11 @@
 		margin: 0 auto;
 		padding: 0 !important;
 		border-radius: 10px !important;
-		background: var(--surface) !important;
-		border: 1px solid var(--border) !important;
-		color: var(--fg-2);
+		/* Muted identity tint (docs/design.md): hue says WHICH project,
+		   the icon says WHAT kind, the accent ring says CURRENT. */
+		background: color-mix(in srgb, var(--tint, var(--muted)) 13%, var(--surface)) !important;
+		border: 1px solid color-mix(in srgb, var(--tint, var(--muted)) 32%, var(--border)) !important;
+		color: color-mix(in srgb, var(--tint, var(--muted)) 60%, var(--fg));
 		display: inline-flex !important;
 		align-items: center !important;
 		justify-content: center !important;
@@ -1232,8 +1258,8 @@
 	}
 	.rail-tile:hover {
 		transform: translateY(-1px);
-		border-color: var(--border-strong) !important;
-		color: var(--fg);
+		border-color: color-mix(in srgb, var(--tint, var(--muted)) 55%, var(--border)) !important;
+		color: color-mix(in srgb, var(--tint, var(--muted)) 40%, var(--fg));
 	}
 	.rail-kind {
 		display: inline-flex;
@@ -2031,11 +2057,11 @@
 		justify-content: center;
 		width: 14px;
 		height: 14px;
-		color: var(--muted);
+		color: color-mix(in srgb, var(--tint, var(--muted)) 65%, var(--muted));
 		flex-shrink: 0;
 	}
 	.item.active .kind-icon {
-		color: var(--fg);
+		color: var(--accent);
 	}
 	.meta {
 		min-width: 0;
@@ -2158,7 +2184,7 @@
 		border-top: 1px solid var(--border);
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 8px;
 	}
 	.mcp-trigger {
 		display: inline-flex;
@@ -2191,10 +2217,12 @@
 		white-space: nowrap;
 	}
 	.sidebar.collapsed .mcp-trigger {
-		width: auto;
+		width: 36px;
+		height: 36px;
 		justify-content: center;
 		padding: 0;
 		align-self: center;
+		border-radius: var(--radius-md);
 	}
 
 	.user-trigger {
@@ -2391,4 +2419,69 @@
 	}
 
 	/* MCP install modal moved to its own component: McpInstallModal.svelte */
+
+	/* ---------- top tab-bar mode (collapsed strip along the top) ---------- */
+	.sidebar.collapsed.top {
+		flex-direction: row;
+		align-items: center;
+		width: 100%;
+		height: 54px;
+		border-right: none;
+		border-bottom: 1px solid var(--border);
+	}
+	.sidebar.collapsed.top .head {
+		border-bottom: none;
+		padding: 0 4px 0 10px;
+	}
+	.sidebar.collapsed.top .ws-row {
+		border-bottom: none;
+		padding: 0 4px;
+	}
+	.sidebar.collapsed.top .actions.rail {
+		flex-direction: row;
+		padding: 0 4px;
+		gap: 8px;
+	}
+	.sidebar.collapsed.top .list {
+		flex-direction: row;
+		align-items: center;
+		flex: 1;
+		min-width: 0;
+		height: 100%;
+		padding: 0 8px;
+		gap: 8px;
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: none;
+	}
+	.sidebar.collapsed.top .list::-webkit-scrollbar {
+		display: none;
+	}
+	.sidebar.collapsed.top .item {
+		flex-shrink: 0;
+	}
+	.sidebar.collapsed.top .foot {
+		flex-direction: row;
+		align-items: center;
+		border-top: none;
+		border-left: 1px solid var(--border);
+		padding: 0 10px;
+		gap: 8px;
+		height: 100%;
+	}
+	/* Popovers hang below the bar instead of beside a rail. */
+	.sidebar.collapsed.top .popover {
+		top: calc(100% + 8px);
+		bottom: auto;
+		left: 8px;
+		right: auto;
+	}
+	.sidebar.collapsed.top .user-menu {
+		left: auto;
+		right: 8px;
+	}
+	.sidebar.collapsed.top .ws-menu {
+		top: calc(100% + 8px);
+		bottom: auto;
+	}
 </style>

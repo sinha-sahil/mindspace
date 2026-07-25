@@ -1,10 +1,35 @@
 /**
- * Stable per-key colors — used ONLY where hue carries meaning greys cannot:
- * multiplayer presence (peer cursors, live avatars). App chrome — project
- * tiles, workspace/user avatars — is achromatic by design; see docs/design.md.
+ * Stable per-key colors. Two palettes, two jobs (docs/design.md):
  *
- * House rule: no purples, no pinks.
+ * - TINT_PALETTE — muted, desaturated identity tints for project tiles
+ *   (Linear-style): enough hue to tell 25 projects apart at a glance,
+ *   quiet enough to sit inside an achromatic shell. Consumed via
+ *   `--tint` + color-mix so one mid-lightness value works in both modes.
+ * - CURSOR_PALETTE — saturated presence colors for multiplayer cursors,
+ *   where vividness IS the point.
+ *
+ * House rule: no purples, no pinks — in either palette.
  */
+
+export const TINT_PALETTE = [
+	{ name: 'stone', hex: '#8f8578' },
+	{ name: 'rust', hex: '#a26a4f' },
+	{ name: 'amber', hex: '#a8862e' },
+	{ name: 'olive', hex: '#7f8f45' },
+	{ name: 'sage', hex: '#4f8f68' },
+	{ name: 'teal', hex: '#3f8f88' },
+	{ name: 'sky', hex: '#5688b0' },
+	{ name: 'slate', hex: '#74829c' }
+];
+
+/** Muted identity tint for a stable key (project id). */
+export function tintForKey(key: string): { name: string; hex: string } {
+	let hash = 0;
+	for (let i = 0; i < key.length; i++) {
+		hash = (hash * 31 + key.charCodeAt(i)) & 0xffffffff;
+	}
+	return TINT_PALETTE[Math.abs(hash) % TINT_PALETTE.length];
+}
 
 export const CURSOR_PALETTE = [
 	{ name: 'amber', from: '#fbbf24', to: '#d97706' },

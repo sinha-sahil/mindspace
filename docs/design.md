@@ -15,8 +15,8 @@ file is the contract; `scripts/design-lint.mjs` ratchets drift back out.
 - **Status is semantic, not decorative**: `--sage` = success, `--saffron` =
   in-flight, `--rose` = error. A status color always encodes state.
 - **No purples, no pinks. Ever.** This includes user-facing default palettes
-  (sheet swatches, cursor colors) and third-party accents (Excalidraw is
-  remapped in `Whiteboard.svelte`).
+  (sheet swatches, cursor colors, identity tints) and third-party accents
+  (Excalidraw is remapped in `Whiteboard.svelte`).
 - **Text contrast floor is AA**: body text uses `--fg`/`--fg-2`/`--muted`.
   `--muted-2` is decorative-only (strokes, glyphs) — it fails 4.5:1.
 
@@ -51,10 +51,14 @@ file is the contract; `scripts/design-lint.mjs` ratchets drift back out.
   0.08em / uppercase / `--muted`. One dialect.
 - **Kind icons**: `KIND_ICONS` in `modules/projects` is the only
   project-kind→icon mapping — sidebar, palette, and menus all read it.
-- **Identity tiles** are achromatic: kind icon in a neutral tile; accent ring
-  marks the active one; workspace tile is inverted; user avatar is a neutral
-  circle. Hue-per-key survives only for multiplayer cursors
-  (`utils/color.ts`, no purples).
+- **Identity tiles** use muted per-project tints (`TINT_PALETTE`,
+  `utils/color.ts`): hue says WHICH project, the kind icon says WHAT it is,
+  the accent ring says CURRENT. Tints are desaturated mid-tones applied via
+  `--tint` + `color-mix` — never gradients, never saturated fills. The
+  workspace tile is inverted neutral; the user avatar is a neutral circle.
+  Saturated hues survive only for multiplayer cursors (`CURSOR_PALETTE`).
+- **Project bar** is positionable: top tab-bar (default) or left rail —
+  user choice in the account menu, `sidebar.barPosition`.
 - **Save state**: the shared `SaveState` component only — transient
   "Saving…"/"Saved" flash, nothing at rest. No permanent status dots.
 - **Toasts**: the in-house `Toaster` card — editorial solid fills, close

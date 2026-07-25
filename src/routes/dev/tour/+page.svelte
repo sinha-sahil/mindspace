@@ -10,7 +10,7 @@
 	import { dev, browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/client/components/Icon.svelte';
-	import { Sidebar } from '$lib/client/modules/sidebar';
+	import { Sidebar, sidebar } from '$lib/client/modules/sidebar';
 	import { projects } from '$lib/client/modules/projects';
 	import { workspaces } from '$lib/client/modules/workspaces';
 	import { CommandPalette } from '$lib/client/modules/command-palette';
@@ -285,7 +285,7 @@ Meridian is our **offline-first** sync engine. This brief covers the *why*, the 
 			<span>{isDark ? 'Light' : 'Dark'}</span>
 		</button>
 	</header>
-	<div class="app">
+	<div class="app" class:topbar={sidebar.topBar}>
 		<Sidebar userEmail="dev@mindspace.local" userId="u-dev" isAdmin={false} />
 		<main class="pane">
 			{#if active?.kind === 'todo'}
@@ -380,6 +380,9 @@ Meridian is our **offline-first** sync engine. This brief covers the *why*, the 
 		flex: 1;
 		min-height: 0;
 		display: flex;
+	}
+	.app.topbar {
+		flex-direction: column;
 	}
 	.pane {
 		flex: 1;

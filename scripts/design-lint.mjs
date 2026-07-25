@@ -79,7 +79,8 @@ const purpleHits = [];
 for (const file of files) {
 	const rel = relative(process.cwd(), file);
 	const text = readFileSync(file, 'utf8');
-	const isTheme = rel.endsWith('theme.css');
+	// Sanctioned color sources — tokens and the curated identity/cursor palettes.
+	const isTheme = rel.endsWith('theme.css') || rel.endsWith('utils/color.ts');
 
 	for (const m of text.matchAll(/#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b/g)) {
 		if (!isTheme) {

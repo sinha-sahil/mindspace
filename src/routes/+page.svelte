@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { replaceState } from '$app/navigation';
-	import { Sidebar } from '$lib/client/modules/sidebar';
+	import { Sidebar, sidebar } from '$lib/client/modules/sidebar';
 	import { ProjectPane } from '$lib/client/modules/whiteboard';
 	import { projects } from '$lib/client/modules/projects';
 	import { workspaces } from '$lib/client/modules/workspaces';
@@ -114,7 +114,7 @@
 	}
 </script>
 
-<div class="app" {@attach mirrorUrl}>
+<div class="app" class:topbar={sidebar.topBar} {@attach mirrorUrl}>
 	<Sidebar userEmail={user?.email ?? ''} userId={user?.id ?? ''} {isAdmin} />
 
 	<main class="main">
@@ -257,6 +257,9 @@
 		height: 100vh;
 		min-height: 0;
 		overflow: hidden;
+	}
+	.app.topbar {
+		flex-direction: column;
 	}
 
 	.main {
