@@ -1224,6 +1224,8 @@
 	   invisible across code. */
 	.ed-editor :global(.livemd-codeline) {
 		background: color-mix(in srgb, var(--fg) 4%, transparent);
+		font-family: var(--font-mono);
+		font-size: 0.88em;
 	}
 	.ed-editor :global(.livemd-fence) {
 		color: var(--muted);
@@ -1233,6 +1235,8 @@
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		padding: 1px 4px;
+		font-family: var(--font-mono);
+		font-size: 0.88em;
 	}
 	.ed-editor :global(.livemd-link) {
 		color: var(--accent);

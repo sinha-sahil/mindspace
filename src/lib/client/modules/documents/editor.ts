@@ -492,14 +492,16 @@ export function formatStateAt(state: EditorState): FormatState {
 const editorTheme = EditorView.theme({
 	'&': {
 		height: '100%',
-		fontSize: '14.5px',
+		fontSize: '15.5px',
 		backgroundColor: 'transparent',
 		color: 'var(--fg)'
 	},
 	'&.cm-focused': { outline: 'none' },
+	// Prose reads in the app sans (same face, size and leading as the
+	// rendered .md-body) — mono is reserved for code constructs below.
 	'.cm-scroller': {
-		fontFamily: 'var(--font-mono)',
-		lineHeight: '1.85',
+		fontFamily: 'var(--font-sans)',
+		lineHeight: '1.75',
 		overflowX: 'hidden'
 	},
 	'.cm-content': {
@@ -576,6 +578,8 @@ const mdHighlight = HighlightStyle.define([
 	{ tag: tags.meta, color: 'var(--muted-2)' },
 	{ tag: tags.atom, color: 'var(--accent)' },
 	{ tag: tags.contentSeparator, color: 'var(--muted-2)', fontWeight: '700' },
+	// Code constructs are the only mono voice in the document (docs/design.md).
+	{ tag: tags.monospace, fontFamily: 'var(--font-mono)', fontSize: '0.88em' },
 	// Nested fenced-code tokens (via codeLanguages) reuse the reading palette.
 	{ tag: tags.keyword, color: 'var(--code-kw)' },
 	{ tag: tags.string, color: 'var(--code-str)' },

@@ -49,6 +49,9 @@ file is the contract; `scripts/design-lint.mjs` ratchets drift back out.
 
 - **Section labels** (DOCUMENTS, OUTLINE, THREADS…): mono 10.5px / 600 /
   0.08em / uppercase / `--muted`. One dialect.
+- **Document prose reads in the app sans** (Geist, 15.5px/1.75 — identical
+  in editor and reader). Mono is code-only: inline chips, fenced blocks,
+  kbd. A document must never read like a terminal.
 - **Kind icons**: `KIND_ICONS` in `modules/projects` is the only
   project-kind→icon mapping — sidebar, palette, and menus all read it.
 - **Identity tiles** use muted per-project tints (`TINT_PALETTE`,
