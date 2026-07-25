@@ -1219,14 +1219,17 @@
 		border-left: 2px solid var(--soft);
 		padding-left: 14px !important;
 	}
+	/* Code tints are TRANSLUCENT on purpose: line/mark backgrounds paint above
+	   CodeMirror's selection layer, so an opaque fill would make selections
+	   invisible across code. */
 	.ed-editor :global(.livemd-codeline) {
-		background: var(--bg-2);
+		background: color-mix(in srgb, var(--fg) 4%, transparent);
 	}
 	.ed-editor :global(.livemd-fence) {
 		color: var(--muted-2);
 	}
 	.ed-editor :global(.livemd-code) {
-		background: var(--bg-2);
+		background: color-mix(in srgb, var(--fg) 6%, transparent);
 		border: 1px solid var(--border);
 		border-radius: 5px;
 		padding: 1px 4px;

@@ -515,8 +515,17 @@ const editorTheme = EditorView.theme({
 	},
 	'&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground':
 		{
-			background: 'color-mix(in srgb, var(--accent) 16%, transparent) !important'
+			background: 'color-mix(in srgb, var(--accent) 30%, transparent) !important'
 		},
+	// drawSelection() suppresses the native selection BACKGROUND inside lines
+	// but not its color — the app-wide `::selection { color: var(--bg) }` was
+	// leaking in and painting selected editor text background-dark (unreadable
+	// in dark mode). Explicit var(--fg), not `inherit`: highlight pseudos
+	// resolve `inherit` against the PARENT's ::selection (the global rule),
+	// not the element's own color.
+	'.cm-line::selection, .cm-line ::selection': {
+		color: 'var(--fg) !important'
+	},
 	'.cm-selectionMatch': {
 		background: 'color-mix(in srgb, var(--fg) 9%, transparent)',
 		borderRadius: '2px'
