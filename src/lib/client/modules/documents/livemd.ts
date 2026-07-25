@@ -7,9 +7,13 @@
  * markdown for editing. (Obsidian itself is closed-source; this recreates
  * the interaction natively on CodeMirror 6 with decorations.)
  *
- * Reveal rule: a line is "revealed" when any selection range touches it.
- * Multi-line blocks (fenced code, mermaid) reveal when the selection
- * intersects the block anywhere.
+ * Reveal rule (sticky): placing the caret in a line — or clicking into a
+ * table/mermaid block — reveals that region's raw markdown, and it STAYS
+ * revealed while the selection remains inside it, so selecting text within
+ * the region you're editing never flips it back to preview. Drag gestures
+ * that start outside a revealed region never reveal anything: highlighting
+ * across rendered prose, tables, or diagrams keeps the layout perfectly
+ * still (the Google-Docs select-to-comment feel).
  */
 import {
 	EditorView,
@@ -19,7 +23,13 @@ import {
 	type DecorationSet,
 	type ViewUpdate
 } from '@codemirror/view';
-import { StateField, type EditorState, type Extension, type Range } from '@codemirror/state';
+import {
+	StateField,
+	StateEffect,
+	type EditorState,
+	type Extension,
+	type Range
+} from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNode } from '@lezer/common';
 import {
@@ -273,28 +283,173 @@ const codeBlockLine = Decoration.line({ class: 'livemd-codeline' });
 const fenceLine = Decoration.line({ class: 'livemd-fence' });
 const taskDoneLine = Decoration.line({ class: 'livemd-task-done' });
 
-/** Lines whose raw markdown is revealed for editing.
- *
- *  Only EMPTY selection ranges (carets) reveal. A non-empty selection is a
- *  highlighting gesture — comment, copy, format — and revealing marks while
- *  the user drags makes the text shift under the pointer, which is what made
- *  select-to-comment feel broken. The layout stays perfectly still during
- *  selection; place the caret inside something to edit its source. */
+/* --------------------------------------------------------------------------
+   Sticky reveal state
+
+   The regions whose raw markdown is currently shown for editing. Two forces
+   pull against each other here:
+
+   - Selecting text to comment/copy must never shift the layout — so a drag
+     that starts in preview reveals nothing (the earlier caret-only rule).
+   - Editing must not flicker — once a caret has revealed a line or a table,
+     selecting text INSIDE that region has to keep it revealed, otherwise
+     every drag inside a table snaps it back to a widget mid-gesture.
+
+   The resolution: reveals are sticky. A caret adds its line (or its whole
+   table/mermaid block) to the revealed set; a non-empty selection keeps
+   whatever revealed regions it overlaps and adds nothing new. Pointer
+   gestures defer their caret's reveal to mouseup (revealRecompute), so
+   mousedown at the start of a drag doesn't flash raw markdown.
+   -------------------------------------------------------------------------- */
+
+type Span = { from: number; to: number };
+
+/** Dispatched on mouseup so a plain click applies its reveal once the
+ *  gesture is over (mid-drag transactions never add reveals). */
+const revealRecompute = StateEffect.define<null>();
+
+function blockAncestor(state: EditorState, pos: number, side: -1 | 1): SyntaxNode | null {
+	let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, side);
+	while (node) {
+		if (node.name === 'Table' || node.name === 'FencedCode') {
+			return node;
+		}
+		node = node.parent;
+	}
+	return null;
+}
+
+/** The region a caret at `pos` reveals: the whole table/fence it sits in,
+ *  or just its line. Whole-block units are what make clicking between two
+ *  rows of a revealed table seamless. */
+function revealUnitAt(state: EditorState, pos: number): Span {
+	const block = blockAncestor(state, pos, 1) ?? blockAncestor(state, pos, -1);
+	if (block) {
+		return { from: state.doc.lineAt(block.from).from, to: state.doc.lineAt(block.to).to };
+	}
+	const line = state.doc.lineAt(pos);
+	return { from: line.from, to: line.to };
+}
+
+function mergeSpans(spans: Span[]): Span[] {
+	if (spans.length < 2) {
+		return spans;
+	}
+	const sorted = [...spans].sort((a, b) => a.from - b.from);
+	const out: Span[] = [{ ...sorted[0] }];
+	for (const s of sorted.slice(1)) {
+		const last = out[out.length - 1];
+		if (s.from <= last.to) {
+			last.to = Math.max(last.to, s.to);
+		} else {
+			out.push({ ...s });
+		}
+	}
+	return out;
+}
+
+function sameSpans(a: readonly Span[], b: readonly Span[]): boolean {
+	return a.length === b.length && a.every((s, i) => s.from === b[i].from && s.to === b[i].to);
+}
+
+function computeReveal(state: EditorState, prev: readonly Span[], allowAdd: boolean): Span[] {
+	const next: Span[] = [];
+	for (const range of state.selection.ranges) {
+		if (range.empty) {
+			if (allowAdd) {
+				next.push(revealUnitAt(state, range.head));
+			} else {
+				for (const s of prev) {
+					if (range.head >= s.from && range.head <= s.to) {
+						next.push({ ...s });
+					}
+				}
+			}
+		} else {
+			for (const s of prev) {
+				if (s.to >= range.from && s.from <= range.to) {
+					next.push({ ...s });
+				}
+			}
+		}
+	}
+	return mergeSpans(next);
+}
+
+const revealField = StateField.define<readonly Span[]>({
+	create(state) {
+		return computeReveal(state, [], true);
+	},
+	update(spans, tr) {
+		let mapped: readonly Span[] = spans;
+		if (tr.docChanged) {
+			mapped = spans.map((s) => ({
+				from: tr.changes.mapPos(s.from),
+				to: tr.changes.mapPos(s.to, 1)
+			}));
+		}
+		const recompute = tr.effects.some((e) => e.is(revealRecompute));
+		if (!tr.selection && !recompute) {
+			return sameSpans(mapped, spans) ? spans : mapped;
+		}
+		const allowAdd = recompute || !tr.isUserEvent('select.pointer');
+		const next = computeReveal(tr.state, mapped, allowAdd);
+		return sameSpans(next, spans) ? spans : next;
+	}
+});
+
+/** Window-level mouseup watcher: pointer gestures suppress reveals while the
+ *  button is down; this applies the deferred reveal when it comes back up
+ *  (even if the release happens outside the editor). */
+const pointerRelease = ViewPlugin.fromClass(
+	class {
+		active = false;
+		alive = true;
+		constructor(readonly view: EditorView) {
+			window.addEventListener('mouseup', this.up);
+		}
+		up = (): void => {
+			if (!this.active) {
+				return;
+			}
+			this.active = false;
+			setTimeout(() => {
+				if (this.alive) {
+					this.view.dispatch({ effects: revealRecompute.of(null) });
+				}
+			}, 0);
+		};
+		destroy(): void {
+			this.alive = false;
+			window.removeEventListener('mouseup', this.up);
+		}
+	},
+	{
+		eventHandlers: {
+			mousedown(): boolean {
+				this.active = true;
+				return false;
+			}
+		}
+	}
+);
+
 function revealedLines(state: EditorState): Set<number> {
 	const lines = new Set<number>();
-	for (const range of state.selection.ranges) {
-		if (!range.empty) {
-			continue;
+	const max = state.doc.length;
+	for (const s of state.field(revealField)) {
+		const first = state.doc.lineAt(Math.min(s.from, max)).number;
+		const last = state.doc.lineAt(Math.min(s.to, max)).number;
+		for (let n = first; n <= last; n++) {
+			lines.add(n);
 		}
-		lines.add(state.doc.lineAt(range.head).number);
 	}
 	return lines;
 }
 
-/** True when a CARET sits inside [from, to] — same stability rule as above:
- *  drag-selections never flip a block widget back to source. */
-function selectionIntersects(state: EditorState, from: number, to: number): boolean {
-	return state.selection.ranges.some((r) => r.empty && r.head >= from && r.head <= to);
+/** True when a revealed region overlaps [from, to]. */
+function revealOverlaps(state: EditorState, from: number, to: number): boolean {
+	return state.field(revealField).some((s) => s.to >= from && s.from <= to);
 }
 
 function fenceLang(state: EditorState, node: { from: number; to: number }): string {
@@ -303,15 +458,14 @@ function fenceLang(state: EditorState, node: { from: number; to: number }): stri
 }
 
 function isLiveMermaid(state: EditorState, node: { from: number; to: number }): boolean {
-	return fenceLang(state, node) === 'mermaid' && !selectionIntersects(state, node.from, node.to);
+	return fenceLang(state, node) === 'mermaid' && !revealOverlaps(state, node.from, node.to);
 }
 
-/** A table renders as a widget only when the selection is outside it AND it
- *  starts at a line start (indented/quoted tables keep their raw source). */
+/** A table renders as a widget only when no revealed region touches it AND
+ *  it starts at a line start (indented/quoted tables keep their raw source). */
 function isLiveTable(state: EditorState, node: { from: number; to: number }): boolean {
 	return (
-		!selectionIntersects(state, node.from, node.to) &&
-		state.doc.lineAt(node.from).from === node.from
+		!revealOverlaps(state, node.from, node.to) && state.doc.lineAt(node.from).from === node.from
 	);
 }
 
@@ -359,11 +513,14 @@ const blockWidgetField = StateField.define<{ decos: DecorationSet; treeLen: numb
 		return { decos: buildBlockWidgets(state), treeLen: syntaxTree(state).length };
 	},
 	update(value, tr) {
-		// Also rebuild when the syntax tree has grown — on large documents the
-		// parser reaches distant tables/diagrams after idle parsing, without
-		// any doc or selection change to piggyback on.
+		// Rebuild when the doc or the revealed set changes, or when the syntax
+		// tree has grown — on large documents the parser reaches distant
+		// tables/diagrams after idle parsing, without any other change to
+		// piggyback on. Plain selection changes don't matter: reveal state is
+		// the only selection-derived input to the widgets.
 		const treeLen = syntaxTree(tr.state).length;
-		if (tr.docChanged || tr.selection || treeLen !== value.treeLen) {
+		const revealChanged = tr.state.field(revealField) !== tr.startState.field(revealField);
+		if (tr.docChanged || revealChanged || treeLen !== value.treeLen) {
 			return { decos: buildBlockWidgets(tr.state), treeLen };
 		}
 		return value;
@@ -564,7 +721,8 @@ export function livePreview(): Extension {
 				this.decorations = buildDecorations(view);
 			}
 			update(u: ViewUpdate) {
-				if (u.docChanged || u.selectionSet || u.viewportChanged) {
+				const revealChanged = u.state.field(revealField) !== u.startState.field(revealField);
+				if (u.docChanged || u.viewportChanged || revealChanged) {
 					this.decorations = buildDecorations(u.view);
 				}
 			}
@@ -605,5 +763,5 @@ export function livePreview(): Extension {
 			}
 		}
 	);
-	return [blockWidgetField, plugin];
+	return [revealField, pointerRelease, blockWidgetField, plugin];
 }
