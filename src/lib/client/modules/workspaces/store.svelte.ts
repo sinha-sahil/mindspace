@@ -68,6 +68,8 @@ function createStore() {
 		errorListener = cb;
 	}
 
+	let initialWorkspaceId: string | null = null;
+
 	async function init(supabase: AppSupabaseClient, userId: string) {
 		if (client === supabase && currentUserId === userId) {
 			return;
@@ -96,7 +98,13 @@ function createStore() {
 
 		state.items = items;
 
-		if (browser) {
+		// Restore priority: deep-link preference > localStorage > first.
+		const preferred = initialWorkspaceId;
+		initialWorkspaceId = null;
+		if (preferred && items.some((w) => w.id === preferred)) {
+			state.activeId = preferred;
+			persistActiveId();
+		} else if (browser) {
 			const stored = localStorage.getItem(ACTIVE_KEY_PREFIX + userId);
 			state.activeId =
 				stored && items.some((w) => w.id === stored) ? stored : (items[0]?.id ?? null);
@@ -106,6 +114,13 @@ function createStore() {
 
 		state.loading = false;
 		fireActiveChange();
+	}
+
+	/** One-shot: a deep link names a project in a specific workspace — that
+	 *  workspace must win over the locally-stored last-active one. Consumed
+	 *  by the next init(). */
+	function setInitialWorkspace(id: string | null) {
+		initialWorkspaceId = id;
 	}
 
 	function persistActiveId() {
@@ -239,6 +254,7 @@ function createStore() {
 		init,
 		reset,
 		select,
+		setInitialWorkspace,
 		add,
 		rename,
 		remove,

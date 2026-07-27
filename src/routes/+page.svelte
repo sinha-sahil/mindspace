@@ -36,25 +36,48 @@
 		const params = new URL(window.location.href).searchParams;
 		const routeProject = params.get('p');
 		const routeDoc = params.get('d');
-		if (routeProject) {
-			projects.setInitialProject(routeProject);
-			if (routeDoc) {
-				documents.setInitialDoc(routeProject, routeDoc);
-			}
-		}
 
-		workspaces.onActiveChange((sb, wsId) => {
-			projects.loadFor(sb, wsId);
-			// Don't close split view on a workspace switch — the right pane runs
-			// its own ProjectSession and intentionally holds any workspace's
-			// project. The left pane follows the sidebar's active project.
-		});
-		if (user) {
-			workspaces.init(supabase, user.id);
-		}
-		// Announce any features shipped since this user's last visit.
-		whatsNew.check();
-		bootstrapped = true;
+		const boot = async () => {
+			if (routeProject) {
+				projects.setInitialProject(routeProject);
+				if (routeDoc) {
+					documents.setInitialDoc(routeProject, routeDoc);
+				}
+				// A shared link can point into ANY workspace the user belongs
+				// to — resolve which one owns the project so init opens it.
+				// Without this, the locally-stored last-active workspace loads,
+				// the preference silently misses, and the link opens whatever
+				// the user last worked on.
+				if (user) {
+					const { data } = await supabase
+						.from('projects')
+						.select('workspace_id')
+						.eq('id', routeProject)
+						.maybeSingle();
+					if (data?.workspace_id) {
+						workspaces.setInitialWorkspace(data.workspace_id);
+					} else {
+						toasts.error("Can't open that link", {
+							description: 'The project may have been deleted, or you may not have access to it.'
+						});
+					}
+				}
+			}
+
+			workspaces.onActiveChange((sb, wsId) => {
+				projects.loadFor(sb, wsId);
+				// Don't close split view on a workspace switch — the right pane runs
+				// its own ProjectSession and intentionally holds any workspace's
+				// project. The left pane follows the sidebar's active project.
+			});
+			if (user) {
+				workspaces.init(supabase, user.id);
+			}
+			// Announce any features shipped since this user's last visit.
+			whatsNew.check();
+			bootstrapped = true;
+		};
+		void boot();
 	});
 
 	// Mirror the active project (and active document, for doc projects) into the

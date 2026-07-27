@@ -22,6 +22,15 @@
 		passkeySupported = isSupported();
 	});
 
+	/** Same-origin relative paths only — never an open redirect. */
+	function safeNext(): string {
+		const raw = new URL(window.location.href).searchParams.get('next');
+		if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
+			return '/';
+		}
+		return raw;
+	}
+
 	async function sendMagicLink(e: SubmitEvent) {
 		e.preventDefault();
 		if (!email.trim()) {
@@ -31,7 +40,9 @@
 		errorMsg = '';
 		const { error } = await supabase.auth.signInWithOtp({
 			email: email.trim(),
-			options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+			options: {
+				emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext())}`
+			}
 		});
 		if (error) {
 			mode = 'error';
@@ -49,7 +60,7 @@
 			await loginWithPasskey(trimmed.length > 0 ? trimmed : null);
 			await invalidate('supabase:auth');
 			analytics.track('user_signed_in', { method: 'passkey' });
-			await goto('/');
+			await goto(safeNext());
 		} catch (err) {
 			mode = 'error';
 			errorMsg = err instanceof Error ? err.message : 'Passkey sign-in failed';

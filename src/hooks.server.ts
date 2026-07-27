@@ -2,6 +2,14 @@ import { createServerClient } from '@supabase/ssr';
 import { env } from '$env/dynamic/public';
 import { dev } from '$app/environment';
 import { redirect, type Handle } from '@sveltejs/kit';
+
+/** Same-origin relative paths only — anything else falls back to '/'. */
+function safeNext(raw: string | null): string {
+	if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
+		return '/';
+	}
+	return raw;
+}
 import { sequence } from '@sveltejs/kit/hooks';
 import type { Database } from '$lib/database.types';
 import { getSupabaseAdmin } from '$lib/server/supabase-admin';
@@ -164,7 +172,13 @@ const authGuard: Handle = async ({ event, resolve }) => {
 			return new Response('Authentication required', { status: 401 });
 		}
 		if (!isAuthRoute && !isPublicRoute) {
-			throw redirect(303, '/auth/login');
+			// Carry the requested URL through the bounce so shared deep links
+			// (/?p=…&d=…) survive authentication.
+			const next = path + event.url.search;
+			throw redirect(
+				303,
+				next === '/' ? '/auth/login' : `/auth/login?next=${encodeURIComponent(next)}`
+			);
 		}
 		return resolve(event);
 	}
@@ -190,7 +204,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	event.locals.isAdmin = !!membership.is_admin;
 
 	if (path === '/auth/login') {
-		throw redirect(303, '/');
+		throw redirect(303, safeNext(event.url.searchParams.get('next')));
 	}
 
 	if (path.startsWith('/admin') && !event.locals.isAdmin) {
